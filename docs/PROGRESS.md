@@ -19,7 +19,7 @@ local.
 | 5 Android host | 20 checks pass on API 24, 31, 34 and 36-16k (2026-11-02 run). 29 and 36 failed on a test bug and an emulator hang; the fixed rerun was cut off by the OOM kill and is pending |
 | 5 samples | Compose, native GLES, WebView: built-in 1.0 → 2.0 live → committed on API 36, with the version label checked on screen (2026-11-03) |
 | 6 Gradle plugin + split | done |
-| 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back. Live `.so` swap in Xonotic not done |
+| 7 Test beds | STK: built-in → next-start update → broken release rolled back, game running. Xonotic: the same AndySU steps pass, but the engine never started (no game data on the emulator); being fixed. Live `.so` swap in Xonotic: designed, not built |
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
 | 9 Publishing | verified locally against a local site; live GitHub run: see step 9 |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
@@ -234,11 +234,21 @@ over `adb reverse`):
 
 | | Xonotic Touch 1.2.104 → 1.2.105 | SuperTuxKart Touch 1.0.29 → 1.0.31 |
 |---|---|---|
-| A runs from the built-in payload (engine .so, Java/SDL code, data) | ok | ok |
+| A runs from the built-in payload (engine .so, Java/SDL code, data) | AndySU side only (see below) | ok |
 | B downloaded, applied on next start, committed; installed APK still versionName A | ok | ok |
 | broken B (truncated dex) fails on start → crash handler rolls back → one relaunch → B | ok | ok |
 
-Evidence: `docs/evidence/stk-{1-builtin,2-updated,3-rolled-back}*.png` and `testbeds.json`. The
+Evidence: `docs/evidence/stk-{1-builtin,2-updated,3-rolled-back}*.png` and `testbeds.json`.
+
+**Correction (2026-11-03): the Xonotic run does not show that the game ran.** A worker's code
+review of the test bed (see `testbeds/patches/xonotic-touch/LIVE_SWAP.md`) pointed out that the
+test waits only for AndySU's own events. Xonotic's `BootActivity` blocks on its 1.16 GB data
+download, and the test emulator has no internet. The saved Xonotic event log holds AndySU events
+only (`booted`, `committed`, `relaunch`), nothing from the engine. "Committed" came from the
+auto-healthy timer while `BootActivity` was on screen. What that run does show: AndySU loaded and
+updated Xonotic's real code and native libraries in transparent mode, and rolled back the broken
+release. It does not show the engine starting. STK did run: its screenshots show the game. The
+test bed is being changed to seed the game data and to assert engine output. The
 Xonotic screenshots came out black (cause not investigated), so they were deleted. The Xonotic
 evidence is its event log, which is not committed; rerunning the test regenerates it.
 
