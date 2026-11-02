@@ -281,6 +281,26 @@ with three rollback layers. Two feasibility probes ran:
   locally built A/B APKs (`--apk-a/--apk-b`) passes on API 34: the loader runs the engine from
   the factory slot, from `slots/1.2.9002` after the update, and again after the rollback. No
   swapping yet: that is milestone 2.
+- **Milestone 2a: the in-process engine swap works** (the worker implemented it; the lead
+  reviewed the patch and loader, rebuilt from the clean clone and re-ran the probe). Patch 0003
+  changes the engine, gated behind `ANDYSU_SWAP`. On a swap request it saves a small JSON state,
+  runs `Host_Shutdown` without `SDL_Quit` or `exit()`, frees the file system and memory pools,
+  and returns to the loader. The loader pre-flights the next `libmain.<hash>.so` (`dlopen`, ABI
+  and `java_abi` check) before touching the old engine, never `dlclose`s, and on a failed init
+  (`Sys_Error` jumps back to the loader) reloads the previous build with
+  `ANDROID_DLEXT_FORCE_LOAD`. `testbed_tests.py --live-swap-probe` (API 36), triggered by a
+  clearly marked TEST HOOK file, no AndySU host involved yet:
+  - A→B→A→B in the **same process**; the state is carried (`swap_count` 1, 2, 3; with
+    `--map afterslime` the map reloads);
+  - after each swap the engine initialises, sets up GL again and renders;
+  - a 4th swap with a forced init failure rolls back in-process to the previous build;
+  - teardown takes 86-290 ms; a swap takes about 17 s under SwiftShader, almost all of it engine init.
+  - **Known leaks:** about +2 fds per swap (`anon_inode`), about +10 MB RSS per swap (+20 MB with a
+    map loaded), and a rolled-back start leaves its copy mapped. They are bounded, but the host
+    should prefer a cold start after a few swaps. Evidence: `docs/evidence/live-swap-*`.
+  - Next, **2b**: drive it from AndySU instead of the test hook. That needs a `LiveSwapHandler`
+    on the Host API, live apply in transparent mode with the slot and asset switch, `pack`
+    renaming only `libmain`, `markHealthy` wiring, and the watchdog as rollback layer 3.
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |

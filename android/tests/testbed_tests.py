@@ -363,6 +363,187 @@ def probe_vid_restart(args):
             d.stop()
 
 
+# ----------------------------------------------------------------------------- live swap probe
+# Milestone 2a (LIVE_SWAP.md): the in-process engine swap itself, with no AndySU host involved. A locally
+# built APK (testbeds/patches/xonotic-touch/build.sh, patches 0002+0003) is installed as a plain app; the
+# loader's TEST HOOK (a file <external files>/andysu-swap-to naming an engine .so) triggers the swaps.
+
+
+def events_since(el, since):
+    out = []
+    for i in range(since, len(el.lines)):
+        m = re.search(r"AndySU-Event\(\s*\d+\): (\{.*\})", el.lines[i])
+        if m:
+            try:
+                out.append((i, json.loads(m.group(1))))
+            except json.JSONDecodeError:
+                pass
+    return out
+
+
+def wait_event(el, since, name, what=None, timeout=240, **match):
+    """First AndySU-Event `name` (fields equal to `match`) after line index `since`. -> (index, event)"""
+    end = time.time() + timeout * dt.SLOW
+    while time.time() < end:
+        for i, e in events_since(el, since):
+            if e.get("event") == name and all(e.get(k) == v for k, v in match.items()):
+                return i, e
+        time.sleep(0.5)
+    raise dt.Fail(f"timed out waiting for event {name} {match} {what or ''}\nlast events:\n" +
+                  "\n".join(json.dumps(e)[:300] for _, e in events_since(el, 0)[-14:]))
+
+
+def extract_lib(apk, dest, abi="x86_64"):
+    import zipfile
+    with zipfile.ZipFile(apk) as z, open(dest, "wb") as f:
+        f.write(z.read(f"lib/{abi}/libmain.so"))
+    return dest
+
+
+FDS_BOUND, THREADS_BOUND, RSS_BOUND_KB = 12, 3, 120 * 1024  # growth allowed over the three swaps
+
+
+def live_swap_probe(args):
+    if not (args.apk_a and args.apk_b):
+        raise SystemExit("--live-swap-probe needs --apk-a and --apk-b (APKs built by testbeds/patches/xonotic-touch/build.sh)")
+    spec = BEDS["xonotic"]
+    pkg = spec["pkg"]
+    work = tempfile.mkdtemp(prefix="liveswap-")
+    libs = {"A": extract_lib(os.path.abspath(args.apk_a), os.path.join(work, "A.so")),
+            "B": extract_lib(os.path.abspath(args.apk_b), os.path.join(work, "B.so"))}
+    d = dt.Device(args.api, 3, existing=args.device)
+    res = {"api": args.api, "swaps": []}
+    el = None
+    try:
+        d.start()
+        d.adb("uninstall", pkg, check=False)
+        d.sh("svc wifi disable", check=False)
+        d.sh("svc data disable", check=False)
+        d.install(os.path.abspath(args.apk_a))
+        base = seed_xonotic(d, pkg, "+exec probe.cfg" if args.map else "")
+        if args.map:
+            cfg = os.path.join(work, "probe.cfg")
+            with open(cfg, "w") as f:
+                f.write(f'defer 15 "map {args.map}"\n')
+            d.adb("push", cfg, f"{base}/data/probe.cfg")
+        el = EngineLog(d)
+        d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
+        _, start0 = wait_event(el, 0, "engine_start", "first engine", timeout=300, swapped=0)
+        pid = start0["pid"]
+        a_id, b_id = None, None
+        _, ent = wait_event(el, 0, "engine_entry", "first engine entry", swapped=0)
+        a_id = ent["build_id"]
+        el.wait(r"========Initialized=========", "A init banner", 0, timeout=300)
+        el.wait(r"GL_RENDERER: ", "A GL renderer", 0)
+        wait_event(el, 0, "engine_frames", "A rendering", timeout=300)
+        if args.map:
+            el.wait(r"(?i)\b" + re.escape(args.map) + r"\b", f"local game on map {args.map}", 0, timeout=300)
+            time.sleep(25)
+        time.sleep(12)
+        base_stat = [e for _, e in events_since(el, 0) if e.get("event") == "proc_stats"][-1]
+        res["steady_before"] = {k: base_stat[k] for k in ("fds", "threads", "rss_kb", "fd_kinds")}
+        log(f"[probe] engine A {a_id} running, pid {pid}; steady {json.dumps(res['steady_before'])}")
+        # B's build id comes from its own descriptor: read it from the first swap's begin event.
+        series = [("B", False), ("A", False), ("B", False)]
+        prev = a_id
+        res["start"] = start0
+        d.sh(f"mkdir -p {base}/swap-src", check=False)
+        for n, (which, fail) in enumerate(series + [("A", True)], 1):
+            mark = el.mark()
+            src = f"{base}/swap-src/{which}-{n}.so"
+            d.adb("push", libs[which], src, timeout=300)
+            trig = os.path.join(work, "andysu-swap-to")
+            with open(trig, "w") as f:
+                f.write(src + "\n" + ("fail_init\n" if fail else ""))
+            d.adb("push", trig, f"{base}/andysu-swap-to")
+            t0 = time.time()
+            _, begin = wait_event(el, mark, "engine_swap_begin", f"swap {n}", timeout=60)
+            if begin["from"] != prev:
+                raise dt.Fail(f"swap {n}: from {begin['from']} != running {prev}")
+            _, saved = wait_event(el, mark, "engine_state_saved", f"swap {n}")
+            _, stopped = wait_event(el, mark, "engine_stopped", f"swap {n}")
+            _, started = wait_event(el, mark, "engine_start", f"swap {n}", swapped=1)
+            row = {"n": n, "to": begin["to"], "fail_init": fail, "state": saved["state"],
+                   "stopped": {k: stopped[k] for k in ("fds", "threads", "rss_kb")},
+                   "started": {k: started[k] for k in ("fds", "threads", "rss_kb", "libmain_maps")}}
+            if not fail:
+                for e in (stopped, started):
+                    if e["pid"] != pid:
+                        raise dt.Fail(f"swap {n}: pid changed {pid} -> {e['pid']}")
+                if started["build_id"] != begin["to"]:
+                    raise dt.Fail(f"swap {n}: started {started['build_id']}, expected {begin['to']}")
+                _, rest = wait_event(el, mark, "engine_state_restored", f"swap {n} state carried", build_id=begin["to"])
+                if rest["state"].get("swap_count") != n:
+                    raise dt.Fail(f"swap {n}: state not carried: {rest['state']}")
+                if args.map and (rest["state"].get("map") != args.map or saved["state"].get("map") != args.map):
+                    raise dt.Fail(f"swap {n}: map {args.map} not carried: saved {saved['state']} restored {rest['state']}")
+                el.wait(r"========Initialized=========", f"swap {n}: init banner", mark, timeout=300)
+                el.wait(r"GL_RENDERER: ", f"swap {n}: GL renderer", mark)
+                _, healthy = wait_event(el, mark, "engine_healthy", f"swap {n} healthy", timeout=300)
+                wait_event(el, mark, "engine_frames", f"swap {n} frames", build_id=begin["to"], timeout=300)
+                row["shutdown_ms"] = stopped["t_ms"] - begin["t_ms"]
+                row["to_healthy_ms"] = healthy["t_ms"] - begin["t_ms"]
+                row["seconds"] = round(time.time() - t0, 1)
+                time.sleep(11)  # settle, then a steady-state sample (loader TEST HOOK emits proc_stats every 5 s)
+                steady = [e for _, e in events_since(el, mark) if e.get("event") == "proc_stats"][-1]
+                row["steady"] = {k: steady[k] for k in ("fds", "threads", "rss_kb", "fd_kinds")}
+                prev = begin["to"]
+                b_id = b_id or (begin["to"] if which == "B" else None)
+            else:
+                # rollback layer 2: the new engine fails its init; the loader reloads the previous build
+                _, failed = wait_event(el, mark, "engine_start_failed", "forced init failure", timeout=120)
+                _, rb = wait_event(el, mark, "engine_rolled_back", "rollback", timeout=120)
+                _, st2 = wait_event(el, mark, "engine_start", "restart of the previous build", swapped=2)
+                if rb["build_id"] != prev or st2["build_id"] != prev or st2["pid"] != pid:
+                    raise dt.Fail(f"rollback went to {rb['build_id']}, expected {prev} in pid {pid}: {rb} {st2}")
+                el.wait(r"========Initialized=========", "rollback: init banner", mark, timeout=300)
+                wait_event(el, mark, "engine_frames", "rollback frames", build_id=prev, timeout=300)
+                row["error"] = failed["error"]
+                row["seconds"] = round(time.time() - t0, 1)
+                row["started"] = {k: st2[k] for k in ("fds", "threads", "rss_kb", "libmain_maps")}
+            res["swaps"].append(row)
+            log(f"[probe] swap {n} -> {begin['to']}{' (forced failure, rolled back)' if fail else ''}: {json.dumps(row)}")
+            time.sleep(3)
+        # the engine must keep running after the last swap
+        mark = el.mark()
+        time.sleep(30)
+        frames = [e["frames"] for _, e in events_since(el, mark) if e.get("event") == "engine_frames"]
+        res["frames_after_30s"] = frames
+        if len(frames) < 2 or frames[-1] <= frames[0]:
+            raise dt.Fail(f"engine not rendering 30 s after the last swap: frame events {frames}")
+        errs = [e for _, e in events_since(el, 0) if e.get("event") in ("loader_failed", "rollback_failed", "engine_swap_refused")]
+        if errs:
+            raise dt.Fail(f"loader errors: {errs}")
+        res["pid"] = pid
+        res["pid_unchanged"] = d.sh(f"pidof {pkg}", check=False).split() == [str(pid)]
+        if not res["pid_unchanged"]:
+            raise dt.Fail("pidof does not show the original pid")
+        screenshot(d, "live-swap-final")
+        ok = [r for r in res["swaps"] if not r["fail_init"]]
+        st = [res["steady_before"]] + [r["steady"] for r in ok]
+        res["steady_fds"] = [x["fds"] for x in st]
+        res["steady_threads"] = [x["threads"] for x in st]
+        res["steady_rss_kb"] = [x["rss_kb"] for x in st]
+        res["libmain_maps"] = [r["started"]["libmain_maps"] for r in res["swaps"]]
+        # Bounds for three swaps (measured, see LIVE_SWAP.md section 6): the engine has to stay
+        # near its steady state, not leak a file descriptor set or a thread per swap.
+        if st[-1]["fds"] - st[0]["fds"] > FDS_BOUND or st[-1]["threads"] - st[0]["threads"] > THREADS_BOUND \
+                or st[-1]["rss_kb"] - st[0]["rss_kb"] > RSS_BOUND_KB:
+            raise dt.Fail(f"resources grew beyond the bound over 3 swaps: fds {res['steady_fds']}, threads "
+                          f"{res['steady_threads']}, rss_kb {res['steady_rss_kb']}")
+        res["verdict"] = "live swap works"
+        log("probe result: " + json.dumps(res, indent=1))
+        os.makedirs(EVIDENCE, exist_ok=True)
+        with open(os.path.join(EVIDENCE, "live-swap-probe.json"), "w") as f:
+            json.dump(res, f, indent=2)
+    finally:
+        if el:
+            el.stop()
+            el.save("live-swap-engine-log.txt")
+        if not args.keep:
+            d.stop()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=list(BEDS))
@@ -372,12 +553,19 @@ def main():
     ap.add_argument("--apk-a", help="Xonotic APK to split as version A (default: testbeds/apks/...); locally built "
                     "APKs (testbeds/patches/xonotic-touch/build.sh) start the engine through the resident loader")
     ap.add_argument("--apk-b", help="Xonotic APK for the update, version B (needs --apk-a)")
+    ap.add_argument("--live-swap-probe", action="store_true",
+                    help="milestone 2a: in-process engine swaps A->B->A->B plus a forced-failure rollback (needs --apk-a/--apk-b)")
+    ap.add_argument("--map", help="with --live-swap-probe: start this local map first and require it to be carried over every swap")
     ap.add_argument("--probe-vid-restart", action="store_true", help="R1 probe on the stock Xonotic APK (no AndySU)")
     args = ap.parse_args()
     dt.CONTAINER = not args.device
     if args.probe_vid_restart:
         args.api = args.api or "36"
         probe_vid_restart(args)
+        return
+    if args.live_swap_probe:
+        args.api = args.api or "36"
+        live_swap_probe(args)
         return
     args.api = args.api or "34"
     if bool(args.apk_a) != bool(args.apk_b):

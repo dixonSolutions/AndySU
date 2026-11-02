@@ -1,0 +1,163 @@
+diff --git a/android/app/src/main/cpp/CMakeLists.txt b/android/app/src/main/cpp/CMakeLists.txt
+index 85bfb61..570618b 100644
+--- a/android/app/src/main/cpp/CMakeLists.txt
++++ b/android/app/src/main/cpp/CMakeLists.txt
+@@ -62,7 +62,7 @@ set(ANDYSU_DIR "${CMAKE_CURRENT_SOURCE_DIR}/andysu")
+ if(EXISTS "${ANDYSU_DIR}/andysu_loader.c")
+     target_sources(main PRIVATE "${ANDYSU_DIR}/andysu_engine.c")
+     target_include_directories(main PRIVATE "${ANDYSU_DIR}")
+-    target_compile_definitions(main PRIVATE ANDYSU_BUILD_ID="${XONOTIC_VERSION}")
++    target_compile_definitions(main PRIVATE ANDYSU_SWAP ANDYSU_BUILD_ID="${XONOTIC_VERSION}")
+     # libmain exports exactly one symbol, so two copies of it never see each other's.
+     target_link_options(main PRIVATE "-Wl,--version-script=${ANDYSU_DIR}/andysu_engine.map" -Wl,--exclude-libs,ALL)
+     add_library(andysu_xonotic_loader SHARED "${ANDYSU_DIR}/andysu_loader.c")
+diff --git a/engine/darkplaces/host.c b/engine/darkplaces/host.c
+index 4c29c27..d233a2a 100644
+--- a/engine/darkplaces/host.c
++++ b/engine/darkplaces/host.c
+@@ -26,6 +26,9 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ #include "libcurl.h"
+ #include "taskqueue.h"
+ #include "utf8lib.h"
++#ifdef ANDYSU_SWAP
++#include "andysu_engine.h"
++#endif
+ 
+ /*
+ 
+@@ -559,6 +562,10 @@ void Host_Init (void)
+ 		Cbuf_Execute(cmd_local->cbuf);
+ 	}
+ 
++#ifdef ANDYSU_SWAP
++	Andysu_RestoreState(); // after a live swap: reconnect / reload the map; test hooks
++#endif
++
+ 	if (!sv.active && !cls.demoplayback && !cls.connect_trying)
+ 	{
+ #ifdef CONFIG_MENU
+@@ -616,6 +623,15 @@ void Host_Shutdown(void)
+ 	Host_UnlockSession();
+ 
+ 	Con_Shutdown();
++#ifdef ANDYSU_SWAP
++	if (andysu_swapping)
++	{
++		// The process lives on and so does this library's address space: give back what an
++		// exit() would have (pk3 file descriptors, every memory pool).
++		FS_Shutdown();
++		Mem_FreeAllPools();
++	}
++#endif
+ 	Memory_Shutdown();
+ }
+ 
+diff --git a/engine/darkplaces/sys_sdl.c b/engine/darkplaces/sys_sdl.c
+index 126e2b0..f9dff44 100644
+--- a/engine/darkplaces/sys_sdl.c
++++ b/engine/darkplaces/sys_sdl.c
+@@ -18,8 +18,15 @@
+ // General routines
+ // =======================================================================
+ 
++#ifdef ANDYSU_SWAP
++extern int andysu_swapping;
++#endif
+ void Sys_SDL_Shutdown(void)
+ {
++#ifdef ANDYSU_SWAP
++	if (andysu_swapping)
++		return; // SDL is shared with the next engine copy and stays initialised
++#endif
+ 	SDL_Quit();
+ }
+ 
+diff --git a/engine/darkplaces/sys_shared.c b/engine/darkplaces/sys_shared.c
+index bd5ad0d..861270b 100644
+--- a/engine/darkplaces/sys_shared.c
++++ b/engine/darkplaces/sys_shared.c
+@@ -37,6 +37,9 @@
+ #include "taskqueue.h"
+ #include "thread.h"
+ #include "libcurl.h"
++#ifdef ANDYSU_SWAP
++#include "andysu_engine.h"
++#endif
+ 
+ 
+ sys_t sys;
+@@ -768,6 +771,9 @@ void Sys_Error (const char *error, ...)
+ 	// don't want a dead window left blocking the OS UI or the abort dialog
+ 	VID_Shutdown();
+ 	S_StopAllSounds();
++#ifdef ANDYSU_SWAP
++	Andysu_AbortStart(string); // trial of a swapped-in engine: longjmp to the loader, does not return
++#endif
+ 
+ 	host.state = host_failed; // make Sys_HandleSignal() call _Exit()
+ 	Sys_SDL_Dialog("Engine Error", string);
+@@ -1148,6 +1154,10 @@ static void Sys_Frame(void)
+ 	if (setjmp(host.abortframe)) // Something bad happened, or the server disconnected
+ 		host.state = host_active; // In case we were loading
+ 
++#ifdef ANDYSU_SWAP
++	Andysu_FrameHook(); // loader asked for a swap? then host.state becomes host_shutdown
++#endif
++
+ 	if (host.state >= host_shutdown) // see Sys_HandleCrash() comments
+ 	{
+ #ifdef __EMSCRIPTEN__
+@@ -1157,6 +1167,13 @@ static void Sys_Frame(void)
+ 		Sys_AllowProfiling(false);
+ #endif
+ 		Host_Shutdown();
++#ifdef ANDYSU_SWAP
++		if (andysu_swapping)
++		{
++			andysu_leave = true; // swap: return to the loader, no exit()
++			return;
++		}
++#endif
+ 		exit(0);
+ 	}
+ 
+@@ -1233,9 +1250,15 @@ int Sys_Main(int argc, char *argv[])
+ 	Host_Init();
+ #ifdef __EMSCRIPTEN__
+ 	emscripten_set_main_loop(Sys_Frame, 0, true); // doesn't return
++#else
++#ifdef ANDYSU_SWAP
++	while(!andysu_leave)
++		Sys_Frame();
++	return ANDYSU_RUN_SWAP;
+ #else
+ 	while(true)
+ 		Sys_Frame();
++#endif
+ #endif
+ 
+ 	return 0;
+diff --git a/engine/darkplaces/zone.c b/engine/darkplaces/zone.c
+index 5d69213..1940f5a 100644
+--- a/engine/darkplaces/zone.c
++++ b/engine/darkplaces/zone.c
+@@ -894,6 +894,19 @@ void Memory_Init (void)
+ 		mem_mutex = Thread_CreateMutex();
+ }
+ 
++#ifdef ANDYSU_SWAP
++// Live engine swap: the library stays mapped after its engine shut down, so release everything the
++// engine allocated (an exit() would have). Nothing may allocate from the pools afterwards.
++void Mem_FreeAllPools(void)
++{
++	while (poolchain)
++	{
++		mempool_t *pool = poolchain;
++		_Mem_FreePool(&pool, __FILE__, __LINE__);
++	}
++}
++#endif
++
+ void Memory_Shutdown (void)
+ {
+ //	Mem_FreePool (&zonemempool);

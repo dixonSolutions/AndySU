@@ -570,3 +570,50 @@ distinct mappings (but keep it, AndySU's contract and the `DT_NEEDED` rewrite al
 it). Limits: this ran in the shell's linker namespace, API 34 only, one flat library without
 dependencies. Not yet shown: the same inside an app's namespace and with `libSDL2.so` as a shared
 `DT_NEEDED`; that comes with the loader prototype (step 2 of section 5).
+
+---------------------------------------------------------------------------------------------------
+
+## 7. Milestone 2a: in-process engine swap, no AndySU host (2026-11-03)
+
+Patch `0003-andysu-engine-swap.patch` (engine) plus the extended `loader/` sources; built by
+`build.sh` as before. Test: `scripts/heavy.sh python3 android/tests/testbed_tests.py
+--live-swap-probe --apk-a .../XonoticTouch-1.2.9001-x86_64.apk --apk-b .../XonoticTouch-1.2.9002-x86_64.apk
+--api 36 [--map afterslime]` (plain APK install, no `andysu split`: 2a needs no host; the loader's
+TEST HOOK file `<external files>/andysu-swap-to` triggers each swap; the loader copies the pushed
+`.so` to `files/andysu-swap/libmain.<hash8>.<n>.so`, read-only, and pre-flights it).
+
+What was built: `Sys_Frame` polls `loader->swap_requested()` once per frame; the engine saves JSON
+state (`swap_count`, `connect` or `map`, `menu`), runs `Host_Shutdown` along the swap path (no
+`SDL_Quit`, no `exit`; plus `FS_Shutdown` and `Mem_FreeAllPools`) and `Sys_Main` returns
+`ANDYSU_RUN_SWAP`. The loader runs the pre-flighted engine with `swapped_in=1` and the state,
+never `dlclose`s the old one. Rollback layer 2 is implemented: `Sys_Error` during a swapped-in
+engine's init (after `VID_Shutdown`) longjmps to the loader, which reloads the previous build with
+`ANDROID_DLEXT_FORCE_LOAD` and runs it with `swapped_in=2`.
+
+Result (API 36 google_apis, SwiftShader): A->B->A->B all pass, pid unchanged, `engine_stopped` then
+`engine_start(swapped=1)` with the right build id, the state carried (`swap_count` 1,2,3; with
+`--map afterslime` the local map is reloaded after every swap), init banner and `GL_RENDERER` again,
+`engine_healthy` after 180 frames, the engine renders for 30 s afterwards, `/proc/self/maps` shows
+one more `libmain.*.so` per swap (2,3,4,5 distinct). Forced init failure on a 4th swap: pid
+unchanged, `engine_start_failed` -> `engine_rolled_back` -> `engine_start(swapped=2)` on the
+previous build, frames continue. Timing: engine teardown 86-290 ms; swap request to healthy engine
+about 16.5-18 s, almost all of it engine init under SwiftShader (not measured on a device).
+
+Resource numbers (steady state, 10+ s after each swap; no map / local map):
+```
+            before   swap1  swap2  swap3     growth per swap
+fds         167      170    172    174       +2 (anon_inode +2 each swap)        / 171 176 179 182, +3 (+1 socket)
+threads     32       32     32     32        0                                   / 33 33 33 33
+rss_kb      275592   247508 260524 270960    about +10 MB                        / 881848 906956 917328 940656, about +20 MB
+```
+Known residue, to fix or live with (bounded by "cold start after K swaps"): about 2 `anon_inode`
+fds per swap (an epoll/eventfd/inotify that SDL or the engine opens and never closes), with a local
+map one more socket per swap, and RSS growth of 10-20 MB per swap (not returned by the engine's
+shutdown). A failed start that is rolled back leaves a poisoned copy: +12 fds, +2 threads, +75 MB
+in the one measurement. The test bounds growth over three swaps at 12 fds, 3 threads, 120 MB.
+
+Not done (milestone 2b): the AndySU host hooks (`LiveSwapHandler`, transparent-mode slot switch,
+assets loader swap, slot GC, `markHealthy` wiring), `andysu pack` renaming only libmain, the
+Java-side data re-unpack before the new engine starts, replacing the file-based TEST HOOK, the
+`java_abi` policy at the host level, stage 2 (keep the GL context), connect-state restore against a
+real server (code exists, only the local map case was exercised), watchdog-driven rollback layer 3.
