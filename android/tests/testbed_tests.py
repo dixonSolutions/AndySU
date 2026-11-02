@@ -12,14 +12,28 @@ projects' GitHub releases; nothing is rebuilt and no source is changed):
      relaunches once and is back on B
 Screenshots and the event log go to docs/evidence/.
 
+Xonotic needs its game data on disk before BootActivity starts the engine (it would otherwise
+download 1.2 GB). The bed copies the pk3s from $XONOTIC_DATA_DIR (default: the Xonotic pk3 set in
+~/.cache/xt-perf/base/data, read only) onto the emulator with `adb push`, enables the engine's
+logcat output (+developer 1) and then requires proof that the ENGINE ran from the payload: SDL's
+"Running main function SDL_main from library <slot>/libmain.so", the engine's init banner and the
+GL renderer line. If the data is missing the bed fails loudly; it never passes on AndySU events
+alone.
+
 Usage: python3 android/tests/testbed_tests.py [--only xonotic|stk] [--api 34]
+       python3 android/tests/testbed_tests.py --probe-vid-restart [--api 36]
+         (stock Xonotic APK, no AndySU: does rendering survive `vid_restart`? see LIVE_SWAP.md)
 """
 import argparse
+import glob
 import json
 import os
+import re
 import shutil
+import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -37,6 +51,95 @@ BEDS = {
 
 def log(m):
     dt.log(m)
+
+
+DATA_SRC = os.path.expanduser(os.environ.get("XONOTIC_DATA_DIR", "~/.cache/xt-perf/base/data"))
+REQUIRED_PK3 = ("-data.pk3", "-maps.pk3", "-music.pk3")
+ENGINE_TAGS = ["SDL:V", "app_process:D", "XonoticTouch:I"]
+
+
+def seed_xonotic(d, pkg, extra_args=""):
+    """Put the game data where GameData expects it (<external files>/data) so BootActivity does
+    not try to download it, and switch on the engine's logcat output."""
+    pk3s = sorted(p for p in glob.glob(os.path.join(DATA_SRC, "*.pk3")) if os.path.isfile(p))  # follows symlinks
+    for suffix in REQUIRED_PK3:
+        if not any(p.endswith(suffix) for p in pk3s):
+            raise dt.Fail(f"Xonotic game data missing: no *{suffix} in {DATA_SRC} (set XONOTIC_DATA_DIR). "
+                          "Without it the engine cannot start, so this bed would prove nothing.")
+    base = f"/sdcard/Android/data/{pkg}/files"
+    # The app must create its own external directories: ones made by `adb shell` belong to the
+    # shell user and the app then cannot create sub-directories in them (GameData fails with
+    # "Cannot create .../data/font-dejavu.pk3dir"). So run BootActivity once without data; it
+    # unpacks the slim bundle (creating files/data as the app) and stops at the download error.
+    d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
+    end = time.time() + 180 * dt.SLOW
+    while time.time() < end:
+        if d.sh(f"ls {base}/.bundle-version 2>/dev/null", check=False).strip():
+            break
+        time.sleep(2)
+    else:
+        raise dt.Fail("seeding: the app did not create its data directory (slim bundle not unpacked)")
+    d.sh(f"am force-stop {pkg}")
+    t0 = time.time()
+    for p in pk3s:
+        d.adb("push", os.path.realpath(p), f"{base}/data/{os.path.basename(p)}", timeout=1200)
+    log(f"seeded {len(pk3s)} pk3s ({sum(os.path.getsize(p) for p in pk3s) >> 20} MiB) in {time.time() - t0:.0f}s")
+    args = os.path.join(tempfile.mkdtemp(prefix="xonargs-"), "xonotic.args")
+    with open(args, "w") as f:
+        f.write("+developer 1 " + extra_args + "\n")
+    d.adb("push", args, f"{base}/xonotic.args")
+    return base
+
+
+class EngineLog:
+    """logcat of the engine side: SDL's own lines and the engine's console (developer 1)."""
+
+    def __init__(self, d):
+        d.adb("logcat", "-c")
+        self.lines = []
+        self.p = subprocess.Popen([dt.ADB, "-s", d.serial, "logcat", "-v", "brief", "-s", *ENGINE_TAGS],
+                                  stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self):
+        for line in self.p.stdout:
+            self.lines.append(line.rstrip("\n"))
+
+    def mark(self):
+        return len(self.lines)
+
+    def wait(self, pattern, what, since=0, timeout=300):
+        rx = re.compile(pattern)
+        end = time.time() + timeout * dt.SLOW
+        seen = since
+        while time.time() < end:
+            while seen < len(self.lines):
+                line = self.lines[seen]
+                seen += 1
+                if rx.search(line):
+                    return line
+            time.sleep(0.5)
+        raise dt.Fail(f"timed out waiting for {what} (/{pattern}/)\nlast engine log lines:\n" + "\n".join(self.lines[-25:]))
+
+    def stop(self):
+        self.p.kill()
+
+    def save(self, name):
+        os.makedirs(EVIDENCE, exist_ok=True)
+        with open(os.path.join(EVIDENCE, name), "w") as f:
+            f.write("\n".join(self.lines) + "\n")
+
+
+def engine_ran(el, since, slot_hint, what):
+    """The engine really started from the payload: SDL_main ran from libmain.so inside the AndySU
+    slot, the engine initialised, and GL came up. Returns the evidence lines."""
+    main = el.wait(r"Running main function SDL_main from library .*libmain\.so", f"{what}: SDL_main start", since)
+    if "/andysu/" not in main or slot_hint not in main:
+        raise dt.Fail(f"{what}: SDL_main did not run from the payload ({slot_hint}): {main}")
+    init = el.wait(r"========Initialized=========", f"{what}: engine init banner", since)
+    gl = el.wait(r"GL_RENDERER: ", f"{what}: GL renderer line", since)
+    log(f"[engine] {what}: {main.strip()} | {init.strip()} | {gl.strip()}")
+    return [main, init, gl]
 
 
 def screenshot(d, name):
@@ -100,8 +203,13 @@ def bed(d, name, spec, work, results):
         d.sh("svc wifi disable", check=False)
         d.sh("svc data disable", check=False)
         d.install(ra["host"]["apk"])
+        if name == "xonotic":
+            # Before the remote is reachable (no adb reverse yet): the seeding launch must not
+            # stage the update, or the next launch would already run B.
+            seed_xonotic(d, pkg)
         d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
         d.watch()
+        el = EngineLog(d) if name == "xonotic" else None
 
         def launch():
             d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
@@ -118,22 +226,30 @@ def bed(d, name, spec, work, results):
         ev = booted(va)
         if not (ev.get("transparent") and ev.get("factory")):
             raise dt.Fail(f"{va} should boot transparently from the built-in payload: {ev}")
+        engine_note = ""
+        if el:
+            ev_lines = engine_ran(el, 0, "/factory/", f"{va} built-in")
+            engine_note = "; engine ran (SDL_main from the payload's libmain.so, init banner, GL renderer)"
         time.sleep(15)
         screenshot(d, f"{name}-1-builtin-{va}")
-        results.append({"bed": name, "step": "builtin", "detail": f"{va} runs from the payload built into the host APK"})
+        results.append({"bed": name, "step": "builtin", "detail": f"{va} runs from the payload built into the host APK" + engine_note})
         st = d.status("staged", timeout=900)
         log(f"[{name}] {vb} staged: {st['status'].get('download_bytes')} bytes")
         d.sh(f"am force-stop {pkg}")
+        mark = el.mark() if el else 0
         launch()
         ev = booted(vb)
         if not ev.get("trial"):
             raise dt.Fail(f"{vb} should boot in trial: {ev}")
+        if el:
+            engine_ran(el, mark, f"/slots/{vb}/", f"{vb} updated")
         d.event("committed", timeout=240)
         time.sleep(10)
         screenshot(d, f"{name}-2-updated-{vb}")
         host_ver = installed_version()
         results.append({"bed": name, "step": "update",
-                        "detail": f"{vb} applied on next start and committed; installed APK still versionName {host_ver}"})
+                        "detail": f"{vb} applied on next start and committed; installed APK still versionName {host_ver}"
+                                  + ("; engine ran from slots/" + vb if el else "")})
         if host_ver != va:
             raise dt.Fail(f"the host APK changed: versionName {host_ver}, expected {va}")
 
@@ -146,6 +262,7 @@ def bed(d, name, spec, work, results):
         d.status("staged", timeout=900)
         d.sh(f"am force-stop {pkg}")
         inits = sum(1 for e in d.events if e.get("event") == "init")
+        mark = el.mark() if el else 0
         launch()
         booted(vb + "-broken")
         # The crash handler rolls back, then relaunches once; that launch runs B again.
@@ -154,6 +271,8 @@ def bed(d, name, spec, work, results):
         if (launch_ev.get("slot") or {}).get("id") != vb or launch_ev.get("in_trial"):
             raise dt.Fail(f"expected a committed {vb} after the rollback: {launch_ev}")
         booted(vb)
+        if el:
+            engine_ran(el, mark, f"/slots/{vb}/", f"{vb} after rollback")
         relaunches = sum(1 for e in d.events if e.get("event") == "init") - inits - 1
         if relaunches != 1:
             raise dt.Fail(f"expected exactly one relaunch after the broken start, saw {relaunches}")
@@ -164,19 +283,104 @@ def bed(d, name, spec, work, results):
                         "detail": f"{vb}-broken failed on start; rolled back by the crash handler; one relaunch; back on {vb}"})
     finally:
         srv.kill()
+        if el:
+            el.stop()
+            el.save(f"{name}-engine-log.txt")
         with open(os.path.join(EVIDENCE, f"{name}-events.jsonl"), "w") as f:
             for e in d.events:
                 f.write(json.dumps(e) + "\n")
 
 
+def surface_frames(d, pkg, samples=3, gap=2.0):
+    """Frame evidence from SurfaceFlinger: the newest presented-frame timestamps of the app's
+    SurfaceView layer must advance between samples. Returns the list of max timestamps (ns)."""
+    layers = d.sh("dumpsys SurfaceFlinger --list", check=False)
+    layer = next((l.strip() for l in layers.splitlines() if pkg in l and "SurfaceView" in l and "Background" not in l), None)
+    if not layer:
+        return {"layer": None, "stamps": []}
+    stamps = []
+    for _ in range(samples):
+        out = d.sh(f"dumpsys SurfaceFlinger --latency '{layer}'", check=False).splitlines()[1:]
+        ts = [int(x.split()[1]) for x in out if len(x.split()) == 3 and x.split()[1].isdigit() and int(x.split()[1]) < 2**62]
+        stamps.append(max(ts) if ts else 0)
+        time.sleep(gap)
+    return {"layer": layer, "stamps": stamps}
+
+
+def probe_vid_restart(args):
+    """R1 (LIVE_SWAP.md): stock Xonotic APK, no AndySU. Reach the menu, run vid_restart, and look
+    for evidence that rendering survives it. Evidence goes to docs/evidence/probe-vid-restart-*."""
+    spec = BEDS["xonotic"]
+    pkg = spec["pkg"]
+    d = dt.Device(args.api, 3, existing=args.device)
+    res = {"api": args.api}
+    try:
+        d.start()
+        d.adb("uninstall", pkg, check=False)
+        d.sh("svc wifi disable", check=False)
+        d.sh("svc data disable", check=False)
+        d.install(os.path.join(TB, spec["a"]))
+        base = seed_xonotic(d, pkg, "+exec probe.cfg")
+        cfg = os.path.join(tempfile.mkdtemp(prefix="probe-"), "probe.cfg")
+        with open(cfg, "w") as f:
+            f.write('echo ANDYSU_PROBE_BEGIN\n'
+                    'defer 25 "echo ANDYSU_PROBE_PRE; screenshot probe-pre"\n'
+                    'defer 35 "echo ANDYSU_PROBE_RESTART; vid_restart"\n'
+                    'defer 55 "echo ANDYSU_PROBE_POST; screenshot probe-post"\n'
+                    'defer 65 "echo ANDYSU_PROBE_DONE"\n')
+        d.adb("push", cfg, f"{base}/data/probe.cfg")
+        el = EngineLog(d)
+        d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
+        el.wait(r"========Initialized=========", "stock engine init", 0, timeout=600)
+        el.wait(r"GL_RENDERER: ", "GL renderer", 0)
+        el.wait(r"ANDYSU_PROBE_PRE", "probe pre marker", 0, timeout=300)
+        res["frames_before"] = surface_frames(d, pkg)
+        el.wait(r"ANDYSU_PROBE_RESTART", "probe restart marker", 0, timeout=300)
+        i_restart = next(i for i, l in enumerate(el.lines) if "ANDYSU_PROBE_RESTART" in l)
+        el.wait(r"ANDYSU_PROBE_POST", "probe post marker (engine alive after vid_restart)", i_restart, timeout=300)
+        res["frames_after"] = surface_frames(d, pkg)
+        el.wait(r"ANDYSU_PROBE_DONE", "probe done marker", i_restart, timeout=300)
+        after = el.lines[i_restart:]
+        res["vid_restart_log"] = [l for l in after if re.search(r"VID_Restart|GL_RENDERER|Display \d|Video mode|Failed|rror", l)][:20]
+        res["gl_renderer_lines_total"] = sum(1 for l in el.lines if "GL_RENDERER:" in l)
+        res["pid_alive"] = bool(d.sh(f"pidof {pkg}", check=False).strip())
+        os.makedirs(EVIDENCE, exist_ok=True)
+        for shot in ("probe-pre", "probe-post"):
+            out = d.sh(f"ls {base}/userdata/data/screenshots/ 2>/dev/null | grep {shot}", check=False).split()
+            res[shot + "_files"] = out
+            for fn in out:
+                dest = os.path.join(EVIDENCE, "probe-vid-restart-" + fn)
+                d.adb("pull", f"{base}/userdata/data/screenshots/{fn}", dest, check=False)
+                res.setdefault("pulled", []).append(dest)
+        screenshot(d, "probe-vid-restart-screencap")
+        el.stop()
+        el.save("probe-vid-restart-engine-log.txt")
+        fb, fa = res["frames_before"]["stamps"], res["frames_after"]["stamps"]
+        res["frames_advanced_before"] = len(fb) > 1 and fb[-1] > fb[0]
+        res["frames_advanced_after"] = len(fa) > 1 and fa[-1] > fa[0]
+        res["verdict"] = "rendering survives vid_restart" if (res["pid_alive"] and res["frames_advanced_after"]) else "NOT PROVEN (see fields)"
+        log("probe result: " + json.dumps(res, indent=2))
+        with open(os.path.join(EVIDENCE, "probe-vid-restart.json"), "w") as f:
+            json.dump(res, f, indent=2)
+    finally:
+        if not args.keep:
+            d.stop()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=list(BEDS))
-    ap.add_argument("--api", default="34")
+    ap.add_argument("--api", default=None, help="default 34 (36 for the vid_restart probe: screenshots)")
     ap.add_argument("--device")
     ap.add_argument("--keep", action="store_true", help="keep the emulator running and the work dir")
+    ap.add_argument("--probe-vid-restart", action="store_true", help="R1 probe on the stock Xonotic APK (no AndySU)")
     args = ap.parse_args()
     dt.CONTAINER = not args.device
+    if args.probe_vid_restart:
+        args.api = args.api or "36"
+        probe_vid_restart(args)
+        return
+    args.api = args.api or "34"
     work = tempfile.mkdtemp(prefix="andysu-testbeds-")
     dt.run(["cargo", "build", "-q", "-p", "andysu-cli"], cwd=dt.REPO)
     dt.gradle(":host-template:andysuHostTemplate")

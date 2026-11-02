@@ -218,6 +218,7 @@ jobs:
           path: dist
       - name: Update Formula/andysu.rb on main ([skip ci]; pushes with the workflow token start no runs)
         run: |
+          mkdir -p Formula
           scripts/homebrew-formula.sh "${{ needs.version.outputs.version }}" dist > Formula/andysu.rb
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
