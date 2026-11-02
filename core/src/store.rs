@@ -44,6 +44,10 @@ pub struct GcReport {
     pub removed_slots: Vec<String>,
     pub removed_blobs: usize,
     pub freed_bytes: u64,
+    /// Of `removed_blobs`: cached copies of plain components dropped because a kept slot holds
+    /// the same bytes (still reachable through `find_local`).
+    #[serde(default)]
+    pub removed_blobs_held_by_slots: usize,
 }
 
 pub struct Store {
@@ -299,7 +303,13 @@ impl Store {
             SlotIndex { id: r.id.clone(), sequence: r.sequence, abi: abi.map(Into::into), components: vec![] };
         for c in comps {
             check_rel_path(&c.path)?;
-            let blob = self.blob_path(&c.sha256);
+            let mut blob = self.blob_path(&c.sha256);
+            if c.archive.is_none() && !blob.is_file() {
+                // GC drops the cached copy of a plain component a kept slot already holds.
+                if let Some(p) = self.find_local(&c.sha256, slots) {
+                    blob = p;
+                }
+            }
             let target = staging.join(&c.path);
             let reuse =
                 if c.archive.is_some() && !blob.is_file() { self.find_local_tree(&c.sha256, slots) } else { None };
@@ -347,17 +357,24 @@ impl Store {
     }
 
     /// Delete slots not in `state.keep()`, stale staging dirs, partial downloads not in
-    /// `keep_parts`, and blobs no kept slot references.
+    /// `keep_parts`, and blobs no kept slot needs. A kept slot needs a blob when it references
+    /// it as a zip component (the slot holds only the extracted tree, so the cached zip is the
+    /// only copy of those bytes and the delta base for the next release), or as a plain component
+    /// whose slot file is not on disk with the blob's size. A plain component already sitting in
+    /// a kept slot is dropped from the cache: `find_local` serves it from the slot file (on
+    /// Android hard links are denied, so the slot holds a second copy). Base directories are not
+    /// managed here. The size check is cheap and enough: slot files are read-only, and every user
+    /// of a slot file re-verifies the SHA-256 (`ingest_bytes`, the patch result).
     pub fn gc(&self, st: &State, low_storage: bool, keep_parts: &[String]) -> Result<GcReport> {
         let keep: HashSet<String> = st.keep(low_storage).into_iter().collect();
         let mut rep = GcReport::default();
-        let mut referenced: HashSet<String> = HashSet::new();
+        let mut kept: Vec<(PathBuf, SlotIndex)> = vec![];
         let slots = self.root.join("slots");
         for e in io_at(fs::read_dir(&slots), "readdir", &slots)?.flatten() {
             let name = e.file_name().to_string_lossy().to_string();
             if keep.contains(&name) {
                 if let Some(ix) = self.read_slot_index(&name) {
-                    referenced.extend(ix.components.into_iter().map(|c| c.sha256));
+                    kept.push((e.path(), ix));
                 }
                 continue;
             }
@@ -365,17 +382,59 @@ impl Store {
             remove_tree(&e.path())?;
             rep.removed_slots.push(name);
         }
+        // sha -> keep it because a kept slot references it as a zip
+        let mut archives: HashSet<&str> = HashSet::new();
+        let mut plain: HashSet<&str> = HashSet::new();
+        for (_, ix) in &kept {
+            for c in &ix.components {
+                if c.archive.is_some() {
+                    archives.insert(&c.sha256);
+                } else {
+                    plain.insert(&c.sha256);
+                }
+            }
+        }
         let blobs = self.root.join("blobs/sha256");
         for e in io_at(fs::read_dir(&blobs), "readdir", &blobs)?.flatten() {
             let name = e.file_name().to_string_lossy().to_string();
             let base = name.strip_suffix(".part").unwrap_or(&name);
-            let keep_it =
-                if name.ends_with(".part") { keep_parts.iter().any(|k| k == base) } else { referenced.contains(base) };
+            let md = e.metadata().ok();
+            let mut held_by_slot = false;
+            let keep_it = if name.ends_with(".part") {
+                keep_parts.iter().any(|k| k == base)
+            } else if archives.contains(base) {
+                true
+            } else if plain.contains(base) {
+                let len = md.as_ref().map(|m| m.len());
+                held_by_slot = len.is_some()
+                    && kept.iter().any(|(dir, ix)| {
+                        ix.components.iter().any(|c| {
+                            c.sha256 == base
+                                && c.archive.is_none()
+                                && fs::metadata(dir.join(&c.path)).is_ok_and(|m| m.is_file() && Some(m.len()) == len)
+                        })
+                    });
+                !held_by_slot
+            } else {
+                false
+            };
             if !keep_it {
-                rep.freed_bytes += e.metadata().map(|m| m.len()).unwrap_or(0);
-                fsx::make_writable_recursive(&e.path());
+                // A blob hard-linked into a slot frees nothing when its name goes.
+                #[cfg(unix)]
+                let shared = {
+                    use std::os::unix::fs::MetadataExt;
+                    md.as_ref().is_some_and(|m| m.nlink() > 1)
+                };
+                #[cfg(not(unix))]
+                let shared = false;
+                if !shared {
+                    rep.freed_bytes += md.as_ref().map(|m| m.len()).unwrap_or(0);
+                    // Not for a shared inode: that would make the slot file writable too.
+                    fsx::make_writable_recursive(&e.path());
+                }
                 let _ = fs::remove_file(e.path());
                 rep.removed_blobs += 1;
+                rep.removed_blobs_held_by_slots += usize::from(held_by_slot);
             }
         }
         rep.removed_slots.sort();

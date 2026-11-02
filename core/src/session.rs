@@ -249,9 +249,10 @@ impl Session {
                 continue; // already extracted locally; staging copies it
             }
             if let Some(p) = self.store.find_local(&c.sha256, &slots) {
-                // Present in an installed slot: re-ingest it into the cache, no download.
-                let data = io_at(fs::read(&p), "read", &p)?;
-                if self.store.ingest_bytes(&c.sha256, &data).is_ok() {
+                // Present in an installed slot (GC drops the cached copy once a kept slot holds
+                // it): staging copies it straight from there, verifying it again. Nothing to
+                // download, and no copy back into the cache.
+                if crate::hash::verify_file(&p, &c.sha256, c.size).is_ok() {
                     continue;
                 }
             }
