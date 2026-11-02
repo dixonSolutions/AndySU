@@ -1,0 +1,18 @@
+{
+  "api": "36",
+  "results": [
+    {
+      "sample": "compose",
+      "detail": "built-in 1.0 ran ('Payload version 1.0 (built in)'); 2.0 downloaded, swapped in live, committed ('Payload version 2.0')"
+    },
+    {
+      "sample": "native",
+      "detail": "built-in 1.0 ran ('GL frame (no text)'); 2.0 downloaded, swapped in live, committed ('GL frame (no text)')"
+    },
+    {
+      "sample": "webview",
+      "detail": "built-in 1.0 ran ('Payload version 1.0'); 2.0 downloaded, swapped in live, committed ('Payload version 2.0')"
+    }
+  ],
+  "failures": []
+}

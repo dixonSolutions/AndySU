@@ -16,18 +16,24 @@
         android:protectionLevel="signature" />
     <uses-permission android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 
+    <!-- Stub activities have no action bar: the payload owns the whole window (and, on Android
+         15+, draws edge to edge and handles the system-bar insets). An app can give a stub
+         another theme through manifest merging (tools:replace="android:theme"). -->
     <application>
         <activity
             android:name="com.andysu.host.HostActivity"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode|density|navigation"
             android:exported="true" />
         <activity
             android:name="com.andysu.host.StubActivity1"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode|density|navigation"
             android:screenOrientation="sensorLandscape"
             android:exported="false" />
         <activity
             android:name="com.andysu.host.StubActivity2"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode|density|navigation"
             android:launchMode="singleTask"
             android:exported="false" />

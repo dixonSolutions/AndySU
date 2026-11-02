@@ -17,7 +17,7 @@ local.
 | 3 CLI | done |
 | 4 Linux desktop host | done (10 scenarios incl. `--apply restart`) |
 | 5 Android host | 20 checks pass on API 24, 31, 34 and 36-16k (2026-11-02 run). 29 and 36 failed on a test bug and an emulator hang; the fixed rerun was cut off by the OOM kill and is pending |
-| 5 samples | all three build. Compose, native and WebView reached "2.0 swapped in live, committed" on API 34, but the run was killed before it finished, and the Compose and WebView screenshots are all-black frames. **Not verified**: needs investigation |
+| 5 samples | Compose, native GLES, WebView: built-in 1.0 → 2.0 live → committed on API 36, with the version label checked on screen (2026-11-03) |
 | 6 Gradle plugin + split | done |
 | 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back. Live `.so` swap in Xonotic not done |
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
@@ -176,6 +176,27 @@ Findings fixed along the way: Android 14 refuses *any* writable file on a class 
 .dex) — slots and the factory are now entirely read-only; before API 26 `DexClassLoader` needs an
 optimized-dex directory; a Kotlin expression-bodied JNI callback had the wrong signature; a failed
 `beginLive` after suspending now resumes the old generation.
+
+### Samples (2026-11-03)
+`android/tests/sample_tests.py` builds each sample with `samples/build.sh` and installs the host.
+It checks that the built-in 1.0 is on screen, then connects the remote and relaunches. The host
+checks on open, swaps 2.0 in live and commits. The version label is read from the
+accessibility tree, and its position must be below the status bar and any action bar.
+
+| Sample | API 36 (google_apis) |
+|---|---|
+| Compose (Compose, AndroidX and Kotlin all in the payload) | 1.0 shown → 2.0 live, committed, "Payload version 2.0" visible |
+| native GLES (`libgame.<hash>.so` swapped under the host's GL context) | 1.0 → 2.0 live, committed (GL frame, screenshot) |
+| WebView | 1.0 → 2.0 live, committed, "Payload version 2.0" visible |
+
+Screenshots: `docs/evidence/sample-*.png`. Found along the way:
+- **ATD images** (`aosp_atd`, used for 31/34 in the matrix) capture normal windows as black
+  frames. GL surfaces still capture. Screenshots therefore come from `google_apis`.
+- **Action bar over the payload on Android 15+** (D28): the stub activities now have no action
+  bar.
+- **AndroidX `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`**: Compose payloads need it, so the host
+  AAR declares it and `host-config` lists it. `pack` had refused the payload ("would need an APK
+  update"), as designed.
 
 ## Step 6 — Gradle plugin and `andysu split` (2026-11-02)
 - `io.github.dixonsolutions.andysu` (included build `android/gradle-plugin`): `role = "host"`

@@ -3,13 +3,17 @@
 
   1. the host APK starts its built-in payload 1.0 (with nothing but normal permissions)
   2. it finds 2.0 on the remote, applies it live (apply = "live") and commits it
-  3. a screenshot of each version goes to docs/evidence/
+  3. what is on screen is checked through the accessibility tree (uiautomator: the Compose and
+     WebView samples show "Payload version <v>"), and a screenshot of each version goes to
+     docs/evidence/. ATD images (aosp_atd) capture normal windows as black frames, so the default
+     image is API 36 google_apis.
 
-Usage: python3 android/tests/sample_tests.py [--only compose|native|webview] [--api 34] [--device SERIAL]
+Usage: python3 android/tests/sample_tests.py [--only compose|native|webview] [--api 36] [--device SERIAL]
 """
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -33,6 +37,37 @@ def screenshot(d, name):
     dt.log(f"screenshot {p}")
 
 
+def screen_texts(d):
+    """(text, top px) of every labelled node, and how far down the window is covered by the
+    status bar or an action bar."""
+    d.sh("uiautomator dump /sdcard/andysu-ui.xml", check=False, timeout=60)
+    xml = d.sh("cat /sdcard/andysu-ui.xml", check=False)
+    texts = [(t, int(top)) for t, top in re.findall(r'text="([^"]+)"[^>]*?bounds="\[\d+,(\d+)\]', xml)]
+    covered = [int(b) for b in re.findall(
+        r'resource-id="android:id/action_bar_container"[^>]*?bounds="\[\d+,\d+\]\[\d+,(\d+)\]', xml)]
+    bars = d.sh("dumpsys window | grep 'type=statusBars'", check=False)
+    covered += [int(t) for t in re.findall(r"insetsSize=Insets\{left=0, top=(\d+)", bars)]
+    return texts, max(covered, default=0)
+
+
+def expect_on_screen(d, name, version, timeout=30):
+    """The UI samples print their payload version; the native one draws with GL (no text)."""
+    if name == "native":
+        return "GL frame (no text)"
+    end = time.time() + timeout * dt.SLOW
+    texts = []
+    while time.time() < end:
+        texts, covered = screen_texts(d)
+        hit = [(t, top) for t, top in texts if f"version {version}" in t]
+        if hit and hit[0][1] >= covered:
+            return hit[0][0]
+        if hit:
+            # In the tree but drawn under the status bar or an action bar (edge to edge, 15+).
+            raise dt.Fail(f"{name}: {hit[0][0]!r} at y={hit[0][1]} is covered (system/action bar to y={covered})")
+        time.sleep(2)
+    raise dt.Fail(f"{name}: 'version {version}' not on screen; saw {texts}")
+
+
 def sample(d, name, pkg, results):
     port = dt.free_port()
     dt.log(f"[{name}] building (remote 127.0.0.1:{port})")
@@ -47,19 +82,25 @@ def sample(d, name, pkg, results):
         dangerous = [p for p in ("CAMERA", "LOCATION", "STORAGE", "INSTALL_PACKAGES", "CONTACTS") if p in perms]
         if dangerous:
             raise dt.Fail(f"{name}: unexpected permissions {dangerous}")
-        d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
+        # First run without the remote, so 1.0 can be seen before the update swaps it out.
         d.watch()
         d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
         ev = d.wait(lambda e: e.get("event") == "booted" and e.get("version") == "1.0", f"{name} 1.0 booted", 120)
         if not ev.get("factory"):
             raise dt.Fail(f"{name}: 1.0 should be the built-in payload: {ev}")
-        time.sleep(3)
+        shown1 = expect_on_screen(d, name, "1.0")
         screenshot(d, f"sample-{name}-1.0")
+        # Now the remote: the next start checks on open and swaps 2.0 in live.
+        d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
+        d.sh(f"am force-stop {pkg}")
+        d.watch()
+        d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
         d.wait(lambda e: e.get("event") == "live_swapped", f"{name} live swap to 2.0", 300)
         d.event("committed", timeout=120)
-        time.sleep(3)
+        shown2 = expect_on_screen(d, name, "2.0")
         screenshot(d, f"sample-{name}-2.0")
-        results.append({"sample": name, "detail": "built-in 1.0 ran; 2.0 downloaded, swapped in live, committed"})
+        results.append({"sample": name, "detail": f"built-in 1.0 ran ({shown1!r}); 2.0 downloaded, swapped in "
+                                                  f"live, committed ({shown2!r})"})
     finally:
         srv.kill()
         d.adb("reverse", "--remove", f"tcp:{port}", check=False)
@@ -68,7 +109,7 @@ def sample(d, name, pkg, results):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=list(SAMPLES))
-    ap.add_argument("--api", default="34")
+    ap.add_argument("--api", default="36")
     ap.add_argument("--device")
     ap.add_argument("--keep", action="store_true")
     args = ap.parse_args()

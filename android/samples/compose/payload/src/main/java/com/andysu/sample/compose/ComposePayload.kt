@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,7 +62,7 @@ class ComposePayload : PayloadAdapter() {
         LaunchedEffect(Unit) { host.markHealthy() } // first composition worked
         MaterialTheme {
             Surface(Modifier.fillMaxSize()) {
-                Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.safeDrawingPadding().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("AndySU Compose sample", style = MaterialTheme.typography.headlineSmall)
                     Text("Payload version ${host.version()}${if (host.isFactory()) " (built in)" else ""}")
                     Text("Taps survive live updates: $taps")

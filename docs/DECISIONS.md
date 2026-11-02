@@ -208,3 +208,12 @@ after consumer verification has passed, and they skip themselves until `CARGO_RE
 Capacitor 8 ships Java 21 class files, which javac 17 cannot read. Local builds (`scripts/env.sh`)
 and CI therefore use Temurin 21. AGP 9.5 supports it, and the bytecode targets stay at 17 (host)
 and 8 (API).
+
+## D28. Stub activities have no action bar (2026-11-03)
+On Android 15+ (target SDK 35+) windows draw edge to edge. A stub activity that inherited the
+default theme drew a window action bar *over* the payload's content: the Compose sample's
+first lines were in the view tree but hidden (API 36, found by the sample test's new visibility
+check). The payload owns the whole window in AndySU, so the host's stub activities now use
+`Theme.DeviceDefault.NoActionBar`. Payloads handle the system-bar insets as any SDK 35+ app must
+(the samples use `safeDrawingPadding()` / `fitsSystemWindows`). An app can still give a stub
+another theme through manifest merging. Hosts made by `split` keep each activity's own theme.
