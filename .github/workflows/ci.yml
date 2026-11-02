@@ -1,11 +1,10 @@
-# Tests on every branch push and pull request. Pushes to main run release.yml instead, which
-# runs the same test jobs before publishing.
+# Tests on every pull request (all work reaches main through PRs). Pushes to main run
+# release.yml instead, which runs these same jobs before publishing.
 name: ci
 on:
-  push:
-    branches-ignore: [main]
   pull_request:
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -166,13 +165,15 @@ jobs:
       - run: cargo install cargo-ndk --locked && (python3 -c "import yaml" || sudo apt-get install -y python3-yaml)
       - name: Package into a local site
         run: |
+          mkdir -p "$RUNNER_TEMP/site"
+          # Serve the site from the start: `cargo package --registry andysu` reads its index.
+          nohup python3 -m http.server 8765 --bind 127.0.0.1 -d "$RUNNER_TEMP/site" >/dev/null 2>&1 &
           cargo build --release -p andysu-cli
           mkdir -p dist/cli && cp target/release/andysu dist/cli/andysu-x86_64-unknown-linux-musl
           scripts/package.sh "$RUNNER_TEMP/site" http://127.0.0.1:8765
       - name: Install every package from it
         run: |
-          python3 -m http.server 8765 --bind 127.0.0.1 -d "$RUNNER_TEMP/site" >/dev/null 2>&1 &
-          sleep 1
+          curl -sf http://127.0.0.1:8765/index.html >/dev/null
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           scripts/verify-consumers.sh http://127.0.0.1:8765 "$version" dist/release cargo npm upm maven pub c godot
 

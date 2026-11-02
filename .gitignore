@@ -18,8 +18,8 @@ android/**/.cxx/
 android/tests/__pycache__/
 docs/evidence/*.jsonl
 bindings/*/node_modules/
-bindings/*/lib/
-bindings/*/dist/
+bindings/react-native/lib/
+bindings/capacitor/dist/
 bindings/unity/Tests/Compile/bin/
 bindings/unity/Tests/Compile/obj/
 /dist/
