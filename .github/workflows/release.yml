@@ -267,7 +267,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: Homebrew/actions/setup-homebrew@master
+      - uses: Homebrew/actions/setup-homebrew@main
       - run: |
           brew tap dixonsolutions/andysu https://github.com/${{ github.repository }}
           brew install dixonsolutions/andysu/andysu

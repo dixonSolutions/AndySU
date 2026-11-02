@@ -39,7 +39,7 @@ fn app_of(site: &Path, r: &Release) -> R<String> {
     let b = read(&site.join("blobs/sha256").join(&d.sha256)).or_else(|_| {
         d.urls
             .iter()
-            .find_map(|u| match andysu_core::transport::get(u, None) {
+            .find_map(|u| match andysu_core::transport::get_max(u, None, d.size) {
                 Ok(andysu_core::transport::Got::Body { bytes, .. }) => Some(bytes),
                 _ => None,
             })
@@ -205,7 +205,7 @@ pub fn verify(
         let check = |sha: &str, urls: &[String], default: String, size: u64| -> R<()> {
             let list = if urls.is_empty() { vec![default] } else { urls.to_vec() };
             let u = baseu.join(&list[0]).map_err(|e| e.to_string())?;
-            let b = match andysu_core::transport::get(u.as_str(), None).map_err(|e| e.to_string())? {
+            let b = match andysu_core::transport::get_max(u.as_str(), None, size).map_err(|e| e.to_string())? {
                 andysu_core::transport::Got::Body { bytes, .. } => bytes,
                 _ => return Err("not modified".into()),
             };

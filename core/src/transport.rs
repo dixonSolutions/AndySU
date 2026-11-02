@@ -42,6 +42,12 @@ fn file_path(url: &str) -> Option<PathBuf> {
 
 /// GET a small resource into memory, with an optional If-None-Match.
 pub fn get(url: &str, etag: Option<&str>) -> Result<Got> {
+    get_max(url, etag, crate::manifest::MAX_MANIFEST as u64)
+}
+
+/// [`get`] for a body of up to `max` bytes (a blob of known size; manifests use [`get`]). A
+/// longer body is cut at `max + 1` bytes, so a size check by the caller catches it.
+pub fn get_max(url: &str, etag: Option<&str>, max: u64) -> Result<Got> {
     if let Some(p) = file_path(url) {
         let bytes = fs::read(&p).map_err(|e| Error::Net(format!("{url}: {e}")))?;
         let tag = format!("\"{}\"", &crate::hash::sha256_hex(&bytes)[..16]);
@@ -60,7 +66,7 @@ pub fn get(url: &str, etag: Option<&str>) -> Result<Got> {
             let etag = r.header("ETag").map(String::from);
             let mut bytes = vec![];
             r.into_reader()
-                .take(crate::manifest::MAX_MANIFEST as u64 + 1)
+                .take(max.saturating_add(1))
                 .read_to_end(&mut bytes)
                 .map_err(|e| Error::Net(e.to_string()))?;
             Ok(Got::Body { bytes, etag })

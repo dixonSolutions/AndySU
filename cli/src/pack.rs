@@ -194,13 +194,13 @@ pub fn known_releases(site: &Path) -> R<Vec<Release>> {
     Ok(v)
 }
 
-fn blob_bytes(site: &Path, c_sha: &str, urls: &[String]) -> Option<Vec<u8>> {
+fn blob_bytes(site: &Path, c_sha: &str, size: u64, urls: &[String]) -> Option<Vec<u8>> {
     let p = site.join("blobs/sha256").join(c_sha);
     if let Ok(b) = fs::read(&p) {
         return Some(b);
     }
     for u in urls.iter().filter(|u| u.starts_with("http")) {
-        if let Ok(andysu_core::transport::Got::Body { bytes, .. }) = andysu_core::transport::get(u, None) {
+        if let Ok(andysu_core::transport::Got::Body { bytes, .. }) = andysu_core::transport::get_max(u, None, size) {
             if sha256_hex(&bytes) == c_sha {
                 return Some(bytes);
             }
@@ -524,7 +524,7 @@ pub fn pack(o: &Options) -> R<Report> {
                     if !seen.insert(oc.sha256.clone()) {
                         continue;
                     }
-                    let Some(old) = blob_bytes(&o.site, &oc.sha256, &oc.urls) else {
+                    let Some(old) = blob_bytes(&o.site, &oc.sha256, oc.size, &oc.urls) else {
                         rep.warnings.push(format!("no local copy of {} ({}); skipping delta", oc.sha256, name));
                         continue;
                     };
@@ -591,7 +591,8 @@ pub fn pack(o: &Options) -> R<Report> {
             andysu_core::fsx::remove_tree(dir).map_err(|e| e.to_string())?;
         }
         for c in &release.components {
-            let b = blob_bytes(&o.site, &c.sha256, &c.urls).ok_or_else(|| format!("blob {} missing", c.sha256))?;
+            let b =
+                blob_bytes(&o.site, &c.sha256, c.size, &c.urls).ok_or_else(|| format!("blob {} missing", c.sha256))?;
             if c.archive.is_some() {
                 let tmp = dir.join(format!(".{}.zip", c.sha256));
                 write(&tmp, &b)?;
