@@ -28,6 +28,14 @@ jobs:
           scripts/gen-header.sh
           git diff --exit-code core/include/andysu.h
 
+  desktop-host:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: make -C desktop test
+
   fuzz-smoke:
     runs-on: ubuntu-latest
     steps:

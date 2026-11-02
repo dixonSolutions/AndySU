@@ -114,6 +114,11 @@ jfn!(Java_com_andysu_host_Core_crashMarkerPath(env, root: JString<'l>) {
     api::crash_marker_path(&r)
 });
 
+jfn!(Java_com_andysu_host_Core_loadPlan(env, dir: JString<'l>, abi: JString<'l>) {
+    let (d, a) = (st(&mut env, &dir)?, st(&mut env, &abi)?);
+    api::load_plan(&d, &a)
+});
+
 jfn!(Java_com_andysu_host_Core_verifyFile(env, path: JString<'l>, sha: JString<'l>, size: jlong) {
     let (p, h) = (st(&mut env, &path)?, st(&mut env, &sha)?);
     api::verify_file(&p, &h, size as u64)

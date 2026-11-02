@@ -147,6 +147,34 @@ pub mod api {
         Ok(json!(Store::open(root)?.crash_marker_path().to_string_lossy()))
     }
 
+    /// What a host must load for a slot on `abi`: absolute library paths in load order, the
+    /// entry library and symbol, and the dex class path. Works for packed slots (descriptor
+    /// `native` map) and for unpacked factory payloads (falls back to lib/<abi>/<entry>.so).
+    pub fn load_plan(slot_dir: &str, abi: &str) -> Result<Value> {
+        let dir = std::path::Path::new(slot_dir);
+        let dp = dir.join(crate::manifest::DESCRIPTOR_PATH);
+        let d = crate::payload::Descriptor::parse(&std::fs::read(&dp).map_err(|e| Error::Io(format!("{}: {e}", dp.display())))?)?;
+        let abs = |p: &str| dir.join(p).to_string_lossy().to_string();
+        let mut libs: Vec<String> = d.native.get(abi).map(|v| v.iter().map(|l| abs(&l.path)).collect()).unwrap_or_default();
+        let entry = d.entry.native_lib.as_ref().map(|n| match d.native_path(abi, n) {
+            Some(p) => abs(p),
+            None => {
+                let f = if n.ends_with(".so") { n.clone() } else { format!("{n}.so") };
+                abs(&format!("{}/{abi}/{f}", d.native_dir.as_deref().unwrap_or("lib")))
+            }
+        });
+        if let Some(e) = &entry {
+            if !libs.contains(e) {
+                libs.push(e.clone());
+            }
+        }
+        Ok(json!({
+            "app": d.app, "version": d.version, "host_api_min": d.host_api_min,
+            "libs": libs, "entry_lib": entry, "symbol": d.entry.symbol,
+            "dex_class": d.entry.dex_class, "dex": d.dex.iter().map(|p| abs(p)).collect::<Vec<_>>(),
+        }))
+    }
+
     pub fn verify_file(path: &str, sha256: &str, size: u64) -> Result<Value> {
         crate::hash::verify_file(std::path::Path::new(path), sha256, size).map(|_| Value::Null)
     }
@@ -295,6 +323,12 @@ pub unsafe extern "C" fn andysu_gc(root: *const c_char, low_storage: bool) -> *m
 #[no_mangle]
 pub unsafe extern "C" fn andysu_state(root: *const c_char) -> *mut c_char {
     out(api::guarded(|| api::state(s(root)?)))
+}
+
+/// Libraries to load (in order), entry library and symbol, dex path for a slot directory.
+#[no_mangle]
+pub unsafe extern "C" fn andysu_load_plan(slot_dir: *const c_char, abi: *const c_char) -> *mut c_char {
+    out(api::guarded(|| api::load_plan(s(slot_dir)?, s(abi)?)))
 }
 
 /// Path a native signal handler should create to report a crash (see `Store::crash_marker_path`).

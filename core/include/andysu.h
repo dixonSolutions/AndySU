@@ -75,6 +75,11 @@ char *andysu_gc(const char *root, bool low_storage);
 char *andysu_state(const char *root);
 
 /**
+ * Libraries to load (in order), entry library and symbol, dex path for a slot directory.
+ */
+char *andysu_load_plan(const char *slot_dir, const char *abi);
+
+/**
  * Path a native signal handler should create to report a crash (see `Store::crash_marker_path`).
  */
 char *andysu_crash_marker_path(const char *root);
