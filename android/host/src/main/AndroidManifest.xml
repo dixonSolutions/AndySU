@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Everything a payload may ever need is declared here, up front, because the host APK never
+  changes. Only normal (install-time, prompt-free) permissions.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application>
+        <activity
+            android:name="com.andysu.host.HostActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode|density|navigation"
+            android:exported="true" />
+        <activity
+            android:name="com.andysu.host.StubActivity1"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode|density|navigation"
+            android:screenOrientation="sensorLandscape"
+            android:exported="false" />
+        <activity
+            android:name="com.andysu.host.StubActivity2"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode|density|navigation"
+            android:launchMode="singleTask"
+            android:exported="false" />
+        <activity
+            android:name="com.andysu.host.StubActivity3"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|keyboard|smallestScreenSize|uiMode|density|navigation"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:exported="false" />
+        <activity
+            android:name="com.andysu.host.PhoenixActivity"
+            android:process=":andysu_phoenix"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:exported="false" />
+
+        <service android:name="com.andysu.host.StubService0" android:exported="false" />
+        <service android:name="com.andysu.host.StubService1" android:exported="false" />
+        <service
+            android:name="com.andysu.host.UpdateJobService"
+            android:permission="android.permission.BIND_JOB_SERVICE"
+            android:exported="false" />
+
+        <receiver android:name="com.andysu.host.StubReceiver0" android:exported="false" />
+        <receiver android:name="com.andysu.host.StubReceiver1" android:exported="false" />
+        <receiver android:name="com.andysu.host.ShellInstallReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="com.andysu.host.SHELL_INSTALL_STATUS" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="com.andysu.host.StubFileProvider"
+            android:authorities="${applicationId}.andysu.files"
+            android:grantUriPermissions="true"
+            android:exported="false" />
+    </application>
+</manifest>

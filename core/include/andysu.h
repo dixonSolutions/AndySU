@@ -70,6 +70,11 @@ char *andysu_report_failure(const char *root, const char *reason);
 
 char *andysu_begin_live(const char *root, int64_t now);
 
+/**
+ * Recovery: forget installed slots and boot the payload built into the host.
+ */
+char *andysu_reset(const char *root, const char *reason);
+
 char *andysu_gc(const char *root, bool low_storage);
 
 char *andysu_state(const char *root);

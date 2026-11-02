@@ -11,3 +11,6 @@ node_modules/
 
 # libFuzzer job logs
 core/fuzz-*.log
+android/tests/reports/
+android/.kotlin/
+android/gradle-plugin/.kotlin/

@@ -1,0 +1,36 @@
+package com.andysu.host
+
+import dalvik.system.DexClassLoader
+
+/**
+ * Child-first loader for one payload generation. The payload's own copies of libraries (Kotlin,
+ * AndroidX, Compose...) win over anything in the host, so a host frozen years ago never shadows
+ * them. Only `com.andysu.api` (the boundary) and the platform come from the parent.
+ *
+ * `System.loadLibrary("game")` in payload code resolves to the generation's uniquely renamed
+ * `libgame.<hash>.so` through [findLibrary]; the library search path is the slot's lib/<abi>
+ * directory, so renamed DT_NEEDED entries resolve inside the same generation.
+ */
+class PayloadClassLoader(
+    dexPath: String,
+    librarySearchPath: String?,
+    parent: ClassLoader,
+    private val libraries: Map<String, String>,
+) : DexClassLoader(dexPath, null, librarySearchPath, parent) {
+
+    override fun loadClass(name: String, resolve: Boolean): Class<*> {
+        findLoadedClass(name)?.let { return it }
+        if (name.startsWith("com.andysu.api.") || name.startsWith("java.") || name.startsWith("android.") ||
+            name.startsWith("dalvik.") || name.startsWith("javax.")
+        ) {
+            return super.loadClass(name, resolve)
+        }
+        return try {
+            findClass(name)
+        } catch (e: ClassNotFoundException) {
+            super.loadClass(name, resolve)
+        }
+    }
+
+    override fun findLibrary(name: String): String? = libraries[name] ?: super.findLibrary(name)
+}

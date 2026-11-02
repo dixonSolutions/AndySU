@@ -208,6 +208,22 @@ impl State {
         }
     }
 
+    /// Recovery: forget every installed slot and boot the payload built into the host. Bad marks
+    /// and the anti-rollback memory (`last_manifest`) are kept.
+    pub fn reset_to_factory(&mut self, reason: &str) -> Event {
+        let e = Event::RolledBack {
+            bad: self.current.as_ref().map(|c| c.id.clone()).unwrap_or_default(),
+            to: None,
+            reason: format!("reset: {reason}"),
+        };
+        self.current = None;
+        self.previous = None;
+        self.pending = None;
+        self.trial = None;
+        self.note(&e);
+        e
+    }
+
     /// Reset counters that only make sense within one process (called on cold start).
     pub fn cold_start(&mut self) {
         self.live_swaps = 0;
@@ -332,6 +348,20 @@ mod tests {
         assert_eq!(s.on_launch(6, true, 2).slot.unwrap().id, "b");
         assert_eq!(s.on_launch(7, true, 2).slot.unwrap().id, "a");
         assert!(s.begin_live(8).is_err());
+    }
+
+    #[test]
+    fn reset_keeps_bad_and_anti_rollback() {
+        let mut s = State::new("x".into());
+        s.stage(slot("a", 1));
+        s.on_launch(0, true, 2);
+        s.bad.push("z".into());
+        s.last_manifest = Some(LastManifest { sequence: 9, ..Default::default() });
+        s.reset_to_factory("user");
+        assert_eq!((s.current.clone(), s.trial.clone()), (None, None));
+        assert_eq!(s.bad, vec!["z".to_string()]);
+        assert_eq!(s.last_manifest.as_ref().unwrap().sequence, 9);
+        assert_eq!(s.on_launch(0, true, 2).slot, None);
     }
 
     #[test]

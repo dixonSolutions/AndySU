@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.22)
+project(nativesample C)
+add_library(game SHARED game.c)
+target_include_directories(game PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../../desktop/include)
+target_compile_definitions(game PRIVATE SAMPLE_VERSION="${SAMPLE_VERSION}")
+target_link_libraries(game GLESv2 log m)
+target_link_options(game PRIVATE "-Wl,-z,max-page-size=16384")

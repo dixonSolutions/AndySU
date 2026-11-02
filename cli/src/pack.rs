@@ -60,6 +60,8 @@ pub struct Options {
     pub base_url: Option<String>,
     pub require_16k: bool,
     pub allow_shell: bool,
+    /// Also write the release as a ready slot directory (for the payload built into a host).
+    pub emit_slot: Option<PathBuf>,
 }
 
 #[derive(Serialize, Debug, Default)]
@@ -524,6 +526,24 @@ pub fn pack(o: &Options) -> R<Report> {
         shell: None,
     };
     release.validate().map_err(|e| e.to_string())?;
+    if let Some(dir) = &o.emit_slot {
+        if dir.exists() {
+            andysu_core::fsx::remove_tree(dir).map_err(|e| e.to_string())?;
+        }
+        for c in &release.components {
+            let b = blob_bytes(&o.site, &c.sha256, &c.urls).ok_or_else(|| format!("blob {} missing", c.sha256))?;
+            if c.archive.is_some() {
+                let tmp = dir.join(format!(".{}.zip", c.sha256));
+                write(&tmp, &b)?;
+                fs::create_dir_all(dir.join(&c.path)).map_err(|e| e.to_string())?;
+                andysu_core::extract::extract_zip(&tmp, &dir.join(&c.path), c.unpacked_size.unwrap_or(4 << 30))
+                    .map_err(|e| e.to_string())?;
+                fs::remove_file(&tmp).map_err(|e| e.to_string())?;
+            } else {
+                write(&dir.join(&c.path), &b)?;
+            }
+        }
+    }
     let rp = o.site.join("releases").join(format!("{id}.json"));
     write(&rp, &serde_json::to_vec_pretty(&release).unwrap())?;
     rep.release = id;

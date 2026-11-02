@@ -148,7 +148,7 @@ fn publish_update_resume_commit_delta_rollback_and_attacks() {
     let srv = serve::spawn(
         &site,
         "127.0.0.1:0",
-        serve::Faults { drop_after: Some(50_000), drop_prefix: "blobs/".into(), fail: vec![] },
+        serve::Faults { drop_after: Some(50_000), drop_prefix: "blobs/".into(), ..Default::default() },
     )
     .unwrap();
     let url = format!("{}/stable/update.json", srv.url());

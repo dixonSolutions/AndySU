@@ -104,6 +104,11 @@ jfn!(Java_com_andysu_host_Core_gc(env, root: JString<'l>, low: jboolean) {
     api::gc(&r, low != 0, &[])
 });
 
+jfn!(Java_com_andysu_host_Core_reset(env, root: JString<'l>, reason: JString<'l>) {
+    let (r, why) = (st(&mut env, &root)?, st(&mut env, &reason)?);
+    api::reset(&r, &why)
+});
+
 jfn!(Java_com_andysu_host_Core_state(env, root: JString<'l>) {
     let r = st(&mut env, &root)?;
     api::state(&r)

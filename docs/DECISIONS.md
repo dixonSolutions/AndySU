@@ -85,3 +85,38 @@ secret.
 The HTTP transport retries each URL up to 3 times on network errors, resuming from the bytes
 already on disk with `Range`. Wrong bytes (hash mismatch) move to the next URL instead; for a
 delta, they make the session fall back to the full blob.
+
+## D16. Host scheduling uses JobScheduler, not WorkManager (2026-11-02)
+The host APK is frozen. WorkManager would freeze androidx.work and Room into it forever, and its
+manifest components could not come from the payload (the host class loader instantiates them).
+The platform JobScheduler (API 21+) gives periodic jobs with the same constraints (unmetered,
+charging, battery not low, persisted across reboots with RECEIVE_BOOT_COMPLETED), plus a check on
+every app open. A payload may still use WorkManager for its own work through the stub components.
+
+## D17. The payload API is Java with platform types only (2026-11-02)
+`android/api` is written in Java, uses only `java.*`/`android.*` types and no default methods.
+Payloads load child-first (so their Kotlin/AndroidX copies win), and any type in the boundary
+signatures must be the same `Class` on both sides; Kotlin function types or desugared default
+methods would break that. Kotlin payloads implement it naturally (`PayloadAdapter`).
+
+## D18. Child-first payload class loading (2026-11-02)
+`PayloadClassLoader` loads payload classes before the host's, except `com.andysu.api.*` and
+platform packages. A host built years ago therefore never shadows the payload's libraries.
+`System.loadLibrary("x")` maps to the generation's renamed `libx.<hash>.so` via `findLibrary`.
+
+## D19. Process relaunch through a phoenix activity (2026-11-02)
+A crash during TRIAL relaunches the app once: the dying process (still foreground, so the
+background-activity-start rules allow it) starts `PhoenixActivity` in `:andysu_phoenix`, which
+kills the old pid and starts the launcher intent. Native crashes on non-main threads reach Java
+through a pipe from the signal handler (the crashing thread is parked). Outside TRIAL, crashes go
+to the platform as usual (tombstones are kept). At most 3 relaunches per minute.
+
+## D20. Local Android emulators crash under KVM on this machine (2026-11-02)
+Evidence: emulator 37.2.12 (installed), 37.2.13 (stable) and 37.3.6 (beta) all SIGSEGV in
+`qemu-system-x86_64-headless` 15-20 s after start, for API 34 ATD and API 36 images, with
+`-gpu swiftshader_indirect`, `-gpu guest`, Vulkan/GLDirectMem features off, 1 or 4 vCPUs
+(coredumpctl shows the crashes; no symbols). With `-accel off` (TCG) the same AVD keeps running,
+so the fault is the emulator's KVM path on kernel 7.2.7-200.fc44 (i7-13700T). Adjustment:
+device tests run locally on the BlissOS VM (`xtbliss`, Android 13 / API 33, KVM through GNOME
+Boxes' qemu; allowed by the brief, left as found), and the API 24/29/31/34/36/36-16k matrix runs
+in GitHub Actions, whose runners support KVM, with the same driver in `--device` mode.

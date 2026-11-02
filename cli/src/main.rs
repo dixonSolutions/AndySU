@@ -120,6 +120,15 @@ enum Cmd {
         #[arg(long)]
         no_keys: bool,
     },
+    /// From andysu.toml, write the host's config.json and andysu-host.json (what the host declares).
+    HostConfig {
+        #[arg(long, default_value = "andysu.toml")]
+        toml: PathBuf,
+        #[arg(long)]
+        config_out: PathBuf,
+        #[arg(long)]
+        host_out: Option<PathBuf>,
+    },
     /// Split a finished APK into a frozen host APK and a payload directory.
     Split(andysu_cli::split::SplitArgs),
     /// Turn a payload directory into a release inside a site directory.
@@ -154,6 +163,9 @@ enum Cmd {
         /// Allow host_api_min above the host's level (a tier-C shell update will be needed).
         #[arg(long)]
         allow_shell: bool,
+        /// Also write the release as a ready slot directory (the payload built into a host APK).
+        #[arg(long)]
+        emit_slot: Option<PathBuf>,
     },
     /// Add a packed release to a channel manifest and sign it.
     Publish {
@@ -247,6 +259,12 @@ enum Cmd {
         /// Drop each path's first response after this many body bytes.
         #[arg(long)]
         drop_after: Option<u64>,
+        /// Only drop paths with this prefix (e.g. blobs/).
+        #[arg(long, default_value = "")]
+        drop_prefix: String,
+        /// Throttle response bodies to about this many KiB per second.
+        #[arg(long)]
+        throttle_kbps: Option<u64>,
     },
 }
 
@@ -281,6 +299,15 @@ fn run(cli: Cli) -> R<()> {
         Cmd::Init { dir, app, repo, no_keys } => {
             println!("{}", andysu_cli::init::init(&dir, app, repo, !no_keys)?);
         }
+        Cmd::HostConfig { toml, config_out, host_out } => {
+            let t = andysu_cli::init::AndySUToml::load(&toml)?;
+            let dir = toml.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+            write(&config_out, json(&t.host_config(dir)?).as_bytes())?;
+            if let Some(h) = host_out {
+                write(&h, json(&t.host_spec()).as_bytes())?;
+            }
+            println!("manifest URL: {}", t.manifest_url()?);
+        }
         Cmd::Split(a) => {
             println!("{}", json(&andysu_cli::split::split(&a)?));
         }
@@ -297,6 +324,7 @@ fn run(cli: Cli) -> R<()> {
             base_url,
             require_16k,
             allow_shell,
+            emit_slot,
         } => {
             let host = host
                 .map(|h| serde_json::from_slice(&read(&h)?).map_err(|e| format!("{}: {e}", h.display())))
@@ -314,6 +342,7 @@ fn run(cli: Cli) -> R<()> {
                 base_url,
                 require_16k,
                 allow_shell,
+                emit_slot,
             };
             let rep = pack::pack(&o)?;
             for w in &rep.warnings {
@@ -374,9 +403,14 @@ fn run(cli: Cli) -> R<()> {
             );
         }
         Cmd::Client { root, cmd } => client(&root, cmd)?,
-        Cmd::Serve { dir, addr, drop_after } => {
-            let s = serve::spawn(&dir, &addr, serve::Faults { drop_after, ..Default::default() })
-                .map_err(|e| e.to_string())?;
+        Cmd::Serve { dir, addr, drop_after, drop_prefix, throttle_kbps } => {
+            let faults = serve::Faults {
+                drop_after,
+                drop_prefix,
+                throttle_bps: throttle_kbps.map(|k| k * 1024),
+                ..Default::default()
+            };
+            let s = serve::spawn(&dir, &addr, faults).map_err(|e| e.to_string())?;
             eprintln!("serving {} on {}", dir.display(), s.url());
             let mut seen = 0;
             loop {

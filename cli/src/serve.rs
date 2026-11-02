@@ -16,6 +16,8 @@ pub struct Faults {
     pub drop_prefix: String,
     /// Paths (prefix match, relative to the root) answered with this status.
     pub fail: Vec<(String, u16)>,
+    /// Limit each response body to about this many bytes per second.
+    pub throttle_bps: Option<u64>,
 }
 
 #[derive(Clone)]
@@ -128,7 +130,17 @@ fn handle(
             return s.shutdown(std::net::Shutdown::Both);
         }
     }
-    s.write_all(&body)
+    match f.throttle_bps {
+        Some(bps) if bps > 0 => {
+            let chunk = (bps / 20).max(1024) as usize;
+            for c in body.chunks(chunk) {
+                s.write_all(c)?;
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Ok(())
+        }
+        _ => s.write_all(&body),
+    }
 }
 
 /// Serve `root` on `addr` (use port 0 for an ephemeral port) in background threads.

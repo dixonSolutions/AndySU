@@ -132,6 +132,10 @@ pub mod api {
         Ok(json!({ "event": e, "slot": cur, "slot_dir": dir }))
     }
 
+    pub fn reset(root: &str, reason: &str) -> Result<Value> {
+        Ok(serde_json::to_value(Store::open(root)?.update_state(|s| s.reset_to_factory(reason))?).unwrap())
+    }
+
     pub fn gc(root: &str, low_storage: bool, keep_parts: &[String]) -> Result<Value> {
         let store = Store::open(root)?;
         let st = crate::state::load(&store.state_path())?.ok_or_else(|| Error::State("no state".into()))?;
@@ -153,9 +157,12 @@ pub mod api {
     pub fn load_plan(slot_dir: &str, abi: &str) -> Result<Value> {
         let dir = std::path::Path::new(slot_dir);
         let dp = dir.join(crate::manifest::DESCRIPTOR_PATH);
-        let d = crate::payload::Descriptor::parse(&std::fs::read(&dp).map_err(|e| Error::Io(format!("{}: {e}", dp.display())))?)?;
+        let d = crate::payload::Descriptor::parse(
+            &std::fs::read(&dp).map_err(|e| Error::Io(format!("{}: {e}", dp.display())))?,
+        )?;
         let abs = |p: &str| dir.join(p).to_string_lossy().to_string();
-        let mut libs: Vec<String> = d.native.get(abi).map(|v| v.iter().map(|l| abs(&l.path)).collect()).unwrap_or_default();
+        let mut libs: Vec<String> =
+            d.native.get(abi).map(|v| v.iter().map(|l| abs(&l.path)).collect()).unwrap_or_default();
         let entry = d.entry.native_lib.as_ref().map(|n| match d.native_path(abi, n) {
             Some(p) => abs(p),
             None => {
@@ -168,8 +175,13 @@ pub mod api {
                 libs.push(e.clone());
             }
         }
+        let names: Vec<Value> = d
+            .native
+            .get(abi)
+            .map(|v| v.iter().map(|l| json!({"name": l.name, "path": abs(&l.path)})).collect())
+            .unwrap_or_default();
         Ok(json!({
-            "app": d.app, "version": d.version, "host_api_min": d.host_api_min,
+            "app": d.app, "version": d.version, "host_api_min": d.host_api_min, "native": names,
             "libs": libs, "entry_lib": entry, "symbol": d.entry.symbol,
             "dex_class": d.entry.dex_class, "dex": d.dex.iter().map(|p| abs(p)).collect::<Vec<_>>(),
         }))
@@ -313,6 +325,12 @@ pub unsafe extern "C" fn andysu_report_failure(root: *const c_char, reason: *con
 #[no_mangle]
 pub unsafe extern "C" fn andysu_begin_live(root: *const c_char, now: i64) -> *mut c_char {
     out(api::guarded(|| api::begin_live(s(root)?, now)))
+}
+
+/// Recovery: forget installed slots and boot the payload built into the host.
+#[no_mangle]
+pub unsafe extern "C" fn andysu_reset(root: *const c_char, reason: *const c_char) -> *mut c_char {
+    out(api::guarded(|| api::reset(s(root)?, s(reason)?)))
 }
 
 #[no_mangle]

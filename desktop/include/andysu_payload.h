@@ -40,6 +40,12 @@ typedef struct andysu_host {
     /* Ask the host to check for updates soon (non-blocking). */
     void (*request_update_check)(void);
     void *host_data;
+    /* Android only (NULL/0 elsewhere). frame() runs on the host's GL thread with the host's EGL
+     * context current; the host keeps the context and surface alive across live swaps. */
+    void *java_vm;             /* JavaVM* */
+    void *activity;            /* jobject: global ref to the current stub Activity, may be NULL */
+    int32_t surface_width;
+    int32_t surface_height;
 } andysu_host;
 
 typedef struct andysu_payload {
