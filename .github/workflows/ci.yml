@@ -1,0 +1,47 @@
+# Tests on every branch push and pull request. Pushes to main run release.yml instead, which
+# runs the same test jobs before publishing.
+name: ci
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --features andysu-core/jni,andysu-core/transport -- -D warnings
+      - run: cargo test --workspace
+      - name: C header is up to date
+        run: |
+          cargo install cbindgen --locked --version 0.29.4
+          scripts/gen-header.sh
+          git diff --exit-code core/include/andysu.h
+
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core/fuzz
+      - run: cargo install cargo-fuzz --locked
+      - name: Fuzz each target for 60 s, seeded with the spec fixtures
+        working-directory: core
+        run: |
+          for t in verify_and_parse parse_manifest; do
+            mkdir -p fuzz/corpus/$t
+            cp ../spec/fixtures/manifest/*/*.json fuzz/corpus/$t/
+            cargo fuzz run $t fuzz/corpus/$t -- -max_total_time=60
+          done

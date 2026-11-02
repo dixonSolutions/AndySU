@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dixonsolutions.github.io/AndySU/spec/schema/state.schema.json",
+  "title": "AndySU client state (state.json)",
+  "type": "object",
+  "required": ["v", "install_id"],
+  "properties": {
+    "v": { "const": 1 },
+    "install_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "current": { "$ref": "#/$defs/slot" },
+    "previous": { "$ref": "#/$defs/slot" },
+    "pending": { "$ref": "#/$defs/slot" },
+    "trial": {
+      "type": ["object", "null"],
+      "required": ["boot_attempts"],
+      "properties": {
+        "boot_attempts": { "type": "integer", "minimum": 0 },
+        "started": { "type": "integer" },
+        "live": { "type": "boolean" }
+      }
+    },
+    "bad": { "type": "array", "items": { "type": "string" } },
+    "last_manifest": {
+      "type": ["object", "null"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 0 },
+        "issued": { "type": "integer" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "etag": { "type": ["string", "null"] }
+      }
+    },
+    "live_swaps": { "type": "integer", "minimum": 0 },
+    "last_event": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "slot": {
+      "type": ["object", "null"],
+      "required": ["id", "sequence"],
+      "properties": {
+        "id": { "type": "string" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "hot_only": { "type": "boolean" }
+      }
+    }
+  }
+}

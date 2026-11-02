@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "app": "com.example.app",
+  "channel": "stable",
+  "issued": "2026-11-01T00:00:00Z",
+  "expires": "2099-01-01T00:00:00Z",
+  "sequence": 7,
+  "releases": [
+    {
+      "id": "1.2.0",
+      "sequence": 3,
+      "components": [
+        {
+          "name": "descriptor",
+          "kind": "content",
+          "path": "andysu-payload.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "app": "com.example.app",
+  "channel": "stable",
+  "issued": "2026-11-01T00:00:00Z",
+  "expires": "2099-01-01T00:00:00Z",
+  "sequence": 7,
+  "releases": [
+    {
+      "id": "1.2.0",
+      "sequence": 3,
+      "requires": {
+        "host_api_min": 1,
+        "shell_min": 1,
+        "api_min": 24,
+        "abis": [
+          "arm64-v8a",
+          "x86_64"
+        ]
+      },
+      "rollout": {
+        "percent": 100,
+        "salt": "1.2.0"
+      },
+      "mandatory": false,
+      "notes_url": "https://example.com/notes/1.2.0",
+      "components": [],
+      "shell": {
+        "version_code": 2,
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "size": 3000000,
+        "urls": [
+          "https://example.com/app-2.apk"
+        ]
+      }
+    }
+  ]
+}

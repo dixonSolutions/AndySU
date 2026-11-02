@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dixonsolutions.github.io/AndySU/spec/schema/payload.schema.json",
+  "title": "AndySU payload descriptor (andysu-payload.json)",
+  "type": "object",
+  "required": ["schema", "app", "version", "host_api_min", "entry"],
+  "properties": {
+    "schema": { "const": 1 },
+    "app": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)*$" },
+    "version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$" },
+    "host_api_min": { "type": "integer", "minimum": 1 },
+    "entry": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "dex_class": { "type": "string", "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*$" },
+        "native_lib": { "type": "string", "pattern": "^[A-Za-z0-9_.+-]+$" },
+        "symbol": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+      },
+      "dependentRequired": { "native_lib": ["symbol"] }
+    },
+    "dex": { "type": "array", "items": { "type": "string" }, "description": "slot-relative dex paths, in class-path order" },
+    "native_dir": { "type": "string", "description": "slot-relative directory holding lib/<abi>/ trees", "default": "lib" },
+    "native": {
+      "type": "object",
+      "description": "per-ABI native libraries in load order (dependencies first), written by andysu pack",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["name", "path"],
+          "properties": { "name": { "type": "string" }, "path": { "type": "string" } }
+        }
+      }
+    },
+    "needs": {
+      "type": "object",
+      "properties": {
+        "permissions": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "activities": { "type": "integer", "minimum": 0 },
+        "services": { "type": "integer", "minimum": 0 },
+        "receivers": { "type": "integer", "minimum": 0 },
+        "providers": { "type": "integer", "minimum": 0 },
+        "features": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+      }
+    }
+  }
+}

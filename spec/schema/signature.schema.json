@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dixonsolutions.github.io/AndySU/spec/schema/signature.schema.json",
+  "title": "AndySU signature envelope (update.json.sig)",
+  "type": "object",
+  "required": ["v", "alg", "sig"],
+  "properties": {
+    "v": { "const": 1 },
+    "alg": { "const": "ed25519" },
+    "sig": { "$ref": "#/$defs/b64sig" },
+    "cert": {
+      "type": "object",
+      "required": ["key", "not_before", "not_after", "sig"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[A-Za-z0-9+/]{43}=$" },
+        "not_before": { "$ref": "#/$defs/time" },
+        "not_after": { "$ref": "#/$defs/time" },
+        "sig": { "$ref": "#/$defs/b64sig" }
+      }
+    }
+  },
+  "$defs": {
+    "b64sig": { "type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$" },
+    "time": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" }
+  }
+}

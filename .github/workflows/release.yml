@@ -1,0 +1,69 @@
+# Every push to main is a release: run all tests, then publish to our own GitHub remote.
+name: release
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: v
+        run: echo "version=$(scripts/version.sh)" >> "$GITHUB_OUTPUT"
+
+  cli:
+    needs: [test, version]
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+          - target: aarch64-unknown-linux-musl
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-zigbuild --locked && pip install ziglang
+      - run: scripts/set-version.sh "${{ needs.version.outputs.version }}"
+      - run: cargo zigbuild --release -p andysu-cli --target ${{ matrix.target }}
+      - run: |
+          mkdir dist
+          cp target/${{ matrix.target }}/release/andysu dist/andysu-${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: dist/*
+
+  github-release:
+    needs: [version, cli]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create release v${{ needs.version.outputs.version }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist && sha256sum * > SHA256SUMS && cd ..
+          gh release create "v${{ needs.version.outputs.version }}" dist/* \
+            --title "AndySU ${{ needs.version.outputs.version }}" --notes "Automated release of ${{ github.sha }}."

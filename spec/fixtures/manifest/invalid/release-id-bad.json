@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "app": "com.example.app",
+  "channel": "stable",
+  "issued": "2026-11-01T00:00:00Z",
+  "expires": "2099-01-01T00:00:00Z",
+  "sequence": 7,
+  "releases": [
+    {
+      "id": "../1.2",
+      "sequence": 3,
+      "requires": {
+        "host_api_min": 1,
+        "shell_min": 1,
+        "api_min": 24,
+        "abis": [
+          "arm64-v8a",
+          "x86_64"
+        ]
+      },
+      "rollout": {
+        "percent": 100,
+        "salt": "1.2.0"
+      },
+      "mandatory": false,
+      "notes_url": "https://example.com/notes/1.2.0",
+      "components": [
+        {
+          "name": "descriptor",
+          "kind": "content",
+          "apply": "restart",
+          "path": "andysu-payload.json",
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "size": 210
+        },
+        {
+          "name": "classes",
+          "kind": "dex",
+          "apply": "restart",
+          "path": "dex/classes.dex",
+          "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "size": 120000,
+          "urls": [
+            "../blobs/sha256/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ],
+          "deltas": [
+            {
+              "from_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "format": "zstd",
+              "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "size": 900,
+              "urls": [
+                "../deltas/cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "libgame",
+          "kind": "native",
+          "apply": "restart",
+          "abi": "arm64-v8a",
+          "path": "lib/arm64-v8a/libgame.0badf00d.so",
+          "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "size": 500000
+        },
+        {
+          "name": "assets",
+          "kind": "content",
+          "apply": "hot",
+          "path": "assets",
+          "archive": "zip",
+          "unpacked_size": 90000,
+          "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "size": 40000,
+          "urls": [
+            "https://cdn.example.com/blobs/sha256/ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          ]
+        }
+      ],
+      "shell": {
+        "version_code": 2,
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "size": 3000000,
+        "urls": [
+          "https://example.com/app-2.apk"
+        ]
+      }
+    }
+  ]
+}
