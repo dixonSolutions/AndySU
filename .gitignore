@@ -1,0 +1,10 @@
+testbeds/*
+!testbeds/patches/
+target/
+build/
+.gradle/
+local.properties
+node_modules/
+*.part
+*.key
+*.jks
