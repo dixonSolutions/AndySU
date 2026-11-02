@@ -1,0 +1,238 @@
+diff --git a/android/app/build.gradle b/android/app/build.gradle
+index 7f24240..ee4b3ba 100644
+--- a/android/app/build.gradle
++++ b/android/app/build.gradle
+@@ -24,6 +24,10 @@ android {
+             cmake {
+                 arguments "-DXONOTIC_DEPS_PREFIX=${depsPrefix}",
+                           "-DXONOTIC_VERSION=${appVersion}"
++                // build.sh variant ":fail" (ORG_GRADLE_PROJECT_andysu_fail_init=1): an engine whose init always fails
++                if (project.findProperty('andysu_fail_init')) {
++                    arguments "-DANDYSU_FAIL_INIT=ON"
++                }
+                 // ccache when the host has it: the NDK compiler call is
+                 // wrapped and the second build of a commit costs seconds.
+                 def ccacheBin = ['/usr/bin/ccache', '/usr/local/bin/ccache',
+diff --git a/android/app/src/main/cpp/CMakeLists.txt b/android/app/src/main/cpp/CMakeLists.txt
+index 570618b..d1fc681 100644
+--- a/android/app/src/main/cpp/CMakeLists.txt
++++ b/android/app/src/main/cpp/CMakeLists.txt
+@@ -63,6 +63,10 @@ if(EXISTS "${ANDYSU_DIR}/andysu_loader.c")
+     target_sources(main PRIVATE "${ANDYSU_DIR}/andysu_engine.c")
+     target_include_directories(main PRIVATE "${ANDYSU_DIR}")
+     target_compile_definitions(main PRIVATE ANDYSU_SWAP ANDYSU_BUILD_ID="${XONOTIC_VERSION}")
++    if(ANDYSU_FAIL_INIT)
++        # A deliberately broken engine for the live-swap rollback test (build.sh variant ":fail").
++        target_compile_definitions(main PRIVATE ANDYSU_FAIL_INIT)
++    endif()
+     # libmain exports exactly one symbol, so two copies of it never see each other's.
+     target_link_options(main PRIVATE "-Wl,--version-script=${ANDYSU_DIR}/andysu_engine.map" -Wl,--exclude-libs,ALL)
+     add_library(andysu_xonotic_loader SHARED "${ANDYSU_DIR}/andysu_loader.c")
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/EngineSwap.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/EngineSwap.java
+new file mode 100644
+index 0000000..5a07cc6
+--- /dev/null
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/EngineSwap.java
+@@ -0,0 +1,182 @@
++package io.github.dixonsolutions.xonotictouch;
++
++import android.content.Context;
++import android.os.Build;
++import android.util.Log;
++
++import java.io.File;
++import java.io.IOException;
++import java.lang.reflect.InvocationHandler;
++import java.lang.reflect.Method;
++import java.lang.reflect.Proxy;
++
++/**
++ * Live engine swap under an AndySU host (Host API level 2, D29), by reflection so the same sources
++ * build and run without AndySU (like {@link AndySUCompat}; no compile dependency on com.andysu.api).
++ *
++ * <p>{@link #register} hands the host a {@code LiveSwapHandler}. When the host has a staged release
++ * that only changes native code and content, it calls {@code onLiveSwap(slotDir, version, cb)}: this
++ * class finds the release's {@code libmain*.so} and asks the resident loader
++ * ({@code libandysu_xonotic_loader.so}, {@link #nativeRequestSwap}) to swap the engine in this
++ * process. The loader reports back through {@link #onEngineEvent} (started, failed(reason),
++ * healthy) and {@link #beforeEngineStart} (unpack the new release's data between the old engine's
++ * teardown and the new engine's start), both called from native threads.
++ */
++final class EngineSwap {
++    private static final String TAG = "XonoticTouch";
++    private static final int EV_STARTED = 1;
++    private static final int EV_FAILED = 2;
++    private static final int EV_HEALTHY = 3;
++
++    private static volatile Context appContext;
++    private static volatile Object callback;       // com.andysu.api.LiveSwapCallback
++    private static volatile Object host;           // com.andysu.api.HostApi
++
++    private EngineSwap() {}
++
++    /** The loader answers for the engine library it loads; null means the swap was accepted. */
++    static native String nativeRequestSwap(String enginePath);
++
++    static void register(Context context) {
++        appContext = context.getApplicationContext();
++        try {
++            Class<?> hostClass = Class.forName("com.andysu.api.Host");
++            Object current = hostClass.getMethod("current").invoke(null);
++            if (current == null) {
++                return; // not under an AndySU host
++            }
++            Class<?> api = Class.forName("com.andysu.api.HostApi");
++            int level = (Integer) api.getMethod("apiLevel").invoke(current);
++            if (level < 2) {
++                return; // an older host: no live native swaps, updates apply on the next start
++            }
++            Class<?> handlerClass = Class.forName("com.andysu.api.LiveSwapHandler");
++            InvocationHandler ih = (proxy, method, args) -> {
++                if (method.getName().equals("onLiveSwap")) {
++                    return onLiveSwap((File) args[0], (String) args[1], args[2]);
++                }
++                return method.getName().equals("hashCode") ? System.identityHashCode(proxy)
++                        : method.getName().equals("equals") ? proxy == args[0] : "XonoticLiveSwapHandler";
++            };
++            Object handler = Proxy.newProxyInstance(handlerClass.getClassLoader(), new Class<?>[] { handlerClass }, ih);
++            api.getMethod("setLiveSwapHandler", handlerClass).invoke(current, handler);
++            host = current;
++            Log.i(TAG, "Live engine swap handler registered with the AndySU host (API level " + level + ")");
++        } catch (Throwable t) {
++            Log.w(TAG, "AndySU live swap not available", t);
++        }
++    }
++
++    static void unregister() {
++        Object h = host;
++        host = null;
++        if (h == null) {
++            return;
++        }
++        try {
++            Class<?> api = Class.forName("com.andysu.api.HostApi");
++            api.getMethod("setLiveSwapHandler", Class.forName("com.andysu.api.LiveSwapHandler")).invoke(h, (Object) null);
++        } catch (Throwable t) {
++            // the host is gone or older: nothing to undo
++        }
++    }
++
++    /** Host thread: main. Returns true to accept (the loader then swaps and reports through callbacks). */
++    private static boolean onLiveSwap(File slotDir, String version, Object cb) {
++        File lib = findEngine(slotDir);
++        if (lib == null) {
++            Log.w(TAG, "Live swap to " + version + " declined: no libmain in " + slotDir);
++            return false;
++        }
++        try {
++            String refused = nativeRequestSwap(lib.getAbsolutePath());
++            if (refused != null) {
++                Log.w(TAG, "Live swap to " + version + " declined by the loader: " + refused);
++                return false;
++            }
++        } catch (UnsatisfiedLinkError e) {
++            Log.w(TAG, "Live swap to " + version + " declined: no loader in this build", e);
++            return false;
++        }
++        callback = cb;
++        Log.i(TAG, "Live swap to " + version + " accepted: " + lib);
++        return true;
++    }
++
++    private static File findEngine(File slotDir) {
++        for (String abi : Build.SUPPORTED_ABIS) {
++            File dir = new File(slotDir, "lib/" + abi);
++            File exact = new File(dir, "libmain.so");
++            if (exact.isFile()) {
++                return exact;
++            }
++            File[] hashed = dir.listFiles((d, name) -> name.startsWith("libmain.") && name.endsWith(".so"));
++            if (hashed != null && hashed.length > 0) {
++                return hashed[0];
++            }
++        }
++        return null;
++    }
++
++    private static void callback(String method, String reason) {
++        Object cb = callback;
++        if (cb == null) {
++            return;
++        }
++        try {
++            Class<?> cls = Class.forName("com.andysu.api.LiveSwapCallback");
++            if (reason == null) {
++                cls.getMethod(method).invoke(cb);
++            } else {
++                cls.getMethod(method, String.class).invoke(cb, reason);
++            }
++        } catch (Throwable t) {
++            Log.w(TAG, "Could not report " + method + " to the AndySU host", t);
++        }
++    }
++
++    /** Native thread (SDL thread or the loader's): the loader's progress, forwarded to the host. */
++    static void onEngineEvent(int kind, String detail) {
++        switch (kind) {
++            case EV_STARTED:
++                callback("started", null);
++                break;
++            case EV_FAILED:
++                callback("failed", detail.isEmpty() ? "the new engine failed to start" : detail);
++                callback = null;
++                break;
++            case EV_HEALTHY:
++                try {
++                    Object h = host;
++                    if (h != null) {
++                        Class.forName("com.andysu.api.HostApi").getMethod("markHealthy").invoke(h);
++                    }
++                } catch (Throwable t) {
++                    Log.w(TAG, "Could not mark the release healthy", t);
++                }
++                callback = null;
++                break;
++            default:
++                break;
++        }
++    }
++
++    /**
++     * SDL thread, after the old engine is gone and before the new one starts: the new release's
++     * game data (QuakeC progs, menu skin) has to be unpacked from the new slot's assets (the host
++     * already switched the app's asset loader). 0 = go on, anything else abandons the start.
++     */
++    static int beforeEngineStart(int swapped) {
++        Context c = appContext;
++        if (swapped != 1 || c == null) {
++            return 0;
++        }
++        try {
++            new GameData(c).prepare((text, note, percent) -> { });
++            return 0;
++        } catch (IOException | RuntimeException e) {
++            Log.e(TAG, "Preparing the new release's data failed", e);
++            return 1;
++        }
++    }
++}
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
+index eafdb8e..2781c71 100644
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
+@@ -77,6 +77,7 @@ public final class XonoticActivity extends SDLActivity {
+             baseDir = new GameData(this).baseDir().getAbsolutePath();
+         }
+         super.onCreate(savedInstanceState);
++        EngineSwap.register(this);
+         holdSustainedPerformance();
+         watchSoftKeyboard();
+         watchInputDevices();
+@@ -89,6 +90,7 @@ public final class XonoticActivity extends SDLActivity {
+             inputManager.unregisterInputDeviceListener(inputDeviceListener);
+         }
+         stopUpdateService();
++        EngineSwap.unregister();
+         super.onDestroy();
+     }
+ 

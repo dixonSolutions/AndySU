@@ -214,3 +214,23 @@ by `andysu host-config` (or by the Gradle plugin). It is frozen with the host. K
 An app may override `apply` per install at runtime (`UpdateClient.setApplyPolicy`). The override
 is stored in `<root>/apply_policy`. Every policy goes through the same TRIAL, commit and rollback
 path.
+
+## 11. Live native swaps in transparent mode (Host API level 2, informative)
+
+A staged release is `native_live` (reported beside `hot_only`, in the check outcome and on the
+pending slot in `state.json`) when every component that differs from the running slot is `kind:
+native` or `kind: content` outside `dex/` (Java resources live in `dex/resources.jar`), no dex or
+`dex/` file was removed, and the descriptor's `entry`, `dex` and `needs` are unchanged. `hot_only`
+releases are `native_live` too. In transparent mode the app's Java code cannot be replaced in a
+running process, so such a release can only go live if the app can swap its native part itself.
+
+Host API level 2 adds `HostApi.setLiveSwapHandler(LiveSwapHandler)`; payloads check
+`apiLevel() >= 2` first. With `apply = live`, a transparent-mode host calls
+`onLiveSwap(slotDir, version, callback)` for a `native_live` release while an activity is
+resumed. `false` (or an exception) declines: nothing changed and `live_fallback` applies. `true`
+accepts; the host then starts a live trial (`begin_live`) and the app reports
+`callback.started()` or `callback.failed(reason)`. `markHealthy()` commits. `failed` makes the
+previous slot current again and marks the release bad while the process keeps running. If
+`started()` or `markHealthy()` do not arrive in time (`watchdog_ms`; 60 s at least until
+`started()`) the host rolls back and relaunches, so the previous slot boots. The slot the process
+booted from is never garbage-collected while it is still in use.

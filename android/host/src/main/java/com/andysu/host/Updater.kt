@@ -42,7 +42,7 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
     fun checkAsync(trigger: String) = exec.execute { runCheck(trigger) }
     fun gcAsync() = exec.execute {
         try {
-            AndySU.emit("gc", JSONObject().put("result", Core.obj(Core.gc(root.path, lowStorage()))))
+            AndySU.gc(lowStorage())?.let { AndySU.emit("gc", JSONObject().put("result", it)) }
         } catch (e: Exception) {
             Log.w(AndySU.TAG, "gc failed", e)
         }
@@ -106,7 +106,7 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
                     if (!outcome.optBoolean("already_staged")) {
                         val need = outcome.optLong("download_bytes")
                         if (need * 2 > allocatable()) {
-                            Core.gc(root.path, true)
+                            AndySU.gc(true)
                             if (need * 2 > allocatable()) return setStatus("error", JSONObject().put("code", "no_space").put("needed", need))
                         }
                         setStatus("downloading", outcome)

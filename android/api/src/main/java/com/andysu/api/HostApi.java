@@ -12,7 +12,11 @@ import java.io.File;
  * runtime, the host's; payloads compile against it with {@code compileOnly}.
  */
 public interface HostApi {
-    /** Host API level implemented by this host (1 for this interface). */
+    /**
+     * Host API level implemented by this host: 1, or 2 for hosts that offer
+     * {@link #setLiveSwapHandler}. Levels are additive; check {@code apiLevel() >= 2} before
+     * calling anything introduced in level 2.
+     */
     int apiLevel();
 
     /** The application context. */
@@ -67,4 +71,10 @@ public interface HostApi {
      * logic. {@code method} is a core API name such as "state" or "load_plan".
      */
     String core(String method, String argsJson);
+
+    /**
+     * Host API level 2: register the app's handler for live native swaps in transparent mode (see
+     * {@link LiveSwapHandler}); null removes it. Call only when {@link #apiLevel()} is at least 2.
+     */
+    void setLiveSwapHandler(LiveSwapHandler handler);
 }

@@ -10,6 +10,8 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.andysu.api.ActivityEvent
+import com.andysu.api.LiveSwapCallback
+import com.andysu.api.LiveSwapHandler
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -61,6 +63,12 @@ object AndySU {
     @Volatile var resumed: Activity? = null
         internal set
     private val watchdog = Runnable { onWatchdog() }
+    private var transparentCallbacks: TransparentCallbacks? = null
+    /** Host API level 2: the app's handler for live native swaps in transparent mode (D29). */
+    @Volatile internal var liveSwapHandler: LiveSwapHandler? = null
+    private var liveSwap: LiveSwap? = null
+    /** A live swap happened in this process: the slot it booted from has to stay on disk. */
+    @Volatile private var liveSwapped = false
 
     fun isInitialized() = this::config.isInitialized
 
@@ -110,7 +118,7 @@ object AndySU {
             .put("trial", inTrial).put("transparent", true))
         com.andysu.api.Host.install(HostApiImpl(null))
         val autoHealthy = config.json.optLong("auto_healthy_ms", 8_000)
-        TransparentCallbacks(autoHealthy).installOn(app)
+        transparentCallbacks = TransparentCallbacks(autoHealthy).also { it.installOn(app) }
         if (inTrial) {
             // Generous: the app gets until well after its first activity has had time to settle.
             NativeBridge.setRelaunchOnCrash(true)
@@ -208,7 +216,9 @@ object AndySU {
             NativeBridge.setRelaunchOnCrash(false)
             swapState = null
             val r = Core.ok(Core.markHealthy(root.path))
-            emit("committed", JSONObject().put("version", generation?.version ?: Transparent.version).put("result", r))
+            emit("committed", JSONObject().put("version", generation?.version ?: Transparent.version).put("result", r)
+                .put("state", Core.obj(Core.state(root.path))))
+            liveSwap = null
             updater.gcAsync()
         }
     }
@@ -272,7 +282,14 @@ object AndySU {
     internal fun onStaged(outcome: JSONObject) {
         if (config.mode != "auto") return
         var policy = applyPolicy()
-        if (policy == "live" && transparent) policy = config.liveFallback
+        if (policy == "live" && transparent) {
+            // D29: native-only releases can go live if the app registered a LiveSwapHandler.
+            val pend = Core.obj(Core.state(root.path)).objOrNull("pending")
+            emit("apply_decision", JSONObject().put("pending", pend?.optString("id")).put("native_live", pend?.optBoolean("native_live") ?: false)
+                .put("handler", liveSwapHandler != null).put("resumed", resumed != null))
+            if (resumed != null && liveSwapHandler != null && applyLiveTransparent()) return
+            policy = config.liveFallback
+        }
         when (policy) {
             "live" -> if (resumed != null && !applyLive()) restartToApply()
             "restart" -> restartToApply()
@@ -306,6 +323,7 @@ object AndySU {
     /** Apply the staged release now, in-process. Returns false if there was nothing to apply. */
     fun applyLive(): Boolean {
         check(Looper.myLooper() == Looper.getMainLooper())
+        if (transparent) return applyLiveTransparent()
         val old = generation ?: return false
         if (inTrial) return false
         val pending = Core.obj(Core.state(root.path)).objOrNull("pending") ?: return false
@@ -346,6 +364,128 @@ object AndySU {
             liveRollback("start() threw: $t")
         }
         return true
+    }
+
+    // ---------------------------------------------------------------- live native swap (D29)
+
+    /** One live native swap in a transparent-mode process: the app swaps its own native code. */
+    private class LiveSwap(
+        val id: String,
+        val fromDir: File?,
+        val fromVersion: String,
+        val fromFactory: Boolean,
+        val toVersion: String,
+    ) : LiveSwapCallback {
+        @Volatile var done = false
+        override fun started() { AndySU.main.post { AndySU.onLiveStarted(this) } }
+        override fun failed(reason: String) { AndySU.main.post { AndySU.onLiveFailed(this, reason) } }
+    }
+
+    /**
+     * Transparent mode, `apply = live`: hand a staged native-only release (`native_live`) to the
+     * app's [LiveSwapHandler]. The slot is only promoted to a live trial once the handler has
+     * accepted: a decline leaves state.json untouched (no cancel API in the core is needed) and
+     * the release applies per `live_fallback`. Returns true if the handler accepted.
+     */
+    private fun applyLiveTransparent(): Boolean {
+        val h = liveSwapHandler ?: return false
+        if (inTrial || liveSwap != null) return false
+        val st = Core.obj(Core.state(root.path))
+        val pending = st.objOrNull("pending") ?: return false
+        if (!pending.optBoolean("native_live")) return false
+        val id = pending.getString("id")
+        val bad = st.optJSONArray("bad")
+        if (bad != null && (0 until bad.length()).any { bad.getString(it) == id }) return false
+        val newDir = File(root, "slots/$id")
+        val version = try {
+            Core.obj(Core.loadPlan(newDir.path, Generation.abi)).optString("version", id)
+        } catch (t: Throwable) {
+            Log.w(TAG, "live swap: cannot read the staged slot", t)
+            return false
+        }
+        val swap = LiveSwap(id, Transparent.slotDir, Transparent.version, Transparent.isFactory, version)
+        val accepted = try {
+            h.onLiveSwap(newDir, version, swap)
+        } catch (t: Throwable) {
+            Log.w(TAG, "LiveSwapHandler threw", t)
+            false
+        }
+        if (!accepted) {
+            emit("live_swap_declined", JSONObject().put("to", version))
+            return false
+        }
+        // Accepted: from here the release is a live trial. (The handler's callbacks arrive through
+        // the main looper, after this turn, so they always see the promoted state.)
+        liveSwap = swap
+        liveSwapped = true
+        try {
+            Core.obj(Core.beginLive(root.path, nowS()))
+        } catch (t: Throwable) {
+            Log.e(TAG, "beginLive failed after the app accepted a live swap", t)
+            emit("live_begin_failed", JSONObject().put("error", t.toString()))
+        }
+        inTrial = true
+        switchTransparentSlot(newDir, version, false)
+        emit("live_swap_requested", JSONObject().put("from", swap.fromVersion).put("to", version))
+        // Until the app reports started() (its engine may take a while to come up) the deadline is
+        // generous; started() re-arms the configured watchdog.
+        trialLive = true
+        NativeBridge.setRelaunchOnCrash(true)
+        main.removeCallbacks(watchdog)
+        main.postDelayed(watchdog, maxOf(config.watchdogMs, 60_000L))
+        return true
+    }
+
+    private fun onLiveStarted(s: LiveSwap) {
+        if (liveSwap !== s || s.done || !inTrial) return
+        emit("live_swapped", JSONObject().put("from", s.fromVersion).put("to", s.toVersion))
+        armWatchdog(live = true)
+    }
+
+    /** The app reports that its swap failed and it still runs its previous native code. */
+    private fun onLiveFailed(s: LiveSwap, reason: String) {
+        if (liveSwap !== s || s.done || !inTrial) return
+        s.done = true
+        main.removeCallbacks(watchdog)
+        emit("live_rollback", JSONObject().put("reason", reason).put("from", s.toVersion).put("to", s.fromVersion))
+        val r = Core.obj(Core.reportFailure(root.path, reason))
+        emit("rolled_back", JSONObject().put("reason", reason).put("result", r).put("state", Core.obj(Core.state(root.path))))
+        inTrial = false
+        trialLive = false
+        NativeBridge.setRelaunchOnCrash(false)
+        liveSwap = null
+        switchTransparentSlot(s.fromDir ?: return, s.fromVersion, s.fromFactory)
+    }
+
+    /** Point the app's view of "its slot" (version, native library dir, assets) at `dir`. */
+    private fun switchTransparentSlot(dir: File, version: String, factory: Boolean) {
+        Transparent.setSlot(dir, version, factory)
+        File(dir, "lib/${Generation.abi}").takeIf { it.isDirectory }?.let { app.applicationInfo.nativeLibraryDir = it.path }
+        try {
+            transparentCallbacks?.switchAssets(app, dir)
+        } catch (t: Throwable) {
+            Log.w(TAG, "could not switch the assets loader", t)
+        }
+    }
+
+    /**
+     * Collect garbage in the store, unless that would delete the slot this (live-swapped) process
+     * booted from: its dex and not-yet-loaded libraries are still read from there until the next
+     * cold start. Returns the core's report, or null when skipped.
+     */
+    fun gc(lowStorage: Boolean): JSONObject? {
+        var low = lowStorage
+        val boot = Transparent.bootSlotId
+        if (liveSwapped && boot != null) {
+            val st = Core.obj(Core.state(root.path))
+            val kept = listOf("current", "previous", "pending").mapNotNull { st.objOrNull(it)?.getString("id") }
+            if (boot !in kept) {
+                emit("gc_skipped", JSONObject().put("reason", "booted slot $boot is in use").put("kept", kept.joinToString()))
+                return null
+            }
+            low = false // previous is only kept when not low on storage
+        }
+        return Core.obj(Core.gc(root.path, low))
     }
 
     private fun restart(g: Generation, state: ByteArray?) {

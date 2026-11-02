@@ -18,10 +18,14 @@
  * Also owns the JNI entry the Java side used to send to the engine (nativeInputDevices): the
  * engine library is no longer loaded by System.loadLibrary. Values are replayed into every engine.
  *
- * TEST HOOK (clearly marked below, to be replaced by the AndySU host in milestone 2b): a thread
- * polls <external files dir>/andysu-swap-to once per second. Contents: line 1 = absolute path of
- * an engine .so readable by the app (e.g. pushed by adb into the app's external files dir), line 2
- * optional `fail_init` (makes the new engine fail its start, to exercise the rollback).
+ * Swaps are requested by the app (EngineSwap.nativeRequestSwap, called from the LiveSwapHandler
+ * the app registered with the AndySU host, D29) and reported back through static Java methods
+ * (EngineSwap.onEngineEvent: started / failed(reason) / healthy; EngineSwap.beforeEngineStart:
+ * the app unpacks the new release's data between the old engine's teardown and the new start).
+ *
+ * TEST HOOK (off unless the file <external files dir>/andysu-swap-hook exists): a thread polls
+ * <external files dir>/andysu-swap-to once per second. Contents: line 1 = absolute path of an
+ * engine .so readable by the app, line 2 optional `fail_init`. Used by the milestone 2a probe.
  */
 #include <android/dlext.h>
 #include <android/log.h>
@@ -58,6 +62,13 @@ static char g_next_path[640];
 static void *g_next_handle;
 static const andysu_engine *g_next_engine;
 static char g_pkg[160];
+static char g_fail_reason[300];
+
+/* Java side (EngineSwap). Absent in builds without it: everything below then does nothing. */
+static JavaVM *g_vm;
+static jclass g_swap_cls;
+static jmethodID g_on_event, g_before_start;
+enum { EV_STARTED = 1, EV_FAILED = 2, EV_HEALTHY = 3 };
 
 static char *g_state; /* last put_state() copy */
 static size_t g_state_len;
@@ -151,6 +162,48 @@ static void emit_stage(const char *event, const char *lib, const andysu_engine *
           s.libmain_maps, s.maps, s.kinds, now_ms());
 }
 
+/* ------------------------------------------------------------------ Java side */
+
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM *vm, void *reserved) {
+    (void)reserved;
+    g_vm = vm;
+    JNIEnv *env;
+    if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK) return JNI_VERSION_1_6;
+    jclass c = (*env)->FindClass(env, "io/github/dixonsolutions/xonotictouch/EngineSwap");
+    if (!c) { (*env)->ExceptionClear(env); return JNI_VERSION_1_6; }
+    g_swap_cls = (*env)->NewGlobalRef(env, c);
+    g_on_event = (*env)->GetStaticMethodID(env, c, "onEngineEvent", "(ILjava/lang/String;)V");
+    g_before_start = (*env)->GetStaticMethodID(env, c, "beforeEngineStart", "(I)I");
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); g_on_event = NULL; g_before_start = NULL; }
+    return JNI_VERSION_1_6;
+}
+
+static JNIEnv *java_env(void) {
+    JNIEnv *env = NULL;
+    if (!g_vm) return NULL;
+    if ((*g_vm)->GetEnv(g_vm, (void **)&env, JNI_VERSION_1_6) == JNI_EDETACHED)
+        (*g_vm)->AttachCurrentThread(g_vm, &env, NULL);
+    return env;
+}
+
+static void notify_java(int kind, const char *detail) {
+    JNIEnv *env = java_env();
+    if (!env || !g_on_event) return;
+    jstring js = (*env)->NewStringUTF(env, detail ? detail : "");
+    (*env)->CallStaticVoidMethod(env, g_swap_cls, g_on_event, (jint)kind, js);
+    if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+    (*env)->DeleteLocalRef(env, js);
+}
+
+/* 0 = go on. The app unpacks the new release's data here. */
+static int java_before_start(int swapped) {
+    JNIEnv *env = java_env();
+    if (!env || !g_before_start) return 0;
+    jint rc = (*env)->CallStaticIntMethod(env, g_swap_cls, g_before_start, (jint)swapped);
+    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return 1; }
+    return rc;
+}
+
 /* ------------------------------------------------------------------ loader API for the engine */
 
 static int api_swap_requested(void) { return atomic_load(&g_swap_flag); }
@@ -171,7 +224,9 @@ static const char *api_get_state(size_t *n) {
 }
 
 static void api_mark_healthy(void) {
+    int was_trial = g_trial;
     g_trial = 0;
+    if (was_trial) notify_java(EV_HEALTHY, "");
     emitf("{\"event\":\"engine_healthy\",\"pid\":%d,\"t_ms\":%lld}", (int)getpid(), now_ms());
 }
 
@@ -186,6 +241,7 @@ static void api_abort_start(const char *why) {
         esc[j++] = (c < 32) ? ' ' : (char)c;
     }
     esc[j] = 0;
+    snprintf(g_fail_reason, sizeof g_fail_reason, "%s", esc);
     emitf("{\"event\":\"engine_start_failed\",\"pid\":%d,\"error\":\"%s\"}", (int)getpid(), esc);
     longjmp(g_jb, 1);
 }
@@ -300,47 +356,67 @@ static int stage_copy(const char *src, char *dst, size_t cap, int seq) {
     return 0;
 }
 
+/* Pre-flight a new engine library (copy to a unique read-only name, dlopen, ABI check) and flag
+ * the swap. The running engine is not touched. 0 = the swap is under way, else err says why not. */
+static int request_swap(const char *src, int fail_init, char *err, size_t errcap) {
+    static int seq;
+    char path[640];
+    void *h = NULL;
+    const andysu_engine *e = NULL;
+    if (atomic_load(&g_swap_flag)) { snprintf(err, errcap, "a swap is already pending"); return 1; }
+    if (stage_copy(src, path, sizeof path, ++seq)) {
+        snprintf(err, errcap, "cannot copy %s (%s)", src, strerror(errno));
+        return 1;
+    }
+    e = open_engine(path, 0, &h, err, errcap);
+    if (e && g_engine && e->java_abi != g_engine->java_abi) {
+        snprintf(err, errcap, "java_abi %u != running %u", e->java_abi, g_engine->java_abi);
+        e = NULL;
+    }
+    if (!e) return 1; /* pre-flight failed: the running engine is untouched */
+    if (fail_init) setenv("ANDYSU_TEST_FAIL_INIT", "1", 1); /* TEST HOOK, read by the engine */
+    else unsetenv("ANDYSU_TEST_FAIL_INIT");
+    snprintf(g_next_path, sizeof g_next_path, "%s", path);
+    g_next_handle = h;
+    g_next_engine = e;
+    emitf("{\"event\":\"engine_swap_begin\",\"pid\":%d,\"t_ms\":%lld,\"from\":\"%s\",\"to\":\"%s\",\"lib\":\"%s\",\"fail_init\":%d}",
+          (int)getpid(), now_ms(), g_engine && g_engine->build_id ? g_engine->build_id : "", e->build_id ? e->build_id : "", path,
+          fail_init);
+    atomic_store(&g_swap_flag, 1);
+    return 0;
+}
+
+/* JNI: EngineSwap.nativeRequestSwap(String enginePath): null = accepted, else the reason it was not. */
+JNIEXPORT jstring JNICALL Java_io_github_dixonsolutions_xonotictouch_EngineSwap_nativeRequestSwap(JNIEnv *env, jclass cls,
+                                                                                                     jstring src) {
+    (void)cls;
+    char err[256] = "";
+    const char *s = (*env)->GetStringUTFChars(env, src, NULL);
+    int rc = request_swap(s, 0, err, sizeof err);
+    if (rc) emitf("{\"event\":\"engine_swap_refused\",\"pid\":%d,\"src\":\"%s\",\"error\":\"%s\"}", (int)getpid(), s, err);
+    (*env)->ReleaseStringUTFChars(env, src, s);
+    return rc ? (*env)->NewStringUTF(env, err) : NULL;
+}
+
+/* TEST HOOK thread (only with the flag file): see the file comment. */
 static void *test_hook_thread(void *arg) {
     (void)arg;
     char trig[400];
     snprintf(trig, sizeof trig, "/storage/emulated/0/Android/data/%s/files/andysu-swap-to", g_pkg);
-    int seq = 0, tick = 0;
+    int tick = 0;
     for (;;) {
         sleep(1);
-        if (++tick % 5 == 0) emit_stage("proc_stats", "", g_engine, 0); /* TEST HOOK: steady-state numbers */
+        if (++tick % 5 == 0) emit_stage("proc_stats", "", g_engine, 0); /* steady-state numbers */
         FILE *f = fopen(trig, "r");
         if (!f) continue;
-        char src[512] = "", flag[64] = "";
+        char src[512] = "", flag[64] = "", err[256] = "";
         if (fgets(src, sizeof src, f)) src[strcspn(src, "\r\n")] = 0;
         if (fgets(flag, sizeof flag, f)) flag[strcspn(flag, "\r\n")] = 0;
         fclose(f);
         unlink(trig);
-        if (!src[0] || atomic_load(&g_swap_flag)) continue;
-        char path[640], err[256] = "";
-        void *h = NULL;
-        const andysu_engine *e = NULL;
-        if (stage_copy(src, path, sizeof path, ++seq)) {
-            snprintf(err, sizeof err, "cannot copy %s (%s)", src, strerror(errno));
-        } else {
-            e = open_engine(path, 0, &h, err, sizeof err);
-            if (e && g_engine && e->java_abi != g_engine->java_abi) {
-                snprintf(err, sizeof err, "java_abi %u != running %u", e->java_abi, g_engine->java_abi);
-                e = NULL;
-            }
-        }
-        if (!e) { /* pre-flight failed: the running engine is untouched */
+        if (!src[0]) continue;
+        if (request_swap(src, !strcmp(flag, "fail_init"), err, sizeof err))
             emitf("{\"event\":\"engine_swap_refused\",\"pid\":%d,\"src\":\"%s\",\"error\":\"%s\"}", (int)getpid(), src, err);
-            continue;
-        }
-        if (!strcmp(flag, "fail_init")) setenv("ANDYSU_TEST_FAIL_INIT", "1", 1); /* TEST HOOK, read by the engine */
-        else unsetenv("ANDYSU_TEST_FAIL_INIT");
-        snprintf(g_next_path, sizeof g_next_path, "%s", path);
-        g_next_handle = h;
-        g_next_engine = e;
-        emitf("{\"event\":\"engine_swap_begin\",\"pid\":%d,\"t_ms\":%lld,\"from\":\"%s\",\"to\":\"%s\",\"lib\":\"%s\",\"fail_init\":%d}",
-              (int)getpid(), now_ms(), g_engine && g_engine->build_id ? g_engine->build_id : "", e->build_id ? e->build_id : "", path,
-              !strcmp(flag, "fail_init"));
-        atomic_store(&g_swap_flag, 1);
     }
     return NULL;
 }
@@ -366,11 +442,13 @@ __attribute__((visibility("default"))) int AndySU_SDL_main(int argc, char *argv[
         emitf("{\"event\":\"loader_failed\",\"pid\":%d,\"lib\":\"%s\",\"error\":\"%s\"}", (int)getpid(), path, err);
         return 1;
     }
-    if (!started) { /* TEST HOOK thread: once per process */
+    if (!started) {
         started = 1;
         read_pkg();
+        char flagfile[400];
+        snprintf(flagfile, sizeof flagfile, "/storage/emulated/0/Android/data/%s/files/andysu-swap-hook", g_pkg);
         pthread_t t;
-        if (!pthread_create(&t, NULL, test_hook_thread, NULL)) pthread_detach(t);
+        if (access(flagfile, F_OK) == 0 && !pthread_create(&t, NULL, test_hook_thread, NULL)) pthread_detach(t);
     }
     for (;;) {
         g_engine = e;
@@ -383,8 +461,15 @@ __attribute__((visibility("default"))) int AndySU_SDL_main(int argc, char *argv[
             e->input_devices(b & 1, (b >> 1) & 1, (b >> 2) & 1);
         }
         int rc;
-        if (setjmp(g_jb) == 0) rc = e->run(&g_api, argc, argv, swapped);
-        else rc = ANDYSU_RUN_FAILED;
+        if (swapped == 1 && java_before_start(1)) {
+            snprintf(g_fail_reason, sizeof g_fail_reason, "preparing the new release's data failed");
+            emitf("{\"event\":\"engine_start_failed\",\"pid\":%d,\"error\":\"%s\"}", (int)getpid(), g_fail_reason);
+            rc = ANDYSU_RUN_FAILED;
+        } else {
+            if (swapped == 1) notify_java(EV_STARTED, "");
+            if (setjmp(g_jb) == 0) rc = e->run(&g_api, argc, argv, swapped);
+            else rc = ANDYSU_RUN_FAILED;
+        }
         g_trial = 0;
         if (rc == ANDYSU_RUN_SWAP && g_next_engine) {
             emit_stage("engine_stopped", path, e, swapped); /* after the old engine's teardown */
@@ -401,6 +486,7 @@ __attribute__((visibility("default"))) int AndySU_SDL_main(int argc, char *argv[
         }
         if (rc == ANDYSU_RUN_FAILED && prev_path[0]) {
             emit_stage("engine_stopped", path, e, swapped);
+            notify_java(EV_FAILED, g_fail_reason); /* the app reports failed(reason) to the AndySU host */
             unsetenv("ANDYSU_TEST_FAIL_INIT");
             atomic_store(&g_swap_flag, 0);
             /* The failed copy is poisoned: never reused (its threads may still be parked). The

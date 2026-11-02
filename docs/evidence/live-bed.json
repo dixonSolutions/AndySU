@@ -1,0 +1,36 @@
+{
+  "api": "34",
+  "versions": {
+    "A": "1.2.9001",
+    "B": "1.2.9002",
+    "F": "1.2.9003",
+    "D": "1.2.9004"
+  },
+  "steps": [
+    {
+      "step": "A built-in",
+      "detail": "1.2.9001 engine ran via the loader (SDL_main -> AndySU_SDL_main -> libmain), pid 2116"
+    },
+    {
+      "step": "live swap",
+      "detail": "1.2.9001 -> 1.2.9002 in pid 2116: live_swap_requested, engine_stopped, engine_start(swapped=1), live_swapped, committed; state current=1.2.9002 (A was the built-in payload, so no previous slot)"
+    },
+    {
+      "step": "in-process rollback",
+      "detail": "1.2.9003 failed its engine init (ANDYSU_FAIL_INIT: this engine build is deliberately broken  ); live_rollback; state current=1.2.9002, bad=['1.2.9003']; engine 1.2.9002 runs again in pid 2116"
+    },
+    {
+      "step": "cold start",
+      "detail": "boots 1.2.9002 (committed), engine from slots/1.2.9002: slots/1.2.9002/lib/x86_64/libmain.so"
+    },
+    {
+      "step": "dex change",
+      "detail": "1.2.9004 staged with native_live=false: no live swap, falls back to the next start"
+    },
+    {
+      "step": "next start",
+      "detail": "1.2.9004 booted on the next start (trial=True)"
+    }
+  ],
+  "verdict": "live bed passes"
+}

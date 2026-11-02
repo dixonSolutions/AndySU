@@ -92,6 +92,10 @@ void Andysu_RestoreState(void)
 
 	if (!andysu_loader)
 		return;
+#ifdef ANDYSU_FAIL_INIT
+	// A deliberately broken engine build (build.sh variant ":fail"): its init always fails.
+	Sys_Error("ANDYSU_FAIL_INIT: this engine build is deliberately broken");
+#endif
 	state = andysu_loader->get_state(&len);
 	// TEST HOOK: the loader's test hook sets this to make the new engine fail its start
 	// (rollback layer 2); only honoured during a trial.

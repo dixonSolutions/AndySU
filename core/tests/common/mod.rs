@@ -26,6 +26,7 @@ pub struct Remote {
     pub dir: tempfile::TempDir,
 }
 
+#[derive(Clone)]
 pub struct File<'a> {
     pub path: &'a str,
     pub kind: Kind,

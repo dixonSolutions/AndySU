@@ -421,6 +421,7 @@ def live_swap_probe(args):
         d.sh("svc data disable", check=False)
         d.install(os.path.abspath(args.apk_a))
         base = seed_xonotic(d, pkg, "+exec probe.cfg" if args.map else "")
+        d.sh(f"touch {base}/andysu-swap-hook")  # the loader's TEST HOOK thread only starts with this flag file
         if args.map:
             cfg = os.path.join(work, "probe.cfg")
             with open(cfg, "w") as f:
@@ -544,6 +545,185 @@ def live_swap_probe(args):
             d.stop()
 
 
+# ----------------------------------------------------------------------------- live bed (D29)
+# Milestone 2b: AndySU drives the engine swap. Locally built APKs (build.sh): A and B differ only in
+# libmain (the dex is byte-identical), F is a broken engine (init always fails), D changes the dex.
+
+JOB_ID = 0x414e4459  # com.andysu.host.Jobs.JOB_ID: `cmd jobscheduler run -f` runs a check in the live process
+
+
+def live_bed(args):
+    need = {"--apk-a": args.apk_a, "--apk-b": args.apk_b, "--apk-fail": args.apk_fail, "--apk-dex": args.apk_dex}
+    missing = [k for k, v in need.items() if not v]
+    if missing:
+        raise SystemExit("--live needs " + ", ".join(sorted(need)) + f" (missing {', '.join(missing)}); build them with "
+                         "testbeds/patches/xonotic-touch/build.sh --variants \"1.2.9001 1.2.9002 1.2.9003:fail 1.2.9004:dex\"")
+    pkg = BEDS["xonotic"]["pkg"]
+    apk = {k: os.path.abspath(v) for k, v in {"A": args.apk_a, "B": args.apk_b, "F": args.apk_fail, "D": args.apk_dex}.items()}
+    work = tempfile.mkdtemp(prefix="livebed-")
+    keys = os.path.join(work, "keys")
+    os.makedirs(keys)
+    dt.run([dt.ANDYSU, "keygen", "--dir", keys])
+    key = os.path.join(keys, "andysu-root.key")
+    site = os.path.join(work, "site")
+    os.makedirs(os.path.join(site, "stable"))
+    port = dt.free_port()
+    cfg = {"app": pkg, "channel": "stable", "roots": [open(os.path.join(keys, "andysu-public.pem")).read()],
+           "manifest_url": f"http://127.0.0.1:{port}/stable/update.json", "mode": "auto", "apply": "live",
+           "check_on_open": True, "watchdog_ms": 45000, "auto_healthy_ms": 60000, "max_boot_attempts": 2, "host_api": 1}
+    cp = os.path.join(work, "config.json")
+    json.dump(cfg, open(cp, "w"))
+    tpl = os.path.join(dt.ANDROID, "host-template/build/andysu/andysu-host-template.zip")
+    ks = ["--keystore", dt.debug_keystore(), "--ks-pass", "pass:android", "--key-alias", "androiddebugkey"]
+    log("[live] splitting A (host with A built in) and the payloads of B, F and D")
+    ra = json.loads(dt.run([dt.ANDYSU, "split", apk["A"], "--out", os.path.join(work, "A"), "--transparent", "--host-template", tpl,
+                            "--config", cp, "--cleartext", *ks], timeout=3600))
+    rel = {"A": ra["version"]}
+    payload = {}
+    for k in "BFD":
+        r = json.loads(dt.run([dt.ANDYSU, "split", apk[k], "--out", os.path.join(work, k), "--transparent"], timeout=3600))
+        rel[k] = r["version"]
+        payload[k] = os.path.join(work, k, "payload")
+
+    def publish(k):
+        dt.run([dt.ANDYSU, "pack", payload[k], "--site", site, "--no-rename"], timeout=3600)
+        dt.run([dt.ANDYSU, "publish", "--site", site, "--release", rel[k], "--key", key])
+        log(f"[live] published {k} = {rel[k]}")
+
+    # A is built into the host; B is published once A's engine is up (a check at open must not apply it
+    # before the app registered its handler).
+    d = dt.Device(args.api, 3, existing=args.device)
+    srv = subprocess.Popen([dt.ANDYSU, "serve", site, "--addr", f"127.0.0.1:{port}"], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+    el = None
+    res = {"api": args.api, "versions": rel, "steps": []}
+
+    def step(name, detail):
+        res["steps"].append({"step": name, "detail": detail})
+        log(f"[live] OK {name}: {detail}")
+
+    def launch():
+        d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
+
+    def run_check():
+        d.sh(f"cmd jobscheduler run -f {pkg} {JOB_ID}", check=False)
+
+    def engine_up(mark, build_id, what, swapped=None, timeout=300):
+        kw = {"build_id": build_id}
+        if swapped is not None:
+            kw["swapped"] = swapped
+        _, st = wait_event(el, mark, "engine_start", what, timeout=timeout, **kw)
+        el.wait(r"========Initialized=========", f"{what}: init banner", mark, timeout=timeout)
+        el.wait(r"GL_RENDERER: ", f"{what}: GL renderer", mark)
+        wait_event(el, mark, "engine_frames", f"{what}: frames", build_id=build_id, timeout=timeout)
+        return st
+
+    def no_event(mark, names, seconds):
+        time.sleep(seconds)
+        bad = [e for _, e in events_since(el, mark) if e.get("event") in names]
+        if bad:
+            raise dt.Fail(f"unexpected events {names}: {bad}")
+
+    try:
+        d.start()
+        d.adb("uninstall", pkg, check=False)
+        d.sh("svc wifi disable", check=False)
+        d.sh("svc data disable", check=False)
+        d.install(ra["host"]["apk"])
+        seed_xonotic(d, pkg)
+        d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
+        el = EngineLog(d)
+        d.watch()
+
+        # ---- 1. A boots from the built-in payload through the loader; B is staged at open (no handler yet)
+        mark = el.mark()
+        launch()
+        _, ev = wait_event(el, mark, "booted", "A booted", version=rel["A"])
+        if not (ev.get("transparent") and ev.get("factory")):
+            raise dt.Fail(f"A should boot transparently from the built-in payload: {ev}")
+        st_a = engine_up(mark, rel["A"], "A", swapped=0)
+        pid = st_a["pid"]
+        step("A built-in", f"{rel['A']} engine ran via the loader (SDL_main -> AndySU_SDL_main -> libmain), pid {pid}")
+        time.sleep(5)
+
+        # ---- 2. B is published; a check in the running process finds it native_live and swaps it in live
+        publish("B")
+        mark = el.mark()
+        run_check()
+        _, dec = wait_event(el, mark, "apply_decision", "decision for B", timeout=120)
+        if not (dec["native_live"] and dec["pending"] == rel["B"] and dec["handler"] and dec["resumed"]):
+            raise dt.Fail(f"B should be native_live with a handler registered: {dec}")
+        wait_event(el, mark, "live_swap_requested", "host calls the handler", timeout=120, to=rel["B"])
+        _, begin = wait_event(el, mark, "engine_swap_begin", "loader pre-flight")
+        wait_event(el, mark, "engine_stopped", "old engine torn down")
+        _, stB = wait_event(el, mark, "engine_start", "B started", swapped=1, build_id=rel["B"])
+        wait_event(el, mark, "live_swapped", "host sees started()", timeout=120)
+        engine_up(mark, rel["B"], "B (live)", swapped=1)
+        _, com = wait_event(el, mark, "committed", "markHealthy commits B", timeout=180, version=rel["B"])
+        if com["state"]["current"]["id"] != rel["B"] or com["state"].get("previous") or com["state"].get("trial"):
+            raise dt.Fail(f"state after commit: {com['state']}")
+        if stB["pid"] != pid or d.sh(f"pidof {pkg}", check=False).split() != [str(pid)]:
+            raise dt.Fail(f"pid changed: {pid} -> {stB['pid']} / pidof {d.sh(f'pidof {pkg}', check=False)}")
+        step("live swap", f"{rel['A']} -> {rel['B']} in pid {pid}: live_swap_requested, engine_stopped, engine_start(swapped=1), "
+             f"live_swapped, committed; state current={rel['B']} (A was the built-in payload, so no previous slot)")
+        no_event(el.mark(), ("watchdog", "live_rollback", "relaunch"), 5)
+
+        # ---- 3. broken B': in-process rollback, state back on B, B' bad, same process
+        publish("F")
+        mark = el.mark()
+        run_check()
+        wait_event(el, mark, "live_swap_requested", "host calls the handler for F", timeout=120, to=rel["F"])
+        wait_event(el, mark, "engine_start_failed", "F's init fails", timeout=180)
+        wait_event(el, mark, "engine_rolled_back", "loader reloads B", timeout=120)
+        _, rbk = wait_event(el, mark, "live_rollback", "host: live_rollback", timeout=60)
+        _, rb = wait_event(el, mark, "rolled_back", "host: state rolled back", timeout=60)
+        stS = engine_up(mark, rel["B"], "B (after rollback)", swapped=2)
+        if rb["state"]["current"]["id"] != rel["B"] or rel["F"] not in rb["state"]["bad"] or rb["state"].get("trial"):
+            raise dt.Fail(f"state after rollback: {rb['state']}")
+        if stS["pid"] != pid or d.sh(f"pidof {pkg}", check=False).split() != [str(pid)]:
+            raise dt.Fail("the process changed during the in-process rollback")
+        step("in-process rollback", f"{rel['F']} failed its engine init ({rbk['reason'][:60]}); live_rollback; state current="
+             f"{rel['B']}, bad={rb['state']['bad']}; engine {rel['B']} runs again in pid {pid}")
+
+        # ---- 4. cold start boots B (F is bad)
+        d.sh(f"am force-stop {pkg}")
+        mark = el.mark()
+        launch()
+        _, ev = wait_event(el, mark, "booted", "cold start", version=rel["B"])
+        if ev.get("trial"):
+            raise dt.Fail(f"B is committed, not a trial: {ev}")
+        st_cold = engine_up(mark, rel["B"], "B (cold start)", swapped=0)
+        step("cold start", f"boots {rel['B']} (committed), engine from slots/{rel['B']}: {st_cold['lib'].split('/andysu/')[-1]}")
+
+        # ---- 5. a dex-changing release is not live: it waits for the next start
+        publish("D")
+        mark = el.mark()
+        time.sleep(8)  # the check at open may already have run
+        run_check()
+        _, dec = wait_event(el, mark, "apply_decision", "decision for D", timeout=120)
+        if dec["native_live"] or dec["pending"] != rel["D"]:
+            raise dt.Fail(f"D changes the dex, so it is not native_live: {dec}")
+        no_event(mark, ("live_swap_requested", "engine_swap_begin", "live_swapped", "relaunch"), 12)
+        step("dex change", f"{rel['D']} staged with native_live=false: no live swap, falls back to the next start")
+        d.sh(f"am force-stop {pkg}")
+        mark = el.mark()
+        launch()
+        _, ev = wait_event(el, mark, "booted", "next start applies D", version=rel["D"])
+        step("next start", f"{rel['D']} booted on the next start (trial={ev.get('trial')})")
+        res["verdict"] = "live bed passes"
+        log("live bed result: " + json.dumps(res, indent=1))
+        os.makedirs(EVIDENCE, exist_ok=True)
+        with open(os.path.join(EVIDENCE, "live-bed.json"), "w") as f:
+            json.dump(res, f, indent=2)
+    finally:
+        srv.kill()
+        if el:
+            el.stop()
+            el.save("live-bed-engine-log.txt")
+        if not args.keep:
+            d.stop()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=list(BEDS))
@@ -553,6 +733,10 @@ def main():
     ap.add_argument("--apk-a", help="Xonotic APK to split as version A (default: testbeds/apks/...); locally built "
                     "APKs (testbeds/patches/xonotic-touch/build.sh) start the engine through the resident loader")
     ap.add_argument("--apk-b", help="Xonotic APK for the update, version B (needs --apk-a)")
+    ap.add_argument("--live", action="store_true",
+                    help="milestone 2b: AndySU drives the engine swap (needs --apk-a/--apk-b/--apk-fail/--apk-dex)")
+    ap.add_argument("--apk-fail", help="with --live: engine whose init always fails (build.sh variant :fail)")
+    ap.add_argument("--apk-dex", help="with --live: a release that changes the dex (build.sh variant :dex)")
     ap.add_argument("--live-swap-probe", action="store_true",
                     help="milestone 2a: in-process engine swaps A->B->A->B plus a forced-failure rollback (needs --apk-a/--apk-b)")
     ap.add_argument("--map", help="with --live-swap-probe: start this local map first and require it to be carried over every swap")
@@ -562,6 +746,12 @@ def main():
     if args.probe_vid_restart:
         args.api = args.api or "36"
         probe_vid_restart(args)
+        return
+    if args.live:
+        args.api = args.api or "34"
+        dt.run(["cargo", "build", "-q", "-p", "andysu-cli"], cwd=dt.REPO)
+        dt.gradle(":host-template:andysuHostTemplate")
+        live_bed(args)
         return
     if args.live_swap_probe:
         args.api = args.api or "36"

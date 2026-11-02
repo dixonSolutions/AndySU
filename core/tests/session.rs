@@ -387,3 +387,155 @@ fn builtin_payload_serves_as_delta_base_and_archive_source() {
     assert_eq!(fs::read(slot.join("lib/x86_64/libgame.so")).unwrap(), lib2);
     assert_eq!(fs::read(slot.join("assets/data/tracks/t7.dat")).unwrap(), vec![7u8; 3000]);
 }
+
+// ---- native_live (D29): which releases a transparent-mode host may swap live ----
+
+fn live_files(v: &str, dex: &str, native: &str, content: &str) -> Vec<File<'static>> {
+    vec![
+        File {
+            path: "dex/classes.dex",
+            kind: Kind::Dex,
+            apply: Apply::Restart,
+            data: format!("dex {dex} {v}").into_bytes(),
+        },
+        File {
+            path: "lib/x86_64/libmain.so",
+            kind: Kind::Native,
+            apply: Apply::Restart,
+            data: format!("so {native}").repeat(400).into_bytes(),
+        },
+        File {
+            path: "assets/data.txt",
+            kind: Kind::Content,
+            apply: Apply::Restart,
+            data: format!("data {content}").into_bytes(),
+        },
+    ]
+}
+
+/// Install release 1.0 (committed), then check/download/stage 2.0 and return its outcome flags
+/// from the check and from the staged slot.
+fn flags_of_update(f1: Vec<File<'static>>, f2: Vec<File<'static>>) -> ((bool, bool), (bool, bool)) {
+    let remote = Remote::new();
+    let dev = tempfile::tempdir().unwrap();
+    let r1 = remote.release("1.0", 1, &f1);
+    install(&remote, dev.path(), &Remote::manifest(1, vec![r1.clone()]));
+    let store = andysu_core::store::Store::open(dev.path()).unwrap();
+    store.launch([0; 16], NOW, true, 2).unwrap();
+    store.update_state(|s| s.mark_healthy()).unwrap();
+    let r2 = remote.release("2.0", 2, &f2);
+    let (b, s) = remote.publish(&Remote::manifest(2, vec![r1, r2]));
+    let mut sess = session(dev.path());
+    let out = sess.check(&remote.manifest_url(), &b, &s, None, NOW).unwrap();
+    let CheckOutcome::Update { hot_only, native_live, .. } = out else { panic!("{out:?}") };
+    download_all(&mut sess);
+    sess.stage().unwrap();
+    let st = store.load_state([0; 16]).unwrap();
+    let p = st.pending.unwrap();
+    ((hot_only, native_live), (p.hot_only, p.native_live))
+}
+
+#[test]
+fn native_live_only_when_no_java_side_changed() {
+    let base = live_files("1", "a", "a", "a");
+    // dex changed (with native and content too): not live
+    let r = flags_of_update(base.clone(), live_files("2", "b", "b", "b"));
+    assert_eq!(r, ((false, false), (false, false)));
+    // dex changed alone: not live
+    let r = flags_of_update(base.clone(), live_files("2", "b", "a", "a"));
+    assert_eq!(r, ((false, false), (false, false)));
+    // native only: live, but not hot
+    let r = flags_of_update(base.clone(), live_files("1", "a", "b", "a"));
+    assert_eq!(r, ((false, true), (false, true)));
+    // native + content: live, not hot (content is apply=restart here)
+    let r = flags_of_update(base.clone(), live_files("1", "a", "b", "b"));
+    assert_eq!(r, ((false, true), (false, true)));
+    // nothing but the descriptor changed (dex bytes identical): live
+    let r = flags_of_update(base.clone(), live_files("1", "a", "a", "a"));
+    assert_eq!(r, ((true, true), (true, true)));
+}
+
+#[test]
+fn hot_only_semantics_unchanged_and_implies_native_live() {
+    let hot = |v: &str| {
+        vec![
+            File { path: "dex/classes.dex", kind: Kind::Dex, apply: Apply::Restart, data: b"dex".to_vec() },
+            File {
+                path: "assets/data.txt",
+                kind: Kind::Content,
+                apply: Apply::Hot,
+                data: format!("data {v}").into_bytes(),
+            },
+        ]
+    };
+    // hot content only: hot_only and native_live
+    assert_eq!(flags_of_update(hot("1"), hot("2")), ((true, true), (true, true)));
+    // a dex change is neither
+    let mut f2 = hot("2");
+    f2[0].data = b"other dex".to_vec();
+    assert_eq!(flags_of_update(hot("1"), f2), ((false, false), (false, false)));
+    // Java resources (dex/resources.jar, content) count as Java side
+    let mut f1 = hot("1");
+    f1.push(File { path: "dex/resources.jar", kind: Kind::Content, apply: Apply::Restart, data: b"jar 1".to_vec() });
+    let mut f2 = f1.clone();
+    f2[2].data = b"jar 2".to_vec();
+    assert_eq!(flags_of_update(f1, f2), ((false, false), (false, false)));
+}
+
+#[test]
+fn native_live_against_the_builtin_payload() {
+    // No current slot yet: the app runs the payload built into the host (a base directory).
+    let remote = Remote::new();
+    let dev1 = tempfile::tempdir().unwrap();
+    let f1 = live_files("1", "a", "a", "a");
+    let r1 = remote.release("1.0", 1, &f1);
+    install(&remote, dev1.path(), &Remote::manifest(1, vec![r1.clone()]));
+    let factory = tempfile::tempdir().unwrap();
+    let src = andysu_core::store::Store::open(dev1.path()).unwrap().slot_dir("1.0");
+    let dst = factory.path().join("payload");
+    fs::create_dir_all(&dst).unwrap();
+    for e in walk(&src) {
+        let rel = e.strip_prefix(&src).unwrap();
+        fs::create_dir_all(dst.join(rel).parent().unwrap()).unwrap();
+        fs::copy(&e, dst.join(rel)).unwrap();
+    }
+    fs::rename(dst.join(andysu_core::store::SLOT_INDEX), dst.join(andysu_core::store::BUILTIN_INDEX)).unwrap();
+
+    let mut cfg = config();
+    cfg.base_dirs = vec![dst.to_string_lossy().into_owned()];
+    let flags = |f2: Vec<File<'static>>| {
+        let dev2 = tempfile::tempdir().unwrap();
+        let r2 = remote.release("2.0", 2, &f2);
+        let (b, s) = remote.publish(&Remote::manifest(2, vec![r1.clone(), r2]));
+        let mut sess = andysu_core::session::Session::new(
+            andysu_core::store::Store::open(dev2.path()).unwrap(),
+            cfg.clone(),
+            [7; 16],
+        )
+        .unwrap();
+        let out = sess.check(&remote.manifest_url(), &b, &s, None, NOW).unwrap();
+        let CheckOutcome::Update { hot_only, native_live, .. } = out else { panic!("{out:?}") };
+        download_all(&mut sess);
+        sess.stage().unwrap();
+        let st = andysu_core::store::Store::open(dev2.path()).unwrap().load_state([0; 16]).unwrap();
+        let p = st.pending.unwrap();
+        ((hot_only, native_live), (p.hot_only, p.native_live))
+    };
+    // native only: live (hot_only stays false without a current slot)
+    assert_eq!(flags(live_files("1", "a", "b", "a")), ((false, true), (false, true)));
+    // dex changed: not live
+    assert_eq!(flags(live_files("2", "b", "b", "a")), ((false, false), (false, false)));
+}
+
+fn walk(dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut v = vec![];
+    for e in fs::read_dir(dir).unwrap() {
+        let p = e.unwrap().path();
+        if p.is_dir() {
+            v.extend(walk(&p));
+        } else {
+            v.push(p);
+        }
+    }
+    v
+}

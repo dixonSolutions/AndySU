@@ -3,6 +3,7 @@
 #
 #   scripts/heavy.sh testbeds/patches/xonotic-touch/build.sh --out testbeds/build/apks
 #   scripts/heavy.sh testbeds/patches/xonotic-touch/build.sh --out DIR --variants "1.2.9001 1.2.9002"
+#   ... --variants "1.2.9001 1.2.9002 1.2.9003:fail"   (":fail": an engine whose init always fails; ":dex": a Java change)
 #   ... --no-loader     only the *.patch files (no resident loader sources): the stock engine layout
 #
 # What it does, in order:
@@ -119,12 +120,24 @@ fi
 
 # ---------------------------------------------------------------- build
 CODE=$CODE_BASE
-for V in $VARIANTS; do
+for SPEC in $VARIANTS; do
+    V="${SPEC%%:*}"; OPT="${SPEC#*:}"; [ "$OPT" = "$SPEC" ] && OPT=""
+    if [ "$OPT" = fail ]; then
+        export ORG_GRADLE_PROJECT_andysu_fail_init=1   # engine whose init always fails (rollback tests)
+    else
+        unset ORG_GRADLE_PROJECT_andysu_fail_init
+    fi
+    EJ=android/app/src/main/java/io/github/dixonsolutions/xonotictouch/EngineSwap.java
+    if [ "$OPT" = dex ] && [ -f "$EJ" ]; then
+        sed -i 's/TAG = "XonoticTouch"/TAG = "XonoticTouchDex"/' "$EJ"   # a Java change: the dex differs
+    fi
     CODE=$((CODE + 1))
     log "Building $V ($ABI), $(date +%T)"
     t0=$(date +%s)
     bash scripts/android-build.sh --abi "$ABI" --version "$V" --code "$CODE" --out "$OUT"
-    echo "build $V took $(( $(date +%s) - t0 )) s"
+    [ "$OPT" = dex ] && [ -f "$EJ" ] && sed -i 's/TAG = "XonoticTouchDex"/TAG = "XonoticTouch"/' "$EJ"
+    echo "build $V${OPT:+ ($OPT)} took $(( $(date +%s) - t0 )) s"
+    echo "classes.dex sha256 $V: $(unzip -p "$OUT/XonoticTouch-$V-$ABI.apk" classes.dex | sha256sum | cut -c1-16)"
     if [ ! -f "$SLIM_CACHED" ] && [ -f "$ASSETS_ZIP" ]; then
         mkdir -p "$ANDROID_CACHE_DIR"; cp "$ASSETS_ZIP" "$SLIM_CACHED"
     fi
