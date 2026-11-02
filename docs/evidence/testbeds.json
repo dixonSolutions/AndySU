@@ -1,19 +1,19 @@
 {
   "results": [
     {
-      "bed": "stk",
+      "bed": "xonotic",
       "step": "builtin",
-      "detail": "1.0.29 runs from the payload built into the host APK"
+      "detail": "1.2.104 runs from the payload built into the host APK; engine ran (SDL_main from the payload's libmain.so, init banner, GL renderer)"
     },
     {
-      "bed": "stk",
+      "bed": "xonotic",
       "step": "update",
-      "detail": "1.0.31 applied on next start and committed; installed APK still versionName 1.0.29"
+      "detail": "1.2.105 applied on next start and committed; installed APK still versionName 1.2.104; engine ran from slots/1.2.105"
     },
     {
-      "bed": "stk",
+      "bed": "xonotic",
       "step": "rollback",
-      "detail": "1.0.31-broken failed on start; rolled back by the crash handler; one relaunch; back on 1.0.31"
+      "detail": "1.2.105-broken failed on start; rolled back by the crash handler; one relaunch; back on 1.2.105"
     }
   ],
   "failures": []

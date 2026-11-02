@@ -1,0 +1,46 @@
+{
+  "api": "36",
+  "frames_before": {
+    "layer": "SurfaceView[io.github.dixonsolutions.xonotictouch/io.github.dixonsolutions.xonotictouch.XonoticActivity]#192",
+    "stamps": [
+      0,
+      0,
+      0
+    ]
+  },
+  "frames_after": {
+    "layer": "SurfaceView[io.github.dixonsolutions.xonotictouch/io.github.dixonsolutions.xonotictouch.XonoticActivity]#192",
+    "stamps": [
+      0,
+      0,
+      0
+    ]
+  },
+  "vid_restart_log": [
+    "D/app_process( 3611): VID_Restart: changing from desktop fullscreen 2400x1080 16bpp on display 0, to desktop fullscreen 1024x768 32bpp on display 0.",
+    "D/app_process( 3611): GL_RENDERER: Android Emulator OpenGL ES Translator (Google SwiftShader)",
+    "D/app_process( 3611): Display 0: 0",
+    "D/app_process( 3611): Failed to load font-file for 'gfx/conchars', it will not support as many characters.",
+    "D/app_process( 3611): Failed to load font-file for 'gfx/font_sbar', it will not support as many characters.",
+    "D/app_process( 3611): Failed to load font-file for 'gfx/font_menu', it will not support as many characters.",
+    "D/app_process( 3611): Failed to load font-file for 'gfx/font_user4', it will not support as many characters.",
+    "D/app_process( 3611): Failed to load font-file for 'gfx/font_user5', it will not support as many characters.",
+    "D/app_process( 3611): Failed to load font-file for 'gfx/font_user6', it will not support as many characters.",
+    "D/app_process( 3611): Failed to load font-file for 'gfx/font_user7', it will not support as many characters."
+  ],
+  "gl_renderer_lines_total": 2,
+  "pid_alive": true,
+  "probe-pre_files": [
+    "/sdcard/Android/data/io.github.dixonsolutions.xonotictouch/files/userdata/data/probe-pre.png"
+  ],
+  "pulled": [
+    "/var/home/ratnode2/Projects/AndySU/docs/evidence/probe-vid-restart-probe-pre.png",
+    "/var/home/ratnode2/Projects/AndySU/docs/evidence/probe-vid-restart-probe-post.png"
+  ],
+  "probe-post_files": [
+    "/sdcard/Android/data/io.github.dixonsolutions.xonotictouch/files/userdata/data/probe-post.png"
+  ],
+  "frames_advanced_before": false,
+  "frames_advanced_after": false,
+  "verdict": "NOT PROVEN (see fields)"
+}
