@@ -295,7 +295,8 @@ def surface_frames(d, pkg, samples=3, gap=2.0):
     """Frame evidence from SurfaceFlinger: the newest presented-frame timestamps of the app's
     SurfaceView layer must advance between samples. Returns the list of max timestamps (ns)."""
     layers = d.sh("dumpsys SurfaceFlinger --list", check=False)
-    layer = next((l.strip() for l in layers.splitlines() if pkg in l and "SurfaceView" in l and "Background" not in l), None)
+    m = re.search(r"SurfaceView\[" + re.escape(pkg) + r"[^\]]*\]#\d+(\(BLAST\))?", layers)
+    layer = m.group(0) if m else None
     if not layer:
         return {"layer": None, "stamps": []}
     stamps = []
@@ -324,9 +325,9 @@ def probe_vid_restart(args):
         cfg = os.path.join(tempfile.mkdtemp(prefix="probe-"), "probe.cfg")
         with open(cfg, "w") as f:
             f.write('echo ANDYSU_PROBE_BEGIN\n'
-                    'defer 25 "echo ANDYSU_PROBE_PRE; screenshot probe-pre"\n'
+                    'defer 25 "echo ANDYSU_PROBE_PRE; screenshot probe-pre.png"\n'
                     'defer 35 "echo ANDYSU_PROBE_RESTART; vid_restart"\n'
-                    'defer 55 "echo ANDYSU_PROBE_POST; screenshot probe-post"\n'
+                    'defer 55 "echo ANDYSU_PROBE_POST; screenshot probe-post.png"\n'
                     'defer 65 "echo ANDYSU_PROBE_DONE"\n')
         d.adb("push", cfg, f"{base}/data/probe.cfg")
         el = EngineLog(d)

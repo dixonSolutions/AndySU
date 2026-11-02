@@ -21,7 +21,7 @@ local.
 | 6 Gradle plugin + split | done |
 | 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back. Live `.so` swap in Xonotic not done |
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
-| 9 Publishing | verified locally against a local site; live GitHub run: see step 9 |
+| 9 Publishing | live: release v0.1.13 on GitHub, every registry installed from the live URLs in CI (Homebrew pending a fix) |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
 | 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated |
 
@@ -297,7 +297,21 @@ installing it from a clean project with `scripts/verify-consumers.sh`:
 - C: `find_package(AndySU)` from the release tarball; build and run;
 - Godot: the addon zip with its AAR.
 
-pub, Homebrew and the live GitHub URLs are verified only in CI, once the repository exists.
+**On GitHub (2026-11-03).** The owner authorised creating `dixonSolutions/AndySU`. It is public,
+with the Actions secrets set by `scripts/setup-secrets.sh` (CI test keys) and Pages served from
+`gh-pages`.
+- The first release run (v0.1.10) failed on: the debug keystore missing on runners, the local
+  registry not yet up when cargo read it, `bindings/flutter/lib/` being git-ignored, and GNU sed
+  on macOS. Fixed in PR #1, whose CI passed every job, including all six emulator levels.
+- **v0.1.13** (the merge of PR #1) is the first published release. Every test job passed; the CLI
+  was built for Linux and macOS; the GitHub Release, Pages registries and signed `SHA256SUMS`
+  were published. **Consumer verification against the live URLs passed for cargo, npm, UPM,
+  Maven, pub, C and Godot.** pub works from static Pages files. Verified independently from this
+  machine: `sha256sum -c` passes, and `andysu verify-file SHA256SUMS` reports root
+  `64529963522e286d`.
+- Homebrew failed on that run (`Formula/` did not exist yet; fixed in PR #3), so `brew install`
+  has not been verified yet. The crates.io and npmjs jobs skipped themselves (no tokens), as
+  intended.
 `actions/publish/test.sh` covers both remote types: three releases with deltas and a 50%
 rollout, against a bare git repo and a stand-in `gh`, then a simulated client updates from each.
 
