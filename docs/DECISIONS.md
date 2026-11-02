@@ -217,3 +217,26 @@ check). The payload owns the whole window in AndySU, so the host's stub activiti
 `Theme.DeviceDefault.NoActionBar`. Payloads handle the system-bar insets as any SDK 35+ app must
 (the samples use `safeDrawingPadding()` / `fitsSystemWindows`). An app can still give a stub
 another theme through manifest merging. Hosts made by `split` keep each activity's own theme.
+
+## D29. Live native swaps in transparent mode: Host API level 2, `LiveSwapHandler` (2026-11-03)
+In transparent mode the app's own Java code runs from the payload under its real names. It
+cannot be replaced inside a running process, so updates there applied on the next start (D21).
+The Xonotic work showed that the native part can be swapped live by an app-side resident loader
+(`testbeds/patches/xonotic-touch/LIVE_SWAP.md`). AndySU supports this as follows:
+- **Eligibility:** with `apply = "live"` in transparent mode, a staged release can go live when
+  every component that differs from the running slot is native code or content (no dex, no Java
+  resources), and the app has registered a handler. Otherwise `live_fallback` applies, as before.
+  The core reports this as `native_live` beside `hot_only`.
+- **API (Host API level 2, additive):** `HostApi.setLiveSwapHandler(LiveSwapHandler)`. The host
+  calls `onLiveSwap(File slotDir, String version, LiveSwapCallback cb)`. Returning false declines
+  (fallback). Otherwise the app swaps its native code (and content) itself and reports
+  `cb.started()` or `cb.failed(reason)`. The core treats the new slot as a live trial
+  (`begin_live`). `markHealthy()` commits; `failed` rolls the state back while the app keeps
+  running its previous code. Payloads check `apiLevel() >= 2` before calling the method.
+- **Rollback layers:** (1) the app's own in-process rollback, reported through `failed`; (2) the
+  watchdog, which on a live trial rolls back and relaunches; (3) a native crash, which writes the
+  crash marker and relaunches. Layers 2 and 3 boot the previous slot.
+- **Library names:** no packing change. The app's loader copies each engine library to a unique
+  file name before `dlopen`, so `--no-rename` stays for transparent payloads.
+- The slot the process booted from stays on disk until the next cold start. It is the
+  `previous` slot and GC keeps it.

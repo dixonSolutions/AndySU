@@ -19,7 +19,7 @@ local.
 | 5 Android host | 20 checks pass on API 24, 31, 34 and 36-16k (2026-11-02 run). 29 and 36 failed on a test bug and an emulator hang; the fixed rerun was cut off by the OOM kill and is pending |
 | 5 samples | Compose, native GLES, WebView: built-in 1.0 → 2.0 live → committed on API 36, with the version label checked on screen (2026-11-03) |
 | 6 Gradle plugin + split | done |
-| 7 Test beds | STK: built-in → next-start update → broken release rolled back, game running. Xonotic: the same AndySU steps pass, but the engine never started (no game data on the emulator); being fixed. Live `.so` swap in Xonotic: designed, not built |
+| 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back, with the game engine verified running at each step. Live `.so` swap in Xonotic: designed (`testbeds/patches/xonotic-touch/LIVE_SWAP.md`), both feasibility probes positive, not built yet |
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
 | 9 Publishing | live: release v0.1.13 on GitHub, every registry installed from the live URLs in CI (Homebrew pending a fix) |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
@@ -247,23 +247,24 @@ over `adb reverse`):
 
 | | Xonotic Touch 1.2.104 → 1.2.105 | SuperTuxKart Touch 1.0.29 → 1.0.31 |
 |---|---|---|
-| A runs from the built-in payload (engine .so, Java/SDL code, data) | AndySU side only (see below) | ok |
+| A runs from the built-in payload (engine .so, Java/SDL code, data) | ok (engine verified, 2026-11-03) | ok |
 | B downloaded, applied on next start, committed; installed APK still versionName A | ok | ok |
 | broken B (truncated dex) fails on start → crash handler rolls back → one relaunch → B | ok | ok |
 
 Evidence: `docs/evidence/stk-{1-builtin,2-updated,3-rolled-back}*.png` and `testbeds.json`.
 
-**Correction (2026-11-03): the Xonotic run does not show that the game ran.** A worker's code
-review of the test bed (see `testbeds/patches/xonotic-touch/LIVE_SWAP.md`) pointed out that the
-test waits only for AndySU's own events. Xonotic's `BootActivity` blocks on its 1.16 GB data
-download, and the test emulator has no internet. The saved Xonotic event log holds AndySU events
-only (`booted`, `committed`, `relaunch`), nothing from the engine. "Committed" came from the
-auto-healthy timer while `BootActivity` was on screen. What that run does show: AndySU loaded and
-updated Xonotic's real code and native libraries in transparent mode, and rolled back the broken
-release. It does not show the engine starting. STK did run: its screenshots show the game. The
-test bed is being changed to seed the game data and to assert engine output. The
-Xonotic screenshots came out black (cause not investigated), so they were deleted. The Xonotic
-evidence is its event log, which is not committed; rerunning the test regenerates it.
+**Correction and fix (2026-11-03).** The first Xonotic runs did not show that the game ran: the
+test waited only for AndySU's events, and `BootActivity` blocks on its 1.16 GB data download on
+an emulator without internet. A worker (Sonnet) found this in a code review and then fixed the
+bed. The lead reviewed the diff and the evidence. The bed now seeds the pk3s (from
+`$XONOTIC_DATA_DIR`, default `~/.cache/xt-perf/base/data`, read only) and fails loudly without
+them. At each boot it requires the engine's own proof:
+`Running main function SDL_main from library …/no_backup/andysu/<slot>/lib/x86_64/libmain.so`
+with the expected slot (factory for A, `slots/1.2.105` for B and after the rollback), the
+`========Initialized=========` banner, and `GL_RENDERER`. All three passed on API 34
+(`docs/evidence/xonotic-engine-log.txt`; the rollback boot is a new process). The menu is drawn
+(`xonotic-1-builtin-1.2.104.png`; the update and rollback screenshots were byte-identical, same
+static menu, so only one is kept).
 
 The games' own updaters run alongside AndySU and would fight it. Two patches, kept in
 `testbeds/patches/` and never pushed to the projects, make them stand down under an AndySU host
@@ -275,8 +276,44 @@ overwritten by a stale state write from the updater thread (now `Store::locked` 
 concurrency test that loses updates without the lock); STK's >4096 asset files (now
 auto-archived into 395 components); aapt2 dropping dot-files (hence `andysu-slot.json`).
 
-Not done: the live `.so` swap inside Xonotic (`Host_Shutdown` → dlopen the new engine) needs
-engine changes. The test beds therefore update on the next start.
+Live `.so` swap in Xonotic (in progress, worker plus lead review):
+`testbeds/patches/xonotic-touch/LIVE_SWAP.md` designs a resident loader. SDL's thread runs a
+small loader instead of `SDL_main`; it `dlopen`s `libmain.<hash>.so` locally, the engine returns
+from its loop after `Host_Shutdown` on a swap request, and the loader starts the next engine,
+with three rollback layers. Two feasibility probes ran:
+- **R1:** `vid_restart` in the stock engine on API 36 recreates the window, EGL context and GL on
+  the same surface and keeps rendering. The engine's own post-restart screenshot shows the menu.
+- **R2:** bionic loads a second copy of identical bytes, under another name or with
+  `android_dlopen_ext(FORCE_LOAD)`, with separate globals (API 34, adb shell namespace).
+- **Milestone 1** (the worker built it; the lead reviewed the code and re-ran the acceptance): a
+  reproducible Xonotic Touch build from the clone (`testbeds/patches/xonotic-touch/build.sh`,
+  53 s for two variants, NDK 27.2 where the project pins 27.3). The engine now runs through the
+  resident loader. SDL starts `AndySU_SDL_main` in `libandysu_xonotic_loader.so`, which
+  `dlopen`s `libmain` `RTLD_LOCAL` through its single exported `andysu_engine_v1`. `libmain`'s
+  only JNI method (`nativeInputDevices`) is forwarded by the loader. The test bed with the
+  locally built A/B APKs (`--apk-a/--apk-b`) passes on API 34: the loader runs the engine from
+  the factory slot, from `slots/1.2.9002` after the update, and again after the rollback. No
+  swapping yet: that is milestone 2.
+- **Milestone 2a: the in-process engine swap works** (the worker implemented it; the lead
+  reviewed the patch and loader, rebuilt from the clean clone and re-ran the probe). Patch 0003
+  changes the engine, gated behind `ANDYSU_SWAP`. On a swap request it saves a small JSON state,
+  runs `Host_Shutdown` without `SDL_Quit` or `exit()`, frees the file system and memory pools,
+  and returns to the loader. The loader pre-flights the next `libmain.<hash>.so` (`dlopen`, ABI
+  and `java_abi` check) before touching the old engine, never `dlclose`s, and on a failed init
+  (`Sys_Error` jumps back to the loader) reloads the previous build with
+  `ANDROID_DLEXT_FORCE_LOAD`. `testbed_tests.py --live-swap-probe` (API 36), triggered by a
+  clearly marked TEST HOOK file, no AndySU host involved yet:
+  - A→B→A→B in the **same process**; the state is carried (`swap_count` 1, 2, 3; with
+    `--map afterslime` the map reloads);
+  - after each swap the engine initialises, sets up GL again and renders;
+  - a 4th swap with a forced init failure rolls back in-process to the previous build;
+  - teardown takes 86-290 ms; a swap takes about 17 s under SwiftShader, almost all of it engine init.
+  - **Known leaks:** about +2 fds per swap (`anon_inode`), about +10 MB RSS per swap (+20 MB with a
+    map loaded), and a rolled-back start leaves its copy mapped. They are bounded, but the host
+    should prefer a cold start after a few swaps. Evidence: `docs/evidence/live-swap-*`.
+  - Next, **2b**: drive it from AndySU instead of the test hook. That needs a `LiveSwapHandler`
+    on the Host API, live apply in transparent mode with the slot and asset switch, `pack`
+    renaming only `libmain`, `markHealthy` wiring, and the watchdog as rollback layer 3.
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |

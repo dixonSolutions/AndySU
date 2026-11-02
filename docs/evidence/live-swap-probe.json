@@ -1,0 +1,183 @@
+{
+  "api": "36",
+  "swaps": [
+    {
+      "n": 1,
+      "to": "1.2.9002",
+      "fail_init": false,
+      "state": {
+        "v": 1,
+        "swap_count": 1,
+        "from": "1.2.9001",
+        "connect": "",
+        "map": "",
+        "menu": 1
+      },
+      "stopped": {
+        "fds": 152,
+        "threads": 31,
+        "rss_kb": 166152
+      },
+      "started": {
+        "fds": 152,
+        "threads": 31,
+        "rss_kb": 166152,
+        "libmain_maps": 2
+      },
+      "shutdown_ms": 160,
+      "to_healthy_ms": 17431,
+      "seconds": 18.5,
+      "steady": {
+        "fds": 171,
+        "threads": 33,
+        "rss_kb": 253612,
+        "fd_kinds": "pk3=7,socket=16,anon=45,pipe=4,dev=39,other=60"
+      }
+    },
+    {
+      "n": 2,
+      "to": "1.2.9001",
+      "fail_init": false,
+      "state": {
+        "v": 1,
+        "swap_count": 2,
+        "from": "1.2.9002",
+        "connect": "",
+        "map": "",
+        "menu": 1
+      },
+      "stopped": {
+        "fds": 156,
+        "threads": 31,
+        "rss_kb": 172568
+      },
+      "started": {
+        "fds": 156,
+        "threads": 31,
+        "rss_kb": 172568,
+        "libmain_maps": 3
+      },
+      "shutdown_ms": 141,
+      "to_healthy_ms": 16467,
+      "seconds": 17.0,
+      "steady": {
+        "fds": 173,
+        "threads": 33,
+        "rss_kb": 267240,
+        "fd_kinds": "pk3=7,socket=16,anon=47,pipe=4,dev=39,other=60"
+      }
+    },
+    {
+      "n": 3,
+      "to": "1.2.9002",
+      "fail_init": false,
+      "state": {
+        "v": 1,
+        "swap_count": 3,
+        "from": "1.2.9001",
+        "connect": "",
+        "map": "",
+        "menu": 1
+      },
+      "stopped": {
+        "fds": 158,
+        "threads": 31,
+        "rss_kb": 183148
+      },
+      "started": {
+        "fds": 158,
+        "threads": 31,
+        "rss_kb": 183148,
+        "libmain_maps": 4
+      },
+      "shutdown_ms": 105,
+      "to_healthy_ms": 16410,
+      "seconds": 17.0,
+      "steady": {
+        "fds": 175,
+        "threads": 33,
+        "rss_kb": 277896,
+        "fd_kinds": "pk3=7,socket=16,anon=49,pipe=4,dev=39,other=60"
+      }
+    },
+    {
+      "n": 4,
+      "to": "1.2.9001",
+      "fail_init": true,
+      "state": {
+        "v": 1,
+        "swap_count": 4,
+        "from": "1.2.9002",
+        "connect": "",
+        "map": "",
+        "menu": 1
+      },
+      "stopped": {
+        "fds": 160,
+        "threads": 31,
+        "rss_kb": 193688
+      },
+      "started": {
+        "fds": 172,
+        "threads": 33,
+        "rss_kb": 270976,
+        "libmain_maps": 5
+      },
+      "error": "ANDYSU test hook: forced failure of the new engine's init  Xonotic Android 1.2.9001 Nov  3 2026 release Clang ",
+      "seconds": 15.5
+    }
+  ],
+  "steady_before": {
+    "fds": 169,
+    "threads": 33,
+    "rss_kb": 283860,
+    "fd_kinds": "pk3=7,socket=17,anon=41,pipe=4,dev=40,other=60"
+  },
+  "start": {
+    "event": "engine_start",
+    "pid": 3354,
+    "lib": "/data/app/~~7cz4N_OjPM4oRS-7dhKlEQ==/io.github.dixonsolutions.xonotictouch-ik7H3cj9UcDRwPsSQc6CiQ==/lib/x86_64/libmain.so",
+    "build_id": "1.2.9001",
+    "swapped": 0,
+    "fds": 125,
+    "threads": 29,
+    "rss_kb": 151600,
+    "libmain_maps": 1,
+    "maps": "libmain.so",
+    "fd_kinds": "pk3=0,socket=14,anon=16,pipe=4,dev=31,other=60",
+    "t_ms": 42899
+  },
+  "frames_after_30s": [
+    240,
+    360,
+    480,
+    600
+  ],
+  "pid": 3354,
+  "pid_unchanged": true,
+  "steady_fds": [
+    169,
+    171,
+    173,
+    175
+  ],
+  "steady_threads": [
+    33,
+    33,
+    33,
+    33
+  ],
+  "steady_rss_kb": [
+    283860,
+    253612,
+    267240,
+    277896
+  ],
+  "libmain_maps": [
+    2,
+    3,
+    4,
+    5
+  ],
+  "verdict": "live swap works"
+}
