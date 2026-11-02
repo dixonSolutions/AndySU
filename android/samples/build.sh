@@ -33,7 +33,7 @@ mode = "auto"
 apply = "live"
 TOML
 "$cli" host-config --toml "$out/andysu.toml" --config-out "$out/config.json" --host-out "$out/andysu-host.json"
-gw="$repo/android/gradlew -q -p $repo/android"
+gw="$repo/android/gradlew -q -p $repo/android -Pandysu.samples=true"
 for v in 1.0 2.0; do
   $gw ":samples:$s:payload:andysuPayloadRelease" -Psample.version=$v
   rm -rf "$out/payload-$v" && cp -r "$repo/android/samples/$s/payload/build/andysu/payload/release" "$out/payload-$v"

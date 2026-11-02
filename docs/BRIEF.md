@@ -375,10 +375,8 @@ Rules:
   adb at `127.0.0.1:5555`. It belongs to the Xonotic work, so you may use it for testing but leave
   it as you found it. **Never** install anything on `127.0.0.1:5605` (`lindroids-lab-b15`, another
   project's VM).
-- **You may not create GitHub repositories.** The owner creates `dixonSolutions/AndySU` (public).
-  Until `git remote get-url origin` works and `gh repo view dixonSolutions/AndySU` succeeds,
-  commit locally, do every step that doesn't need GitHub, and check again from time to time. Once
-  it exists, push your history and carry on with the CI and publishing steps.
+- **GitHub repo:** on 2026-11-03 the owner authorised you to create `dixonSolutions/AndySU` (public).
+  Don't create any other repository without asking.
 - GitHub CLI: authenticated as `dixonSolutions` with `repo` and `workflow` scopes. Store the test
   payload signing key as an Actions secret with `gh secret set`. **Never commit private keys.**
   Every key in this repo's CI is a test key.

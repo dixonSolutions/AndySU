@@ -1,0 +1,16 @@
+# What each channel offers. Change it with a pull request: merging applies it (workflow "apply").
+#
+#   release  a release id that has been ingested (workflow "ingest")
+#   rollout  percent of installs that get it (default 100); the rest stay on the previous release
+#
+# Promote:  copy the beta release into stable.   Stage:  lower stable's rollout, raise it later.
+# Roll back: set release to an older id; it is republished under a new sequence so every client
+# moves onto it (or run the "rollback" workflow).
+expires_days = 30
+
+[channels.beta]
+# release = "1.1.0"
+
+[channels.stable]
+# release = "1.0.0"
+# rollout = 100

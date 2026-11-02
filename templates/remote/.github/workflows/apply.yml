@@ -1,0 +1,24 @@
+# Merging a change to channels.toml publishes it: new releases, promotions, rollouts, rollbacks.
+name: apply
+on:
+  push:
+    branches: [main]
+    paths: [channels.toml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: site
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          signing-key: ${{ secrets.ANDYSU_SIGNING_KEY }}
+          signing-cert: ${{ secrets.ANDYSU_SIGNING_CERT }}
+      - run: python3 scripts/reconcile.py --site site --key "$ANDYSU_KEY_FILE" ${ANDYSU_CERT_FILE:+--cert "$ANDYSU_CERT_FILE"} | tee changes.txt
+      - run: scripts/push-site.sh "apply: $(head -c 200 changes.txt | tr '\n' ';')"
+      - run: scripts/verify-site.sh

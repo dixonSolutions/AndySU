@@ -28,7 +28,7 @@ JSON
 
 run_action() { # kind version
   INPUT_PAYLOAD="$t/p$2" INPUT_CONFIG="$t/$1/andysu.toml" INPUT_SIGNING_KEY="$key" INPUT_SIGNING_CERT="" \
-    INPUT_VERSION="" INPUT_CHANNEL="" INPUT_PACK_ARGS="" INPUT_ROLLOUT="" INPUT_PAGES_BRANCH=gh-pages \
+    INPUT_VERSION="" INPUT_CHANNEL="" INPUT_PACK_ARGS="" INPUT_ROLLOUT="${ROLLOUT:-}" INPUT_PAGES_BRANCH=gh-pages \
     INPUT_ANDYSU_VERSION=latest GH_TOKEN=x GITHUB_REPOSITORY=owner/app ANDYSU_CLI="$cli" \
     RUNNER_TEMP="$t/runner-$1" GITHUB_OUTPUT="$t/out-$1" bash "$repo_root/actions/publish/publish.sh"
 }
@@ -46,7 +46,7 @@ printf 'app = "%s"\nhost_api = 1\npublic_key = "k.pem"\n[remote]\ntype = "pages"
   "$APP" > "$t/pages/andysu.toml"
 cp "$t/keys/andysu-public.pem" "$t/pages/k.pem"
 for v in 1.0 2.0 3.0; do
-  ANDYSU_GIT_REMOTE="$t/pages/origin.git" run_action pages "$v" >/dev/null
+  ROLLOUT=$([ "$v" = 3.0 ] && echo 50 || true) ANDYSU_GIT_REMOTE="$t/pages/origin.git" run_action pages "$v" >/dev/null
 done
 git clone -q --branch gh-pages "$t/pages/origin.git" "$t/pages/served"
 p="$(port)"
@@ -56,8 +56,10 @@ sleep 0.3
 releases="$(python3 -c "import json; print([r['id'] for r in json.load(open('$t/pages/served/stable/update.json'))['releases']])")"
 [ "$releases" = "['1.0', '2.0', '3.0']" ] || { echo "pages: unexpected releases $releases" >&2; exit 1; }
 ls "$t/pages/served/deltas" | grep -q . || { echo "pages: no deltas were built" >&2; exit 1; }
-client_update pages "http://127.0.0.1:$p/stable/update.json" | grep -q '"staged": "3.0"'
-echo "ok pages: 3 releases on the branch (with deltas), client staged 3.0"
+pct="$(python3 -c "import json; print(json.load(open('$t/pages/served/stable/update.json'))['releases'][-1]['rollout']['percent'])")"
+[ "$pct" = 50 ] || { echo "pages: rollout input not applied ($pct)" >&2; exit 1; }
+client_update pages "http://127.0.0.1:$p/stable/update.json" | grep -Eq '"staged": "(2|3)\.0"'
+echo "ok pages: 3 releases on the branch (with deltas, 3.0 at 50% rollout), client staged 2.0 or 3.0 by its bucket"
 
 # ---- github (stand-in gh)
 gh_root="$t/github"

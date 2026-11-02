@@ -44,7 +44,7 @@ fi
 umask 022
 trap 'rm -f "$work/signing.key"' EXIT
 rollout=()
-[ -z "$INPUT_ROLLOUT" ] || rollout=(--rollout "$version=$INPUT_ROLLOUT")
+[ -z "$INPUT_ROLLOUT" ] || rollout=(--rollout "$INPUT_ROLLOUT")
 # shellcheck disable=SC2206
 pack_args=($INPUT_PACK_ARGS)
 

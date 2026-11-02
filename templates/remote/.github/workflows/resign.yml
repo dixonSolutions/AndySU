@@ -1,0 +1,24 @@
+# Manifests expire (freeze-attack protection). Re-sign every channel weekly so clients never see
+# an expired one.
+name: resign
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: site
+  cancel-in-progress: false
+jobs:
+  resign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          signing-key: ${{ secrets.ANDYSU_SIGNING_KEY }}
+          signing-cert: ${{ secrets.ANDYSU_SIGNING_CERT }}
+      - run: python3 scripts/reconcile.py --site site --resign --key "$ANDYSU_KEY_FILE" ${ANDYSU_CERT_FILE:+--cert "$ANDYSU_CERT_FILE"}
+      - run: scripts/push-site.sh "re-sign channels"
+      - run: scripts/verify-site.sh

@@ -1,0 +1,39 @@
+name: AndySU remote setup
+description: Install the andysu CLI, check out the published site (gh-pages) and write the signing key
+inputs:
+  signing-key:
+    required: true
+  signing-cert:
+    default: ""
+  andysu-version:
+    default: latest
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        KEY: ${{ inputs.signing-key }}
+        CERT: ${{ inputs.signing-cert }}
+        V: ${{ inputs.andysu-version }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        if [ "$V" = latest ]; then u=https://github.com/dixonSolutions/AndySU/releases/latest/download
+        else u=https://github.com/dixonSolutions/AndySU/releases/download/v$V; fi
+        mkdir -p "$RUNNER_TEMP/bin"
+        curl -sfL -o "$RUNNER_TEMP/bin/andysu" "$u/andysu-x86_64-unknown-linux-musl"
+        chmod +x "$RUNNER_TEMP/bin/andysu"
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+        remote="https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY"
+        if git ls-remote --exit-code "$remote" gh-pages >/dev/null; then
+          git clone -q --depth 1 --branch gh-pages "$remote" site
+        else
+          git init -q -b gh-pages site && git -C site remote add origin "$remote"
+        fi
+        umask 077
+        printf '%s\n' "$KEY" > "$RUNNER_TEMP/signing.key"
+        echo "ANDYSU_KEY_FILE=$RUNNER_TEMP/signing.key" >> "$GITHUB_ENV"
+        if [ -n "$CERT" ]; then
+          printf '%s\n' "$CERT" > "$RUNNER_TEMP/signing.cert.json"
+          echo "ANDYSU_CERT_FILE=$RUNNER_TEMP/signing.cert.json" >> "$GITHUB_ENV"
+        fi

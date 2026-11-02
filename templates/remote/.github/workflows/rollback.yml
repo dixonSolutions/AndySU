@@ -1,0 +1,30 @@
+# Emergency rollback: republish a known-good release on a channel now, and record it in
+# channels.toml. Clients move forward onto it (a new sequence), so no client is left behind.
+name: rollback
+on:
+  workflow_dispatch:
+    inputs:
+      channel: { description: Channel, default: stable }
+      to: { description: "Known-good release id", required: true }
+permissions:
+  contents: write
+concurrency:
+  group: site
+  cancel-in-progress: false
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          signing-key: ${{ secrets.ANDYSU_SIGNING_KEY }}
+          signing-cert: ${{ secrets.ANDYSU_SIGNING_CERT }}
+      - run: |
+          python3 scripts/set-channel.py channels.toml "${{ inputs.channel }}" "${{ inputs.to }}" --rollout 100
+          python3 scripts/reconcile.py --site site --key "$ANDYSU_KEY_FILE" ${ANDYSU_CERT_FILE:+--cert "$ANDYSU_CERT_FILE"}
+          scripts/push-site.sh "rollback ${{ inputs.channel }} to ${{ inputs.to }}"
+          scripts/verify-site.sh
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "rollback: ${{ inputs.channel }} -> ${{ inputs.to }}" && git push -q origin HEAD:main

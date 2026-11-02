@@ -206,6 +206,8 @@ impl AndySUToml {
             .iter()
             .map(|p| format!("android.permission.{p}"))
             .collect();
+        // Declared by the host AAR for AndroidX core in payloads (see its AndroidManifest.xml).
+        perms.push(format!("{}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION", self.app));
         for p in &self.host.permissions {
             let full = if p.contains('.') { p.clone() } else { format!("android.permission.{p}") };
             if !perms.contains(&full) {

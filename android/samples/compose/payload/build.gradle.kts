@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.andysu.sample.compose"
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = "com.andysu.sample.compose"
         minSdk = 23

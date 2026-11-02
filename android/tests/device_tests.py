@@ -594,6 +594,7 @@ def scenarios(d, b, r, results):
         raise Fail(f"tamper: {e}")
     open(r.manifest_path(), "wb").write(good)
     r.sign()
+    newest = open(r.manifest_path(), "rb").read(), open(r.manifest_path() + ".sig", "rb").read()
     d.broadcast("check")
     d.status("up_to_date")
     open(r.manifest_path(), "wb").write(good)
@@ -602,7 +603,12 @@ def scenarios(d, b, r, results):
     e = d.status("error")
     if e["status"].get("code") != "sequence_rollback":
         raise Fail(f"replay: {e}")
+    # Expired: re-sign the newest manifest (a fresh sequence) to expire right away, and check
+    # once that instant has passed on the device's clock too.
+    open(r.manifest_path(), "wb").write(newest[0])
+    open(r.manifest_path() + ".sig", "wb").write(newest[1])
     r.sign("--expires-days", "0")
+    time.sleep(2.5)
     d.broadcast("check")
     e = d.status("error")
     if e["status"].get("code") != "expired":
@@ -651,11 +657,12 @@ def scenarios(d, b, r, results):
     # apply policy = next_start while the app is in the foreground: staged, not applied until the next start
     d.broadcast("policy", policy="next_start")
     d.event("apply_policy", policy="next_start")
+    since = len(d.events)
     r.publish("8.5")
     d.broadcast("check")
     d.status("staged")
     time.sleep(3 * SLOW)
-    if any(e.get("event") in ("live_swapped", "relaunch") for e in d.events[-30:]):
+    if any(e.get("event") in ("live_swapped", "relaunch") for e in d.events[since:]):
         raise Fail("next_start policy applied the update early")
     d.force_stop()
     d.launch()

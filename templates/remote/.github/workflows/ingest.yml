@@ -1,0 +1,60 @@
+# Adds a payload to the site (blobs, deltas, release metadata) without offering it to anyone, then
+# opens a pull request that offers it on a channel. Trigger it from the app's CI:
+#   gh workflow run ingest --repo owner/app-updates -f payload_url=<tar.gz URL> -f version=1.2.0
+# or with a repository_dispatch event of type "ingest" carrying the same fields.
+name: ingest
+on:
+  workflow_dispatch:
+    inputs:
+      payload_url: { description: "URL of the payload directory as .tar.gz", required: true }
+      version: { description: "Release id", required: true }
+      channel: { description: "Channel to propose it for", default: beta }
+      auto_apply: { description: "Offer it right away instead of opening a pull request", type: boolean, default: false }
+  repository_dispatch:
+    types: [ingest]
+permissions:
+  contents: write
+  pull-requests: write
+concurrency:
+  group: site
+  cancel-in-progress: false
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    env:
+      PAYLOAD_URL: ${{ inputs.payload_url || github.event.client_payload.payload_url }}
+      VERSION: ${{ inputs.version || github.event.client_payload.version }}
+      CHANNEL: ${{ inputs.channel || github.event.client_payload.channel || 'beta' }}
+      AUTO_APPLY: ${{ inputs.auto_apply || github.event.client_payload.auto_apply || false }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          signing-key: ${{ secrets.ANDYSU_SIGNING_KEY }}
+          signing-cert: ${{ secrets.ANDYSU_SIGNING_CERT }}
+      - name: Pack ${{ env.VERSION }}
+        run: |
+          mkdir payload
+          curl -sfL "$PAYLOAD_URL" | tar xz -C payload
+          [ -f payload/andysu-payload.json ] || { d=$(dirname "$(find payload -name andysu-payload.json | head -1)"); mv "$d" payload.real && rm -rf payload && mv payload.real payload; }
+          andysu pack payload --site site --channel "$CHANNEL" --id "$VERSION" $(cat pack-args 2>/dev/null || true)
+      - run: scripts/push-site.sh "ingest $VERSION"
+      - name: Offer it on ${{ env.CHANNEL }}
+        run: |
+          python3 scripts/set-channel.py channels.toml "$CHANNEL" "$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$AUTO_APPLY" = true ]; then
+            git commit -qam "$CHANNEL: $VERSION" && git push -q origin HEAD:main
+            # Pushes made with the workflow token start no workflows: apply here.
+            python3 scripts/reconcile.py --site site --key "$ANDYSU_KEY_FILE" ${ANDYSU_CERT_FILE:+--cert "$ANDYSU_CERT_FILE"}
+            scripts/push-site.sh "apply: $CHANNEL $VERSION"
+            scripts/verify-site.sh
+          else
+            git switch -qc "release/$CHANNEL-$VERSION"
+            git commit -qam "$CHANNEL: $VERSION"
+            git push -q origin "release/$CHANNEL-$VERSION"
+            gh pr create --base main --title "$CHANNEL: $VERSION" \
+              --body "Offers release \`$VERSION\` on \`$CHANNEL\`. Merging publishes it (workflow apply)."
+          fi

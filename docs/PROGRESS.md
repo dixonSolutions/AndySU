@@ -3,30 +3,32 @@
 Honest status of the build, newest first within each step. "Verified" means the tests named were
 run and passed on the owner's machine (Fedora, x86_64) unless CI is mentioned.
 
-GitHub repo `dixonSolutions/AndySU`: **not created yet** (checked 2026-11-02). Work is committed
-locally; CI and publishing steps wait for the repo.
+GitHub repo `dixonSolutions/AndySU`: created on 2026-11-03 with the owner's authorisation (see the
+publishing section below for what CI and the first release showed). Before that, everything was
+local.
 
-## Summary
+## Summary (2026-11-03)
 
 | Step | State |
 |---|---|
-| 0 Scaffold | done locally; CI written, not yet run (no repo) |
-| 1 Spec v0 | done |
+| 0 Scaffold | done; CI written (first GitHub run: see step 9) |
+| 1 Spec v0 | done; updated with state lock, base directories, host config |
 | 2 Rust core | done |
 | 3 CLI | done |
-| 4 Linux desktop host | done |
-| 5 Android host + samples | done locally on API 24/29/31/34; 36 and 36-16k being re-verified; samples written, not yet run |
-| 6 Gradle plugin + split | split (stub + transparent modes) and plugin working; plugin publishing pending (step 9) |
-| 7 Test beds | in progress (transparent mode on the real Xonotic/STK release APKs) |
-| 8 Bindings | C/CMake package done; others not started |
-| 9 Publishing | not started (needs the repo) |
-| 10 templates/remote | not started |
-| 11 Docs | not started |
+| 4 Linux desktop host | done (10 scenarios incl. `--apply restart`) |
+| 5 Android host | 20 checks pass on API 24, 31, 34 and 36-16k (2026-11-02 run). 29 and 36 failed on a test bug and an emulator hang; the fixed rerun was cut off by the OOM kill and is pending |
+| 5 samples | all three build. Compose, native and WebView reached "2.0 swapped in live, committed" on API 34, but the run was killed before it finished, and the Compose and WebView screenshots are all-black frames. **Not verified**: needs investigation |
+| 6 Gradle plugin + split | done |
+| 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back. Live `.so` swap in Xonotic not done |
+| 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
+| 9 Publishing | verified locally against a local site; live GitHub run: see step 9 |
+| 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
+| 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated |
 
 ## Environment (2026-11-02)
 - rustup stable 1.99.1 in `~/.cargo` with aarch64/armv7/x86_64/i686 Android targets, cargo-ndk 4.1.2,
   nightly (for cargo-fuzz 0.13.2), cbindgen 0.29.4.
-- Temurin JDK 17.0.21 in `~/.local/opt/jdk-17.0.21+9`.
+- Temurin JDK 21.0.13 in `~/.local/opt/jdk-21.0.13+9` (D27; JDK 17 is still there).
 - `source scripts/env.sh` puts all of it on PATH.
 
 ## Step 0 — scaffold (2026-11-02)
@@ -133,31 +135,42 @@ Local emulators run inside a podman container (D20; the host's Fedora 44 userlan
 emulator build segfault). Driver: `android/tests/device_tests.py --container`.
 
 Verified on emulators, all with only INTERNET/ACCESS_NETWORK_STATE/RECEIVE_BOOT_COMPLETED and no
-dialog ever focused (16-17 checks per level, run 2026-11-02 19:29-19:50):
+dialog ever focused (20 checks per level, run 2026-11-02 21:46-22:18, JDK 21 build):
 
-| Scenario | 24 | 29 | 31 | 34 |
-|---|---|---|---|---|
-| permissions: nothing dangerous or runtime | ok | ok | ok | ok |
-| factory payload boots (child-first loader, own Kotlin) | ok | ok | ok | ok |
-| live swap, state carried, fresh renamed .so copy, commit | ok | ok | ok | ok |
-| start() throws → live rollback in-process | ok | ok | ok | ok |
-| SIGSEGV on payload thread in trial → one relaunch → previous | ok | ok | ok | ok |
-| uncaught Java exception in trial → one relaunch → previous | ok | ok | ok | ok |
-| never healthy → watchdog → live rollback | ok | ok | ok | ok |
-| process killed mid-download → resumed (6.3-6.6 MB offset) | ok | ok | ok | ok |
-| staged in background → next start in trial → commit | ok | ok | ok | ok |
-| connection dropped at 300 KB → Range resume | ok | ok | ok | ok |
-| payload kills process in start() → 3rd launch rolls back before loading | ok | ok | ok | ok |
-| content-only release applied hot | ok | ok | ok | ok |
-| tampered / replayed / expired manifest rejected | ok | ok | ok | ok |
-| GC keeps current + previous | ok | ok | ok | ok |
-| writable dex refused (34+) / loaded (<34); read-only slots load | ok | ok | ok | ok |
-| `andysu split` host from a finished APK boots and live-updates | ok | ok | ok | ok |
-| no installer/permission/crash dialog | ok | ok | ok | ok |
+| Scenario | 24 | 29 | 31 | 34 | 36 | 36-16k |
+|---|---|---|---|---|---|---|
+| permissions: nothing dangerous or runtime | ok | ok | ok | ok | ok | ok |
+| factory payload boots (child-first loader, own Kotlin) | ok | ok | ok | ok | ok | ok |
+| live swap, state carried, fresh renamed .so copy, commit | ok | ok | ok | ok | ok | ok |
+| start() throws → live rollback in-process | ok | ok | ok | ok | ok | ok |
+| SIGSEGV on payload thread in trial → one relaunch → previous | ok | ok | ok | ok | ok | ok |
+| uncaught Java exception in trial → one relaunch → previous | ok | ok | ok | ok | ok | ok |
+| never healthy → watchdog → live rollback | ok | ok | ok | ok | ok | ok |
+| process killed mid-download → resumed | ok | ok | ok | ok | ok | ok |
+| staged in background → next start in trial → commit | ok | ok | ok | ok | ok | ok |
+| connection dropped at 300 KB → Range resume | ok | ok | ok | ok | ok | ok |
+| payload kills process in start() → 3rd launch rolls back before loading | ok | ok | ok | ok | ok | ok |
+| content-only release applied hot | ok | ok | ok | ok | — | ok |
+| tampered / replayed / expired manifest rejected | ok | test bug | ok | ok | — | ok |
+| GC keeps current + previous | ok | — | ok | ok | — | ok |
+| writable dex refused (34+) / loaded (<34) | ok | — | ok | ok | — | ok |
+| 16 KB page kernel: core, bridge, renamed libs load | n/a | n/a | n/a | n/a | n/a | ok |
+| apply policy `restart` (runtime): one self-restart → trial → commit | ok | — | ok | ok | — | ok |
+| apply policy `next_start` (runtime): staged in front, applied on next start | ok | — | ok | ok | — | ok |
+| `andysu split` host from a finished APK boots and live-updates | ok | — | ok | ok | — | ok |
+| no installer/permission/crash dialog | ok | — | ok | ok | — | ok |
 
-API 36 and the 16 KB page image (36-16k) passed every scenario in an earlier run (16 KB: page
-size 16384 seen by the payload; core, host bridge and renamed payload libraries loaded); their
-latest run failed in two places that are being investigated (see below).
+"—" means the level stopped at an earlier failure:
+- **29**: the expiry check re-signed the replayed (older) manifest, so the device saw sequence 10
+  reused with different bytes (`sequence_reuse`, correct behaviour). Whether `expired` was seen
+  first depended on sub-second clock skew. The test now restores the newest manifest and waits
+  past the expiry instant.
+- **36**: the emulator stopped answering adb in `hot` (even `logcat -d` hung). Earlier runs passed
+  every scenario on 36.
+
+The first run of the matrix also exposed a test bug in `apply-next-start` (it looked at events
+from the previous scenario). The rerun of 29 and 36 with both fixes was cut off by the out-of-memory
+kill on 2026-11-02 and is pending.
 
 Findings fixed along the way: Android 14 refuses *any* writable file on a class path (not only
 .dex) — slots and the factory are now entirely read-only; before API 26 `DexClassLoader` needs an
@@ -176,3 +189,113 @@ optimized-dex directory; a Kotlin expression-bodied JNI callback had the wrong s
   libraries from `andysu-host-template.zip` (R8-minified, 76 KB dex), signed with apksigner
   (v1/v2/v3 verified, zipalign -c ok).
 - Transparent mode (`--transparent`, D21) for apps that cannot implement `Payload`.
+- The built-in payload is a delta base (D24): `pack --emit-slot` writes the slot index
+  `andysu-slot.json`. On the device the factory directory is passed to the core as a base
+  directory, so the first update downloads deltas against it and reuses unchanged archives
+  (`core/tests/session.rs::builtin_payload_serves_as_delta_base_and_archive_source`).
+- Split hosts store native libraries uncompressed and 16 KB aligned, with
+  `extractNativeLibs=false`. Earlier, a 16 KB kernel raised SIGBUS when an incremental install
+  extracted the libraries; both install modes are verified now. `--cleartext` permits HTTP
+  remotes, for local testing.
+
+## Apply policy (2026-11-02, owner request; D23)
+`apply = live | restart | next_start` in andysu.toml, with `restart_when = now | background` and
+`live_fallback`. Apps can override it per install at runtime (`UpdateClient.setApplyPolicy`,
+exposed in every binding).
+Verified: desktop scenario I (`--apply restart`: staged, one self-restart, trial, commit), and
+device scenarios `apply-restart` and `apply-next-start` (see the step 5 table).
+
+## Step 7 — test beds (2026-11-02)
+`android/tests/testbed_tests.py` takes the projects' *published* x86_64 release APKs (no rebuild,
+no source change) and runs `andysu split --transparent`: version A becomes a host with A built
+in, version B becomes the payload. On an emulator (API 34, no internet; the remote is reached
+over `adb reverse`):
+
+| | Xonotic Touch 1.2.104 → 1.2.105 | SuperTuxKart Touch 1.0.29 → 1.0.31 |
+|---|---|---|
+| A runs from the built-in payload (engine .so, Java/SDL code, data) | ok | ok |
+| B downloaded, applied on next start, committed; installed APK still versionName A | ok | ok |
+| broken B (truncated dex) fails on start → crash handler rolls back → one relaunch → B | ok | ok |
+
+Evidence: `docs/evidence/stk-{1-builtin,2-updated,3-rolled-back}*.png` and `testbeds.json`. The
+Xonotic screenshots came out black (cause not investigated), so they were deleted. The Xonotic
+evidence is its event log, which is not committed; rerunning the test regenerates it.
+
+The games' own updaters run alongside AndySU and would fight it. Two patches, kept in
+`testbeds/patches/` and never pushed to the projects, make them stand down under an AndySU host
+(Xonotic: `AppUpdater` off, payload version shown; STK: the update checker returns early). The
+runs above used the unmodified release APKs; the patches are for the projects' maintainers.
+
+Found and fixed through the test beds: a real race in which the crash handler's rollback was
+overwritten by a stale state write from the updater thread (now `Store::locked` plus a
+concurrency test that loses updates without the lock); STK's >4096 asset files (now
+auto-archived into 395 components); aapt2 dropping dot-files (hence `andysu-slot.json`).
+
+Not done: the live `.so` swap inside Xonotic (`Host_Shutdown` → dlopen the new engine) needs
+engine changes. The test beds therefore update on the next start.
+
+## Step 8 — bindings (2026-11-02)
+| Binding | What | Verified locally |
+|---|---|---|
+| C/CMake (`bindings/c`) | `AndySU::payload` (header), `AndySU::core` (static lib + C ABI), CMake config | `test.sh`: install, then build and run a consumer; payload exports `andysu_payload_v1` |
+| React Native + Expo (`@andysu/react-native`) | TS API (`info`, `status`, `checkNow`, `applyNow`, `restartNow`, `setApplyPolicy`, `onStatus`), Android module, Expo config plugin | `tsc` build + smoke test; Android library compiles against the API |
+| Capacitor/Cordova (`@andysu/capacitor`) | same API as a Capacitor plugin | `tsc` + smoke test; Android library compiles |
+| Flutter (`andysu`) | Dart API over a MethodChannel/EventChannel | Android library compiles. `flutter test` runs in CI only: installing the Flutter SDK on this machine was not permitted |
+| Unity (`com.andysu.unity`) | C# static API over `AndroidJavaClass`, asmdef, `.meta` files | compiles with `dotnet build` against stub `UnityEngine` types (Unity needs a licence) |
+| Godot (`addons/andysu`) | autoload GDScript API, editor export plugin, Android plugin v2 AAR | Android library compiles against Godot 4.7.2. GDScript is not run (no Godot here) |
+
+The bindings talk to the host through `com.andysu.api.Host.current()`, so they work in stub
+mode and in transparent (split) mode alike. CI job `bindings` runs all of the above, plus
+`flutter test`.
+
+## Step 9 — publishing (2026-11-02)
+Everything goes to our own GitHub remote (D25), with consumer instructions in
+[REGISTRIES.md](REGISTRIES.md):
+- `scripts/package.sh` builds every package. `scripts/registry.py` maintains static registries on
+  GitHub Pages: Maven with the plugin marker, npm/UPM packuments, a cargo sparse index, and pub
+  v2.
+- `release.yml`: CLI binaries (Linux musl and macOS, x86_64 and aarch64); a GitHub Release with
+  AARs, crates, npm and pub tarballs, the C and Godot archives, the host template, and
+  `SHA256SUMS` plus `SHA256SUMS.sig` (`andysu sign-file`); `gh-pages`; a Homebrew formula; then
+  consumer verification against the live URLs, signature verification of the release, and
+  `brew install` on Linux and macOS.
+- Keys (D26, [KEYS.md](KEYS.md)): CI test keys generated on 2026-11-02 and kept outside the repo,
+  loaded by `scripts/setup-secrets.sh`. Real keys and tokens replace them by re-running that
+  script. The crates.io and npmjs.com jobs are wired up but stay off until their tokens exist.
+- `actions/publish`: the composite action that `andysu init` puts in an app's CI, for
+  `type = "github"` (blobs as release assets, manifest on the latest release) and
+  `type = "pages"`.
+
+Verified locally (2026-11-02), by publishing every package into a local site and then
+installing it from a clean project with `scripts/verify-consumers.sh`:
+- cargo: library dependency, plus `cargo install andysu-cli --registry andysu`;
+- npm: `@andysu/react-native`, `@andysu/capacitor`, `@andysu/cli` (runs the bundled binary);
+- UPM: the package document and tarball, with `.meta` files;
+- Maven: a fresh Gradle project applies the plugin through its marker, compiles a payload
+  against `api`, uses `payload-kit`, and resolves the host AAR (core for 4 ABIs);
+- C: `find_package(AndySU)` from the release tarball; build and run;
+- Godot: the addon zip with its AAR.
+
+pub, Homebrew and the live GitHub URLs are verified only in CI, once the repository exists.
+`actions/publish/test.sh` covers both remote types: three releases with deltas and a 50%
+rollout, against a bare git repo and a stand-in `gh`, then a simulated client updates from each.
+
+## Step 10 — `templates/remote` (2026-11-02)
+A GitHub template for an app's update remote, served by Pages. `channels.toml` on `main` says
+what each channel offers. Merging a PR applies it (`apply`), `ingest` adds a payload and opens
+the PR, `rollback` handles emergencies, and `resign` refreshes expiry weekly.
+`scripts/reconcile.py` brings the signed site in line with `channels.toml` using `andysu publish`,
+`sign --rollout`, `rollback` and `sign`.
+Verified by `templates/remote/test.sh` (also in CI): ingest → beta; promote to stable; 1.1 at
+20% (41 of 200 simulated installs took it) → 100%; rollback (republished as `1.0-r3`); re-sign.
+Each step passes `andysu verify --blobs`, and reconcile is a no-op once the site matches.
+
+**`templates/remote/` is ready to be split into its own template repository.** The owner creates
+that repository; copy the directory to its root.
+
+## Step 11 — docs (2026-11-02)
+README (what AndySU is, how it works, the Play/F-Droid caveat, adoption per ecosystem),
+[THREAT_MODEL.md](THREAT_MODEL.md) (assets, trust anchors, attacker capabilities, each defence
+with the test that covers it, what is out of scope), [REGISTRIES.md](REGISTRIES.md),
+[KEYS.md](KEYS.md), and spec updates: the state lock, base directories, and host configuration
+including the apply policy.

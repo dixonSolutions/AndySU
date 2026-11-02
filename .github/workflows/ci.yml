@@ -24,6 +24,8 @@ jobs:
       - run: cargo test --workspace
       - name: The publish action (pages and github remotes, against local stand-ins)
         run: cargo build -p andysu-cli && bash actions/publish/test.sh
+      - name: The remote template (ingest, promote, rollout, rollback, re-sign)
+        run: bash templates/remote/test.sh
       - name: C header is up to date
         run: |
           cargo install cbindgen --locked --version 0.29.4

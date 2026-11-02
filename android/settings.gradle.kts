@@ -20,9 +20,10 @@ rootProject.name = "andysu-android"
 
 include(":api", ":host", ":payload-kit", ":host-template")
 include(":testapp:app", ":testapp:payload")
-//include(":samples:compose:app", ":samples:compose:payload")
-//include(":samples:native:app", ":samples:native:payload")
-//include(":samples:webview:app", ":samples:webview:payload")
+// The samples (-Pandysu.samples=true; samples/build.sh sets it).
+if (providers.gradleProperty("andysu.samples").orNull == "true") {
+    for (s in listOf("compose", "native", "webview")) include(":samples:$s:app", ":samples:$s:payload")
+}
 
 // The ecosystem bindings' Android libraries, compiled against :api (-Pandysu.bindings=true; CI).
 if (providers.gradleProperty("andysu.bindings").orNull == "true") {

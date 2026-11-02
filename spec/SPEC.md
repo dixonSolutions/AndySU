@@ -130,6 +130,7 @@ packer refuses to publish a payload whose `needs` exceed what the frozen host de
 
 ```
 <root>/state.json                  schema/state.schema.json, replaced atomically
+<root>/state.lock                  exclusive lock held for every read-modify-write of the state
 <root>/blobs/sha256/<hex>          verified blobs
 <root>/blobs/sha256/<hex>.part     partial downloads (resumed with HTTP Range)
 <root>/slots/<release-id>/         installed slots (read-only code files)
@@ -150,12 +151,27 @@ IDLE --download+verify--> STAGED --launch/live apply--> TRIAL --markHealthy--> C
 - Every launch while a slot is in TRIAL increments `boot_attempts` *before* loading it. When
   `boot_attempts` exceeds `max_boot_attempts` (default 2), the client rolls back before loading.
 - A crash or an init failure during TRIAL rolls back immediately.
-- `state.json` is written as: write `state.json.tmp`, fsync it, rename over `state.json`, fsync
-  the directory. A reader therefore always sees the old or the new state, never a torn one.
+- `state.json` is written as: write a uniquely named temporary file next to it, fsync it, rename
+  it over `state.json`, fsync the directory. A reader therefore always sees the old or the new
+  state, never a torn one. Every read-modify-write (staging, launch decisions, commit, rollback)
+  runs under an exclusive lock on `state.lock`, so that concurrent writers (an updater thread and
+  a crash handler, or two processes) cannot lose each other's transitions.
 - A slot is built in `<id>.staging/`, code files are made read-only (required for dynamically
   loaded code on Android 14+), everything is fsynced, then the directory is renamed to `<id>/`.
 - Garbage collection keeps the current slot, the previous slot and the pending one; on
   low-storage devices only the current one.
+
+### 7.1 Base directories (the built-in payload)
+
+A client may be given read-only *base directories*: slots that are not under `<root>`, typically
+the payload built into the host APK (on Android, extracted once to `<root>/factory/<id>/`). A base
+directory holds the release's files plus `andysu-slot.json`, the slot index that `andysu pack
+--emit-slot` writes (a name without a leading dot, because Android's asset packaging drops
+dot-files). When staging, a client looks up a component's bytes in its blobs, then in its slots,
+then in base directories. A file found there with the right SHA-256 is used as the base of a
+delta, or copied into the new slot instead of being downloaded. An unpacked archive found there
+is reused the same way. The first update after install therefore downloads only what changed
+since the built-in payload.
 
 ## 8. Archive extraction
 
@@ -171,3 +187,27 @@ Every native library in a payload has a unique file name and SONAME, `lib<name>.
 entry that refers to a renamed library is rewritten to match. Because bionic and glibc key loaded
 libraries by path and SONAME, loading a new generation maps a fresh copy instead of reusing the
 old one. Libraries for Android 15+ MUST have LOAD segments aligned to 16 KB.
+
+## 10. Host configuration (informative)
+
+The host reads its configuration from `assets/andysu/config.json`, generated from `andysu.toml`
+by `andysu host-config` (or by the Gradle plugin). It is frozen with the host. Keys:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `app`, `channel`, `manifest_url` | required, `stable`, required | what to fetch |
+| `roots` | required | trusted root public keys (PEM or base64), more than one during a rotation |
+| `mode` | `auto` | `auto` (check, download, apply), `download_only`, `check_only`, `off` |
+| `apply` | `live` | `live`: swap in-process; `restart`: relaunch to apply; `next_start`: stage only |
+| `restart_when` | `now` | with `apply = restart`: `now`, or `background` (end the process once the user has left) |
+| `live_fallback` | `next_start` | what `live` does where a live swap is impossible (`next_start` or `restart`) |
+| `network`, `charging`, `battery_not_low` | `any`, false, true | constraints for background checks |
+| `check_on_open`, `check_interval_minutes` | true, 360 | when to check |
+| `watchdog_ms` | 10000 | TRIAL deadline for `markHealthy()` |
+| `auto_healthy_ms` | 8000 | transparent mode: commit after an activity stayed resumed this long |
+| `max_boot_attempts` | 2 | cold boots of a TRIAL slot before rolling back without loading it |
+| `host_api`, `shell_version` | 1, 0 | what the frozen host offers (release requirements) |
+
+An app may override `apply` per install at runtime (`UpdateClient.setApplyPolicy`). The override
+is stored in `<root>/apply_policy`. Every policy goes through the same TRIAL, commit and rollback
+path.
