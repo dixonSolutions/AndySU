@@ -28,7 +28,8 @@ object Factory {
         tmp.mkdirs()
         val n = copy(ctx.assets, ASSET_DIR, tmp)
         if (n == 0) throw FileNotFoundException("no assets/$ASSET_DIR in the host APK")
-        tmp.walkTopDown().filter { it.isFile && (it.name.endsWith(".dex") || it.name.endsWith(".so")) }.forEach { it.setReadOnly() }
+        // Immutable like a slot; Android 14 refuses writable dex, jar and zip files on a class path.
+        tmp.walkTopDown().filter { it.isFile }.forEach { it.setReadOnly() }
         base.listFiles()?.filter { it.name != tmp.name }?.forEach { old -> old.walkBottomUp().forEach { it.setWritable(true); it.delete() } }
         check(tmp.renameTo(dir)) { "rename factory dir" }
         return dir

@@ -52,6 +52,9 @@ object AndySU {
         private set
     private var trialLive = false
     private var booted = false
+    /** Transparent mode: the app's own components run from the payload (see Transparent). */
+    @Volatile var transparent = false
+        private set
     var bootError: String? = null
         private set
     internal val activities = LinkedHashSet<Activity>()
@@ -89,6 +92,31 @@ object AndySU {
     }
 
     // ---------------------------------------------------------------- boot
+
+    /** Transparent mode start, from InitProvider (before Application.onCreate). */
+    internal fun initTransparent(ctx: Context) {
+        init(ctx)
+        if (booted) return
+        booted = true
+        transparent = true
+        inTrial = Transparent.inTrial
+        // The component factory may have been given a copy; point the app's own ApplicationInfo
+        // (what getApplicationInfo() returns everywhere) at the slot's libraries too.
+        Transparent.slotDir?.let { File(it, "lib/${Generation.abi}") }?.takeIf { it.isDirectory }?.let {
+            app.applicationInfo.nativeLibraryDir = it.path
+        }
+        emit("launch", Transparent.launchEvent ?: JSONObject())
+        emit("booted", JSONObject().put("version", Transparent.version).put("factory", Transparent.isFactory)
+            .put("trial", inTrial).put("transparent", true))
+        val autoHealthy = config.json.optLong("auto_healthy_ms", 8_000)
+        TransparentCallbacks(autoHealthy).installOn(app)
+        if (inTrial) {
+            // Generous: the app gets until well after its first activity has had time to settle.
+            NativeBridge.setRelaunchOnCrash(true)
+            main.postDelayed(watchdog, maxOf(config.watchdogMs, autoHealthy + 60_000))
+        }
+        if (config.checkOnOpen && config.mode != "off") updater.checkAsync("open")
+    }
 
     fun ensureBooted() {
         check(Looper.myLooper() == Looper.getMainLooper())
@@ -178,7 +206,7 @@ object AndySU {
             NativeBridge.setRelaunchOnCrash(false)
             swapState = null
             val r = Core.ok(Core.markHealthy(root.path))
-            emit("committed", JSONObject().put("version", generation?.version).put("result", r))
+            emit("committed", JSONObject().put("version", generation?.version ?: Transparent.version).put("result", r))
             updater.gcAsync()
         }
     }
@@ -222,6 +250,7 @@ object AndySU {
 
     /** Called by the updater after staging, on the main thread. */
     internal fun onStaged(outcome: JSONObject) {
+        if (transparent) return // applied on the next start
         if (config.mode == "auto" && config.apply == "live" && resumed != null) applyLive()
     }
 
@@ -234,7 +263,15 @@ object AndySU {
         if (pending.optBoolean("hot_only") && !old.isNative) return applyHot(old)
         val state = suspendGeneration(old)
         emit("suspended", JSONObject().put("version", old.version).put("state_bytes", state?.size ?: 0))
-        val r = Core.obj(Core.beginLive(root.path, nowS()))
+        val r = try {
+            Core.obj(Core.beginLive(root.path, nowS()))
+        } catch (t: Throwable) {
+            // Nothing changed on disk: resume the generation we just suspended.
+            Log.e(TAG, "beginLive failed", t)
+            emit("begin_live_failed", JSONObject().put("error", t.toString()))
+            restart(old, state)
+            return false
+        }
         val dir = r.str("slot_dir")
         previous = old
         swapState = state
@@ -259,6 +296,17 @@ object AndySU {
             liveRollback("start() threw: $t")
         }
         return true
+    }
+
+    private fun restart(g: Generation, state: ByteArray?) {
+        try {
+            startGeneration(g, state)
+            if (!g.isNative) activities.toList().forEach { attachPayload(it, null) }
+            else activities.toList().forEach { NativeView.attach(it, g) }
+        } catch (t: Throwable) {
+            Log.e(TAG, "restart failed", t)
+            Phoenix.relaunch(app, "generation failed to restart")
+        }
     }
 
     private fun applyHot(g: Generation): Boolean {
@@ -342,7 +390,8 @@ object AndySU {
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             try {
-                emit("uncaught", JSONObject().put("thread", t.name).put("error", e.toString()).put("trial", inTrial))
+                emit("uncaught", JSONObject().put("thread", t.name).put("error", e.toString()).put("trial", inTrial)
+                    .put("stack", Log.getStackTraceString(e).take(4000)))
                 if (inTrial) {
                     Core.ok(Core.reportFailure(root.path, "uncaught exception: $e"))
                     Phoenix.relaunch(app, "uncaught exception during trial")

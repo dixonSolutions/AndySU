@@ -13,10 +13,12 @@ import dalvik.system.DexClassLoader
  */
 class PayloadClassLoader(
     dexPath: String,
+    /** Optimized-dex directory; required before API 26 (ignored from then on), null otherwise. */
+    optimizedDir: String?,
     librarySearchPath: String?,
     parent: ClassLoader,
     private val libraries: Map<String, String>,
-) : DexClassLoader(dexPath, null, librarySearchPath, parent) {
+) : DexClassLoader(dexPath, optimizedDir, librarySearchPath, parent) {
 
     override fun loadClass(name: String, resolve: Boolean): Class<*> {
         findLoadedClass(name)?.let { return it }

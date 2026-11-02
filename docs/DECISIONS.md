@@ -111,12 +111,36 @@ kills the old pid and starts the launcher intent. Native crashes on non-main thr
 through a pipe from the signal handler (the crashing thread is parked). Outside TRIAL, crashes go
 to the platform as usual (tombstones are kept). At most 3 relaunches per minute.
 
-## D20. Local Android emulators crash under KVM on this machine (2026-11-02)
-Evidence: emulator 37.2.12 (installed), 37.2.13 (stable) and 37.3.6 (beta) all SIGSEGV in
-`qemu-system-x86_64-headless` 15-20 s after start, for API 34 ATD and API 36 images, with
-`-gpu swiftshader_indirect`, `-gpu guest`, Vulkan/GLDirectMem features off, 1 or 4 vCPUs
-(coredumpctl shows the crashes; no symbols). With `-accel off` (TCG) the same AVD keeps running,
-so the fault is the emulator's KVM path on kernel 7.2.7-200.fc44 (i7-13700T). Adjustment:
-device tests run locally on the BlissOS VM (`xtbliss`, Android 13 / API 33, KVM through GNOME
-Boxes' qemu; allowed by the brief, left as found), and the API 24/29/31/34/36/36-16k matrix runs
-in GitHub Actions, whose runners support KVM, with the same driver in `--device` mode.
+## D20. Local Android emulators run inside a container (2026-11-02)
+On the owner's machine (Fedora 44, kernel 7.2.7, glibc of that release) every emulator build
+(37.2.12 installed, 37.2.13 stable, 37.3.6 beta) segfaults 5-120 s after start, for API 24, 34
+and 36 images, with KVM and also with TCG, every GPU mode: a thread jumps into the heap (core
+dumps via coredumpctl/eu-stack show no valid frames). The same binary and AVDs run fine inside an
+Ubuntu 24.04 container (`android/tests/emulator/Containerfile`, `run.sh`: host networking,
+`/dev/kvm` passed through, SDK mounted read-only at the same path, SELinux labels disabled for that
+container instead of relabelling the shared SDK): API 34 boots in 25 s. The device tests use it
+with `--container`. The shared BlissOS VM was tried first but is in active use by other work
+(it was rebooted externally mid-run), so it is not used for routine runs. CI runs the same driver
+against GitHub's emulators in `--device` mode.
+
+## D21. Two host modes: stub mode and transparent mode (2026-11-02)
+*Stub mode* (all API levels, live swap): the app's code implements `com.andysu.api.Payload` and
+runs inside host stub components. *Transparent mode* (Android 9+, next-start updates): for apps
+that cannot be changed, e.g. SDL games whose Activity must be an `SDLActivity`, `andysu split
+--transparent` keeps every component of the original manifest and sets
+`android:appComponentFactory` to the host's `AndySUComponentFactory`. Its
+`instantiateClassLoader` (public API since 28) runs the core's boot decision and returns the
+slot's class loader, so the app's own Application, activities and services load from the
+payload under their real names. `ApplicationInfo.nativeLibraryDir` is pointed into the slot,
+payload assets reach `getAssets()`/AAssetManager through a `ResourcesLoader` with an
+`AssetsProvider` (Android 11+; asset *listing* is not supported), and a generation is committed
+once an activity has stayed resumed for `auto_healthy_ms`. Library names are kept
+(`pack --no-rename`): one generation per process, and engines that `dlopen("libmain.so")` by name
+keep working. minSdk is raised to 28 (30 when the payload has assets).
+
+## D22. Native library names are content hashes, so identical libraries are shared (2026-11-02)
+`lib<name>.<hash8>.so` hashes the original bytes. An unchanged library therefore keeps its name
+across releases and a live swap reuses the loaded copy. That is within the contract (`start()`
+may run again on a copy after `suspend()`, which must release everything), and it keeps deltas
+and downloads minimal. A generation that must not share state with the previous one gets a
+fresh copy whenever its bytes differ.

@@ -80,6 +80,7 @@ class Fail(Exception):
 
 
 SLOW = 1.0  # --slow: multiplies every timeout (software-emulated devices)
+CONTAINER = False  # --container: run emulators inside the andysu-emulator podman image
 
 
 # ----------------------------------------------------------------------------- build
@@ -138,7 +139,19 @@ class Build:
         cp = os.path.join(self.work, "config.json")
         json.dump(cfg, open(cp, "w"), indent=2)
         gradle(":testapp:app:assembleDebug", f"-Pandysu.config={cp}", f"-Pandysu.factory={slot}")
+        gradle(":host-template:andysuHostTemplate")
+        self.template = os.path.join(ANDROID, "host-template/build/andysu/andysu-host-template.zip")
         self.apk = os.path.join(ANDROID, "testapp/app/build/outputs/apk/debug/app-debug.apk")
+        # andysu split on a finished APK (the test payload's own release APK): host + payload.
+        self.split_dir = os.path.join(self.work, "split")
+        shutil.rmtree(self.split_dir, ignore_errors=True)
+        rep = json.loads(run([ANDYSU, "split", os.path.join(ANDROID, "testapp/payload/build/outputs/apk/release/payload-release-unsigned.apk"),
+                              "--out", self.split_dir, "--entry-class", "com.andysu.testpayload.TestPayload",
+                              "--host-template", self.template, "--config", cp,
+                              "--keystore", os.path.expanduser("~/.android/debug.keystore"), "--ks-pass", "pass:android",
+                              "--key-alias", "androiddebugkey", "--cleartext"]))
+        self.split_apk = rep["host"]["apk"]
+        self.split_version = rep["version"]
         self.host_json = os.path.join(self.work, "host.json")
         json.dump({"app": PKG, "host_api": 1, "permissions": sorted(NORMAL_PERMS), "activities": 4, "services": 2,
                    "receivers": 2, "providers": 1}, open(self.host_json, "w"))
@@ -223,11 +236,14 @@ class Device:
             log(f"[{self.api}] creating AVD")
             subprocess.run([AVDMANAGER, "create", "avd", "-n", self.name, "-k", img, "-d", "pixel_6", "--force"],
                            input="no\n", text=True, capture_output=True, check=True)
-        log(f"[{self.api}] booting emulator")
-        self.emu = subprocess.Popen([EMULATOR, "-avd", self.name, "-port", str(self.port), "-no-window", "-no-audio",
-                                     "-no-boot-anim", "-no-snapshot", "-wipe-data", "-gpu", "swiftshader_indirect",
-                                     "-memory", "3072", "-cores", "4"],
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log(f"[{self.api}] booting emulator{' (container)' if CONTAINER else ''}")
+        common = ["-wipe-data", "-memory", "3072", "-cores", "4"]
+        if CONTAINER:
+            cmd = [os.path.join(ANDROID, "tests", "emulator", "run.sh"), self.name, str(self.port), *common]
+        else:
+            cmd = [EMULATOR, "-avd", self.name, "-port", str(self.port), "-no-window", "-no-audio", "-no-boot-anim",
+                   "-no-snapshot", "-gpu", "swiftshader_indirect", *common]
+        self.emu = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.adb("wait-for-device", timeout=300)
         end = time.time() + 600
         while time.time() < end:
@@ -270,6 +286,8 @@ class Device:
                 self.emu.wait(timeout=60)
             except subprocess.TimeoutExpired:
                 self.emu.kill()
+            if CONTAINER:
+                subprocess.run(["podman", "stop", "-t", "5", f"andysu-emu-{self.port}"], capture_output=True)
 
     def _focus_watch(self):
         while not self._stop_focus.is_set():
@@ -613,6 +631,19 @@ def scenarios(d, b, r, results):
             raise Fail(f"payload saw page size {d.last_payload.get('page_size')}")
         ok("16k", "16 KB page kernel: core, host bridge and renamed payload libraries all loaded and ran")
 
+    # andysu split: the host built from a finished APK boots its built-in payload and updates
+    d.adb("uninstall", PKG, check=False)
+    d.install(b.split_apk)
+    d.launch()
+    ev = d.payload(b.split_version)
+    if not ev.get("factory"):
+        raise Fail(f"split host should start on its built-in payload: {ev}")
+    d.event("live_swapped", to="7.6", timeout=120)
+    # 7.6 is content-only on top of 7.5's code: its dex still says 7.5, the content says 7.6.
+    d.wait(lambda e: e.get("event") == "payload_started" and e.get("motd") == "hot motd 7.6", "7.6 content running")
+    d.event("committed")
+    ok("split", f"host APK made by `andysu split` from the payload's own APK: built-in {b.split_version} ran, live update to 7.6 committed")
+
     # no dialogs
     bad_focus = [f for f in d.focus_log if any(x in f.lower() for x in
                  ["packageinstaller", "permissioncontroller", "grantpermissions", "application not responding",
@@ -638,10 +669,12 @@ def main():
     ap.add_argument("--api", nargs="+", default=["24", "29", "31", "34", "36", "36-16k"])
     ap.add_argument("--keep", action="store_true", help="keep the work directory")
     ap.add_argument("--device", help="run on this already-running device (adb serial) instead of emulators")
+    ap.add_argument("--container", action="store_true", help="run emulators in a podman container (tests/emulator)")
     ap.add_argument("--slow", type=float, default=1.0, help="timeout multiplier for slow (TCG) devices")
     args = ap.parse_args()
-    global SLOW
+    global SLOW, CONTAINER
     SLOW = args.slow
+    CONTAINER = args.container
 
     work = tempfile.mkdtemp(prefix="andysu-device-")
     b = Build(work)

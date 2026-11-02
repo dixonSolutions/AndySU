@@ -13,6 +13,10 @@ pub struct Entry {
     pub native_lib: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
+    /// Transparent mode (Android 9+): the app's own components run from the payload under their
+    /// real names (no Payload class); updates apply on the next start.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub transparent: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
@@ -101,8 +105,8 @@ impl Descriptor {
             return Err(bad("host_api_min must be >= 1"));
         }
         let e = &self.entry;
-        if e.dex_class.is_none() && e.native_lib.is_none() {
-            return Err(bad("entry needs dex_class or native_lib"));
+        if e.dex_class.is_none() && e.native_lib.is_none() && !e.transparent {
+            return Err(bad("entry needs dex_class, native_lib or transparent"));
         }
         if let Some(c) = &e.dex_class {
             if !is_java_name(c) {

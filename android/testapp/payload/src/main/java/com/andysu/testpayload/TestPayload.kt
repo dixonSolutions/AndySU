@@ -81,7 +81,7 @@ class TestPayload : PayloadAdapter() {
         val probe = File(host.context().cacheDir, "probe-${System.nanoTime()}.dex")
         src.copyTo(probe, overwrite = true)
         probe.setWritable(true)
-        DexClassLoader(probe.path, null, null, javaClass.classLoader).loadClass(javaClass.name)
+        DexClassLoader(probe.path, host.context().codeCacheDir.path, null, javaClass.classLoader).loadClass(javaClass.name)
         probe.delete()
         "loaded"
     } catch (t: Throwable) {

@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+include("${CMAKE_CURRENT_LIST_DIR}/AndySUTargets.cmake")
+# AndySU::core: the core's C ABI as a static library (present when the package was built with it).
+get_filename_component(_andysu_prefix "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+find_library(ANDYSU_CORE_LIBRARY NAMES andysu_core PATHS "${_andysu_prefix}/@CMAKE_INSTALL_LIBDIR@" NO_DEFAULT_PATH)
+if(ANDYSU_CORE_LIBRARY AND NOT TARGET AndySU::core)
+  add_library(AndySU::core STATIC IMPORTED)
+  set_target_properties(AndySU::core PROPERTIES
+    IMPORTED_LOCATION "${ANDYSU_CORE_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${_andysu_prefix}/@CMAKE_INSTALL_INCLUDEDIR@"
+    INTERFACE_LINK_LIBRARIES "pthread;dl;m")
+endif()
+check_required_components(AndySU)

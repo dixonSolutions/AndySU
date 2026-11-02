@@ -13,12 +13,12 @@ locally; CI and publishing steps wait for the repo.
 | 0 Scaffold | done locally; CI written, not yet run (no repo) |
 | 1 Spec v0 | done |
 | 2 Rust core | done |
-| 3 CLI | done (split/init pending, see steps 6 and 10) |
+| 3 CLI | done |
 | 4 Linux desktop host | done |
-| 5 Android host + samples | not started |
-| 6 Gradle plugin + split | not started |
-| 7 Test beds | not started |
-| 8 Bindings | not started |
+| 5 Android host + samples | done locally on API 24/29/31/34; 36 and 36-16k being re-verified; samples written, not yet run |
+| 6 Gradle plugin + split | split (stub + transparent modes) and plugin working; plugin publishing pending (step 9) |
+| 7 Test beds | in progress (transparent mode on the real Xonotic/STK release APKs) |
+| 8 Bindings | C/CMake package done; others not started |
 | 9 Publishing | not started (needs the repo) |
 | 10 templates/remote | not started |
 | 11 Docs | not started |
@@ -91,7 +91,8 @@ Verified:
   → `bad_signature`; `--expires-days 0` → `expired`; wrong key → `bad_signature`; root-certified
   release key accepted; payload needing CAMERA refused at pack time; GC removes the bad slot.
 
-Open: `andysu split` (step 6) and `andysu init` (step 10) are stubs that return an error.
+Later additions: `andysu init` (detects the project type, keys, andysu.toml, CI workflow) and
+`andysu host-config` (andysu.toml → host config.json + andysu-host.json).
 
 ## Step 4 — Linux desktop host (2026-11-02)
 `desktop/`: `andysu-desktop-host` (C, links `libandysu_core.a`), the payload contract
@@ -117,3 +118,61 @@ Verified (`make -C desktop test`, real binaries over HTTP):
 - G 6.0 crashes inside `start()` on a cold boot → one relaunch → back on 5.0, 6.0 marked bad.
 - H three live swaps in one process, each generation with its own dependency copy.
 - GC afterwards removed 7 slots and 21 blobs.
+
+## Step 5 — Android host AAR, API, samples (2026-11-02)
+Modules in `android/`: `api` (the Java contract: `Payload`, `PayloadAdapter`, `HostApi`,
+`UpdateClient`, service/receiver handlers), `host` (AAR: bootloader, child-first
+`PayloadClassLoader`, live swap with state, watchdog, live rollback, phoenix relaunch for crashes
+in trial, native bridge `libandysu_host.so` for native payloads on a host-owned GL surface with an
+async-signal-safe crash marker, JobScheduler checks, updater over the core session with ETag,
+Range and deltas, recovery screen, tier-C PackageInstaller path, stubs), `payload-kit` (lifecycle
+and saved-state owners so Compose works in a payload), `gradle-plugin`, `testapp`, and samples
+(Compose, native GLES, WebView; `samples/build.sh`). minSdk 21 for the host (D16-D19).
+
+Local emulators run inside a podman container (D20; the host's Fedora 44 userland makes every
+emulator build segfault). Driver: `android/tests/device_tests.py --container`.
+
+Verified on emulators, all with only INTERNET/ACCESS_NETWORK_STATE/RECEIVE_BOOT_COMPLETED and no
+dialog ever focused (16-17 checks per level, run 2026-11-02 19:29-19:50):
+
+| Scenario | 24 | 29 | 31 | 34 |
+|---|---|---|---|---|
+| permissions: nothing dangerous or runtime | ok | ok | ok | ok |
+| factory payload boots (child-first loader, own Kotlin) | ok | ok | ok | ok |
+| live swap, state carried, fresh renamed .so copy, commit | ok | ok | ok | ok |
+| start() throws → live rollback in-process | ok | ok | ok | ok |
+| SIGSEGV on payload thread in trial → one relaunch → previous | ok | ok | ok | ok |
+| uncaught Java exception in trial → one relaunch → previous | ok | ok | ok | ok |
+| never healthy → watchdog → live rollback | ok | ok | ok | ok |
+| process killed mid-download → resumed (6.3-6.6 MB offset) | ok | ok | ok | ok |
+| staged in background → next start in trial → commit | ok | ok | ok | ok |
+| connection dropped at 300 KB → Range resume | ok | ok | ok | ok |
+| payload kills process in start() → 3rd launch rolls back before loading | ok | ok | ok | ok |
+| content-only release applied hot | ok | ok | ok | ok |
+| tampered / replayed / expired manifest rejected | ok | ok | ok | ok |
+| GC keeps current + previous | ok | ok | ok | ok |
+| writable dex refused (34+) / loaded (<34); read-only slots load | ok | ok | ok | ok |
+| `andysu split` host from a finished APK boots and live-updates | ok | ok | ok | ok |
+| no installer/permission/crash dialog | ok | ok | ok | ok |
+
+API 36 and the 16 KB page image (36-16k) passed every scenario in an earlier run (16 KB: page
+size 16384 seen by the payload; core, host bridge and renamed payload libraries loaded); their
+latest run failed in two places that are being investigated (see below).
+
+Findings fixed along the way: Android 14 refuses *any* writable file on a class path (not only
+.dex) — slots and the factory are now entirely read-only; before API 26 `DexClassLoader` needs an
+optimized-dex directory; a Kotlin expression-bodied JNI callback had the wrong signature; a failed
+`beginLive` after suspending now resumes the old generation.
+
+## Step 6 — Gradle plugin and `andysu split` (2026-11-02)
+- `io.github.dixonsolutions.andysu` (included build `android/gradle-plugin`): `role = "host"`
+  generates `assets/andysu/config.json` and the built-in payload; `role = "payload"` runs
+  `andysu split` on the variant APK (`andysuPayload<Variant>`).
+- `andysu split app.apk`: payload extraction (dex, `lib/<abi>`, assets, Java resources jar,
+  descriptor with `needs` from the binary manifest), and with `--host-template` a signed host APK:
+  binary manifest rewritten (`cli/src/axml.rs`, round trip identical to the original under
+  `aapt2 dump xmltree` except line numbers), components mapped onto stubs keeping their
+  attributes and intent filters, resources kept, `resources.arsc` stored and aligned, host dex and
+  libraries from `andysu-host-template.zip` (R8-minified, 76 KB dex), signed with apksigner
+  (v1/v2/v3 verified, zipalign -c ok).
+- Transparent mode (`--transparent`, D21) for apps that cannot implement `Payload`.

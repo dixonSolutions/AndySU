@@ -15,7 +15,8 @@
       "properties": {
         "dex_class": { "type": "string", "pattern": "^[A-Za-z_$][A-Za-z0-9_$]*(\\.[A-Za-z_$][A-Za-z0-9_$]*)*$" },
         "native_lib": { "type": "string", "pattern": "^[A-Za-z0-9_.+-]+$" },
-        "symbol": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" }
+        "symbol": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+        "transparent": { "type": "boolean", "description": "Android 9+: the app's own components run from the payload under their real names" }
       },
       "dependentRequired": { "native_lib": ["symbol"] }
     },

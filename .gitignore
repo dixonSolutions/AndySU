@@ -14,3 +14,6 @@ core/fuzz-*.log
 android/tests/reports/
 android/.kotlin/
 android/gradle-plugin/.kotlin/
+android/**/.cxx/
+android/tests/__pycache__/
+docs/evidence/*.jsonl

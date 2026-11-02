@@ -49,6 +49,11 @@ fn full_cycle_install_update_commit() {
     assert!(d.in_trial);
     let so = store.slot_dir("1.0").join("lib/x86_64/libgame.so");
     assert!(fs::metadata(&so).unwrap().permissions().readonly(), "code must be read-only");
+    let data = store.slot_dir("1.0").join("assets/data.txt");
+    assert!(
+        fs::metadata(&data).unwrap().permissions().readonly(),
+        "every slot file is read-only (Android 14 class path jars)"
+    );
     store.update_state(|s| s.mark_healthy()).unwrap();
 
     // Second release only changes hot content -> hot_only.

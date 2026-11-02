@@ -41,7 +41,10 @@ class Generation private constructor(
                     }
                 }
                 val libDir = File(dir, "lib/$abi").takeIf { it.isDirectory }?.path
-                val loader = PayloadClassLoader(dex.joinToString(File.pathSeparator), libDir, Generation::class.java.classLoader!!, libs)
+                // Before API 26 DexClassLoader needs a writable optimized-dex directory; keep it in the
+                // slot so it goes away with the slot.
+                val odex = if (Build.VERSION.SDK_INT < 26) File(dir, ".oat").apply { mkdirs() }.path else null
+                val loader = PayloadClassLoader(dex.joinToString(File.pathSeparator), odex, libDir, Generation::class.java.classLoader!!, libs)
                 val payload = loader.loadClass(dexClass).getDeclaredConstructor().newInstance() as Payload
                 return Generation(dir, factory, version, payload, 0, loader)
             }

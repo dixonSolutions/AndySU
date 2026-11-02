@@ -62,6 +62,9 @@ pub struct Options {
     pub allow_shell: bool,
     /// Also write the release as a ready slot directory (for the payload built into a host).
     pub emit_slot: Option<PathBuf>,
+    /// Keep library file names and SONAMEs (transparent mode: one generation per process, and
+    /// engines that dlopen("libmain.so") by name keep working).
+    pub no_rename: bool,
 }
 
 #[derive(Serialize, Debug, Default)]
@@ -315,7 +318,8 @@ pub fn pack(o: &Options) -> R<Report> {
         let mut rename: HashMap<String, String> = HashMap::new();
         for rel in rels {
             let file = rel.rsplit('/').next().unwrap();
-            let new = if already_hashed(file) { file.to_string() } else { hash8_name(file, &files[rel].0) };
+            let new =
+                if o.no_rename || already_hashed(file) { file.to_string() } else { hash8_name(file, &files[rel].0) };
             rename.insert(file.to_string(), new);
         }
         let mut deps: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -336,7 +340,11 @@ pub fn pack(o: &Options) -> R<Report> {
             }
             let new_name = &rename[&file];
             let soname = info.soname.as_ref().map(|_| new_name.as_str());
-            let out = elf::rewrite(data, soname, &rename).map_err(|e| format!("{rel}: {e}"))?;
+            let out = if o.no_rename {
+                data.clone()
+            } else {
+                elf::rewrite(data, soname, &rename).map_err(|e| format!("{rel}: {e}"))?
+            };
             deps.insert(file.clone(), info.needed.clone());
             let new_rel = format!("lib/{abi}/{new_name}");
             if new_rel != *rel {

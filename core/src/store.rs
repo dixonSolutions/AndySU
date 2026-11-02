@@ -73,6 +73,18 @@ fn dir_size(p: &Path) -> u64 {
     }
 }
 
+fn readonly_tree(p: &Path) -> Result<()> {
+    for e in io_at(fs::read_dir(p), "readdir", p)?.flatten() {
+        let ft = e.file_type()?;
+        if ft.is_dir() {
+            readonly_tree(&e.path())?;
+        } else if ft.is_file() {
+            set_readonly(&e.path())?;
+        }
+    }
+    Ok(())
+}
+
 impl Store {
     pub fn open(root: impl Into<PathBuf>) -> Result<Store> {
         let root = root.into();
@@ -223,15 +235,16 @@ impl Store {
                     io_at(fs::create_dir_all(&target), "mkdir", &target)?;
                     let cap = c.unpacked_size.unwrap_or_else(|| c.size.saturating_mul(64)).min(MAX_UNPACKED);
                     extract_zip(&blob, &target, cap)?;
+                    readonly_tree(&target)?;
                 }
                 None => {
                     if fs::symlink_metadata(&target).is_ok() {
                         return Err(Error::UnsafePath(format!("{} is placed twice", c.path)));
                     }
                     link_or_copy(&blob, &target)?;
-                    if matches!(c.kind, Kind::Dex | Kind::Native) {
-                        set_readonly(&target)?;
-                    }
+                    // Slots are immutable. Every file is read-only, not only dex and .so: Android
+                    // 14 also refuses writable jar/zip entries on a class path (Java resources).
+                    set_readonly(&target)?;
                 }
             }
             index.components.push(IndexEntry {

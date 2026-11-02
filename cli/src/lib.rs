@@ -2,7 +2,9 @@
 //! can call the same code.
 
 pub mod apk;
+pub mod axml;
 pub mod elf;
+pub mod hostapk;
 pub mod init;
 pub mod keys;
 pub mod pack;

@@ -184,6 +184,7 @@ pub mod api {
             "app": d.app, "version": d.version, "host_api_min": d.host_api_min, "native": names,
             "libs": libs, "entry_lib": entry, "symbol": d.entry.symbol,
             "dex_class": d.entry.dex_class, "dex": d.dex.iter().map(|p| abs(p)).collect::<Vec<_>>(),
+            "transparent": d.entry.transparent,
         }))
     }
 

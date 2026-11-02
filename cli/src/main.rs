@@ -166,6 +166,9 @@ enum Cmd {
         /// Also write the release as a ready slot directory (the payload built into a host APK).
         #[arg(long)]
         emit_slot: Option<PathBuf>,
+        /// Keep native library names (transparent-mode payloads).
+        #[arg(long)]
+        no_rename: bool,
     },
     /// Add a packed release to a channel manifest and sign it.
     Publish {
@@ -325,6 +328,7 @@ fn run(cli: Cli) -> R<()> {
             require_16k,
             allow_shell,
             emit_slot,
+            no_rename,
         } => {
             let host = host
                 .map(|h| serde_json::from_slice(&read(&h)?).map_err(|e| format!("{}: {e}", h.display())))
@@ -343,6 +347,7 @@ fn run(cli: Cli) -> R<()> {
                 require_16k,
                 allow_shell,
                 emit_slot,
+                no_rename,
             };
             let rep = pack::pack(&o)?;
             for w in &rep.warnings {

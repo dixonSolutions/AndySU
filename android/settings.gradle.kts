@@ -16,7 +16,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "andysu-android"
 
-include(":api", ":host", ":payload-kit")
+include(":api", ":host", ":payload-kit", ":host-template")
 include(":testapp:app", ":testapp:payload")
 //include(":samples:compose:app", ":samples:compose:payload")
 //include(":samples:native:app", ":samples:native:payload")

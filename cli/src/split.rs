@@ -39,6 +39,27 @@ pub struct SplitArgs {
     /// Keep only these ABIs (default: all).
     #[arg(long)]
     pub abi: Vec<String>,
+    /// Also build the frozen host APK from this host template (andysu-host-template-<ver>.zip).
+    #[arg(long, requires = "config")]
+    pub host_template: Option<PathBuf>,
+    /// Host config.json (from `andysu host-config`).
+    #[arg(long)]
+    pub config: Option<PathBuf>,
+    /// Keystore for signing the host APK (the app's own key, so it installs over the original).
+    #[arg(long)]
+    pub keystore: Option<PathBuf>,
+    /// apksigner --ks-pass value, e.g. pass:secret or env:VAR.
+    #[arg(long)]
+    pub ks_pass: Option<String>,
+    #[arg(long)]
+    pub key_alias: Option<String>,
+    /// Allow plain-HTTP remotes (local testing only; real remotes use HTTPS).
+    #[arg(long)]
+    pub cleartext: bool,
+    /// Transparent mode (Android 9+): keep the app's components and code as they are; the host
+    /// loads them from the payload. No entry class needed; updates apply on the next start.
+    #[arg(long)]
+    pub transparent: bool,
 }
 
 #[derive(serde::Serialize, Debug, Default)]
@@ -51,6 +72,8 @@ pub struct SplitReport {
     pub assets: usize,
     pub java_resources: usize,
     pub manifest: crate::apk::ManifestInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<crate::hostapk::HostReport>,
 }
 
 fn is_java_resource(n: &str) -> bool {
@@ -124,6 +147,7 @@ pub fn split(a: &SplitArgs) -> R<SplitReport> {
         rep.java_resources = javares.len();
     }
     let entry = match (&a.entry_class, &a.entry_native) {
+        _ if a.transparent => Entry { transparent: true, dex_class: a.entry_class.clone(), ..Default::default() },
         (Some(c), None) => Entry { dex_class: Some(c.clone()), ..Default::default() },
         (None, Some(n)) => {
             let (lib, sym) = n.split_once(':').ok_or("--entry-native wants LIB:SYMBOL")?;
@@ -165,5 +189,41 @@ pub fn split(a: &SplitArgs) -> R<SplitReport> {
     rep.app = app;
     rep.version = version;
     rep.manifest = mi;
+    if let (Some(tpl), Some(cfg)) = (&a.host_template, &a.config) {
+        // The payload as it is now becomes the one built into the host (a packed slot).
+        let site = a.out.join("factory-site");
+        let slot = a.out.join("factory");
+        let _ = std::fs::remove_dir_all(&site);
+        let o = crate::pack::Options {
+            payload: payload.clone(),
+            site,
+            channel: "stable".into(),
+            id: None,
+            host: None,
+            hot: vec![],
+            archive: vec![],
+            deltas: 0,
+            delta_format: andysu_core::manifest::PatchFormat::Zstd,
+            base_url: None,
+            require_16k: false,
+            allow_shell: false,
+            emit_slot: Some(slot.clone()),
+            no_rename: a.transparent,
+        };
+        crate::pack::pack(&o)?;
+        let ho = crate::hostapk::HostOptions {
+            template: tpl.clone(),
+            config: cfg.clone(),
+            factory: slot,
+            out: a.out.join("host.apk"),
+            keystore: a.keystore.clone(),
+            ks_pass: a.ks_pass.clone(),
+            key_alias: a.key_alias.clone(),
+            cleartext: a.cleartext,
+            transparent: a.transparent,
+            payload_has_assets: rep.assets > 0,
+        };
+        rep.host = Some(crate::hostapk::build(&a.apk, &ho)?);
+    }
     Ok(rep)
 }
