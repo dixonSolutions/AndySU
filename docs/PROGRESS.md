@@ -14,7 +14,7 @@ locally; CI and publishing steps wait for the repo.
 | 1 Spec v0 | done |
 | 2 Rust core | done |
 | 3 CLI | done (split/init pending, see steps 6 and 10) |
-| 4 Linux desktop host | not started |
+| 4 Linux desktop host | done |
 | 5 Android host + samples | not started |
 | 6 Gradle plugin + split | not started |
 | 7 Test beds | not started |
@@ -92,3 +92,28 @@ Verified:
   release key accepted; payload needing CAMERA refused at pack time; GC removes the bad slot.
 
 Open: `andysu split` (step 6) and `andysu init` (step 10) are stubs that return an error.
+
+## Step 4 — Linux desktop host (2026-11-02)
+`desktop/`: `andysu-desktop-host` (C, links `libandysu_core.a`), the payload contract
+`desktop/include/andysu_payload.h` (`ANDYSU_PAYLOAD(start, suspend)`), and a sample payload
+(`examples/counter`, a counter plus a dependency library that counts its own loaded copies).
+New core C ABI call `andysu_load_plan` (also on JNI) returns the libraries to load in order, the
+entry library and symbol. The host: cold-start decision through the core; loads every library of
+a generation by absolute path in descriptor order; live swap = `suspend()` → `begin_live` → load
+the new uniquely named libraries → `start(state)`; live rollback on `start()` failure or watchdog;
+native crashes write the crash marker from an async-signal-safe handler and re-`execve` the host
+(at most 3 times in a row); commands and JSON events over stdio.
+
+Verified (`make -C desktop test`, real binaries over HTTP):
+- A factory payload boots.
+- B live update to 1.0: counter carried across generations as JSON state, the new generation sees
+  `dep_instances == 1` (its own fresh copy of the renamed dependency), committed after 10 frames.
+- C 2.0 `start()` returns 7 → live rollback to 1.0 in the same process with the same state; 2.0
+  marked bad.
+- D 3.0 never calls `mark_healthy` → watchdog → live rollback.
+- E 4.0 segfaults on its 5th frame in trial → crash marker → exactly one relaunch (same PID,
+  `execve`) → the core rolls back (`native crash: SIGSEGV`) → 1.0 runs.
+- F next-start mode: 5.0 staged while 1.0 runs, booted in TRIAL on the next launch, committed.
+- G 6.0 crashes inside `start()` on a cold boot → one relaunch → back on 5.0, 6.0 marked bad.
+- H three live swaps in one process, each generation with its own dependency copy.
+- GC afterwards removed 7 slots and 21 blobs.
