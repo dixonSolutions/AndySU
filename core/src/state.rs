@@ -19,6 +19,11 @@ pub struct SlotRef {
     /// True when every component that changed from the current slot is `apply: hot` content.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hot_only: bool,
+    /// True when every component that changed from the current slot is native code or content: no
+    /// dex and no Java resources, and the descriptor's entry/dex/needs are unchanged. In transparent
+    /// mode such a release can go live through a `LiveSwapHandler` (Host API level 2, D29).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub native_live: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Default)]
@@ -279,7 +284,7 @@ mod tests {
     use super::*;
 
     fn slot(id: &str, seq: u64) -> SlotRef {
-        SlotRef { id: id.into(), sequence: seq, hot_only: false }
+        SlotRef { id: id.into(), sequence: seq, hot_only: false, native_live: false }
     }
 
     #[test]

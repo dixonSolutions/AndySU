@@ -49,6 +49,16 @@ object Transparent {
         private set
     @Volatile var launchEvent: JSONObject? = null
         private set
+    /** The slot this process booted from (null for the built-in payload). A live swap leaves it on disk. */
+    @Volatile var bootSlotId: String? = null
+        private set
+
+    /** A live native swap (D29) moved the app to another slot; the process keeps its class loader. */
+    internal fun setSlot(dir: File, newVersion: String, factory: Boolean) {
+        slotDir = dir
+        version = newVersion
+        isFactory = factory
+    }
 
     private fun processName(): String = if (Build.VERSION.SDK_INT >= 28) Application.getProcessName() else ""
 
@@ -111,6 +121,7 @@ object Transparent {
                 val loader = PayloadClassLoader(dex.joinToString(File.pathSeparator), null, libDir.takeIf { it.isDirectory }?.path, parent, libs)
                 if (libDir.isDirectory) ai.nativeLibraryDir = libDir.path
                 slotDir = dir
+                bootSlotId = if (dirPath != null && dir.parentFile?.name == "slots") dir.name else null
                 inTrial = trial
                 isFactory = dirPath == null
                 version = plan.optString("version", "?")
@@ -180,12 +191,26 @@ class InitProvider : ContentProvider() {
 /** Activity tracking for transparent mode: assets loader, auto-healthy, resumed activity. */
 internal class TransparentCallbacks(private val autoHealthyMs: Long) : Application.ActivityLifecycleCallbacks {
     private val main = Handler(Looper.getMainLooper())
-    private val loader: Any? = if (Build.VERSION.SDK_INT >= 30) Transparent.slotDir?.let { Transparent.assetsLoader(it) } else null
+    private var loader: Any? = if (Build.VERSION.SDK_INT >= 30) Transparent.slotDir?.let { Transparent.assetsLoader(it) } else null
     private val healthy = Runnable { if (AndySU.resumed != null) AndySU.markHealthy() }
 
     fun installOn(app: Application) {
         if (Build.VERSION.SDK_INT >= 30 && loader != null) app.resources.addLoaders(loader as ResourcesLoader)
         app.registerActivityLifecycleCallbacks(this)
+    }
+
+    /** A live native swap (D29): `getAssets()` must now see the new slot's assets (Android 11+). */
+    @SuppressLint("NewApi")
+    fun switchAssets(app: Application, dir: File) {
+        if (Build.VERSION.SDK_INT < 30) return
+        val old = loader as? ResourcesLoader
+        val new = Transparent.assetsLoader(dir)
+        val all = (listOf(app.resources) + AndySU.activities.map { it.resources }).distinct()
+        for (r in all) {
+            if (old != null) r.removeLoaders(old)
+            r.addLoaders(new)
+        }
+        loader = new
     }
 
     override fun onActivityPreCreated(activity: Activity, savedInstanceState: Bundle?) {

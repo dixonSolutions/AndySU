@@ -617,3 +617,37 @@ assets loader swap, slot GC, `markHealthy` wiring), `andysu pack` renaming only 
 Java-side data re-unpack before the new engine starts, replacing the file-based TEST HOOK, the
 `java_abi` policy at the host level, stage 2 (keep the GL context), connect-state restore against a
 real server (code exists, only the local map case was exercised), watchdog-driven rollback layer 3.
+
+---------------------------------------------------------------------------------------------------
+
+## 8. Milestone 2b: AndySU drives the swap (D29), 2026-11-03
+
+Patch `0004-andysu-live-swap-handler.patch` (`EngineSwap.java`, `XonoticActivity`, CMake/gradle
+`ANDYSU_FAIL_INIT`) plus loader changes. `EngineSwap.register()` (reflection, no compile dependency)
+registers a `LiveSwapHandler` through `HostApi.setLiveSwapHandler` when `Host.current()` exists and
+`apiLevel() >= 2`. `onLiveSwap` finds `lib/<abi>/libmain*.so` in the new slot and calls the loader's
+new JNI entry `EngineSwap.nativeRequestSwap` (copy to a unique read-only name, `dlopen`, ABI and
+`java_abi` check; a refusal declines the swap before anything is torn down). The loader reports to
+Java through `EngineSwap.onEngineEvent` (started / failed(reason) / healthy -> `Host.markHealthy()`)
+and `EngineSwap.beforeEngineStart` (runs `GameData.prepare()` for the new release between the old
+engine's teardown and the new engine's start). The file TEST HOOK now only runs when
+`<external files>/andysu-swap-hook` exists (the 2a probe creates it).
+
+Test: `scripts/heavy.sh python3 android/tests/testbed_tests.py --live --api 34 --apk-a ...9001 --apk-b
+...9002 --apk-fail ...9003 --apk-dex ...9004` (APKs from `build.sh --variants "1.2.9001 1.2.9002
+1.2.9003:fail 1.2.9004:dex"`; the `classes.dex` of 9001/9002/9003 is byte-identical, 9004 changes
+Java). Result, one emulator run on API 34: A boots built-in through the loader; B published, a check
+in the running process (`cmd jobscheduler run -f`) finds it `native_live`, the handler accepts, and
+`live_swap_requested -> engine_swap_begin -> engine_stopped -> engine_start(swapped=1) -> live_swapped
+-> engine_healthy -> committed` all happen in the same pid with `state.current = B`; F (init always
+fails, built with a define, not the hook) gives `engine_start_failed -> engine_rolled_back ->
+engine_start(swapped=2) -> live_rollback -> rolled_back`, same pid, `state.current = B`, `bad = [F]`;
+a cold start boots B from `slots/B`; D (dex change) is staged with `native_live=false`, no swap events
+for 12 s, and the next start boots D.
+
+Not covered by the bed: watchdog expiry on a live trial (relaunch into the previous slot) and a
+native crash during the trial (the engine installs its own signal handlers, so AndySU's marker may
+not be written; `max_boot_attempts` then decides), a second live swap after a cold start into a
+slot (the GC guard keeps the booted slot; reasoned, not run), a real device.
+After an in-process rollback the unpacked game data belongs to the failed release until the next
+start re-unpacks it (the data prepare only runs for the swap, not for the rollback).

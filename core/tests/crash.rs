@@ -63,11 +63,11 @@ impl Fs for FaultFs {
 
 fn states() -> (State, State) {
     let mut old = State::new("11111111-2222-4333-8444-555555555555".into());
-    old.stage(SlotRef { id: "1.0".into(), sequence: 1, hot_only: false });
+    old.stage(SlotRef { id: "1.0".into(), sequence: 1, hot_only: false, native_live: false });
     old.on_launch(0, true, 2);
     old.mark_healthy();
     let mut new = old.clone();
-    new.stage(SlotRef { id: "2.0".into(), sequence: 2, hot_only: false });
+    new.stage(SlotRef { id: "2.0".into(), sequence: 2, hot_only: false, native_live: false });
     new.on_launch(0, true, 2);
     (old, new)
 }
@@ -113,7 +113,7 @@ fn torn_staging_never_becomes_a_slot() {
     fs::create_dir_all(staging.join("lib")).unwrap();
     fs::write(staging.join("lib/half.so"), b"\x7fELF partial").unwrap();
     let mut st = store.load_state([1; 16]).unwrap();
-    st.stage(SlotRef { id: "2.0".into(), sequence: 2, hot_only: false });
+    st.stage(SlotRef { id: "2.0".into(), sequence: 2, hot_only: false, native_live: false });
     // (pending was recorded only after rename in real code; simulate a pending pointing at a
     // slot that never got renamed into place)
     store.save_state(&st).unwrap();

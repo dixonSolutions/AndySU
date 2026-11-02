@@ -216,6 +216,18 @@ impl Store {
         serde_json::from_slice(&b).ok()
     }
 
+    /// The directory and index of what the app is running from: the current slot, or (no current
+    /// slot yet) the payload built into the host, the first base directory with an index.
+    pub fn running(&self, current: Option<&SlotRef>) -> Option<(PathBuf, SlotIndex)> {
+        if let Some(c) = current {
+            return self.read_slot_index(&c.id).map(|ix| (self.slot_dir(&c.id), ix));
+        }
+        self.base_dirs.iter().find_map(|d| {
+            let read = |n: &str| fs::read(d.join(n)).ok().and_then(|b| serde_json::from_slice::<SlotIndex>(&b).ok());
+            read(SLOT_INDEX).or_else(|| read(BUILTIN_INDEX)).map(|ix| (d.clone(), ix))
+        })
+    }
+
     /// Find a local copy of a blob: the cache, or a non-archive file in an installed slot.
     /// Installed slots and base directories, with their indexes.
     fn local_indexes(&self, slots: &[String]) -> Vec<(PathBuf, SlotIndex)> {
@@ -270,6 +282,23 @@ impl Store {
             .collect();
         let removed = base.components.iter().any(|e| !comps.iter().any(|c| c.path == e.path));
         !removed && changed.iter().all(|c| c.kind == Kind::Content && c.apply == Apply::Hot)
+    }
+
+    /// True when every component that differs from `base` is native code or content outside
+    /// `dex/` (Java resources live in `dex/resources.jar`), and no dex or `dex/` file was removed.
+    /// `hot_only` releases qualify too. Like `is_hot_only` it ignores the descriptor; `Session::
+    /// stage` checks that its entry, dex and needs did not change.
+    pub fn is_native_live(&self, comps: &[&Component], base: Option<&SlotIndex>) -> bool {
+        let Some(base) = base else { return false };
+        let java_side = |kind: Kind, path: &str| kind == Kind::Dex || path.starts_with("dex/");
+        let changed_ok = comps
+            .iter()
+            .filter(|c| c.path != DESCRIPTOR_PATH)
+            .filter(|c| !base.components.iter().any(|e| e.path == c.path && e.sha256 == c.sha256))
+            .all(|c| c.kind != Kind::Dex && !java_side(c.kind, &c.path));
+        let java_removed =
+            base.components.iter().any(|e| java_side(e.kind, &e.path) && !comps.iter().any(|c| c.path == e.path));
+        changed_ok && !java_removed
     }
 
     /// Build `slots/<id>/` from cached blobs: assemble in `<id>.staging/`, make code read-only,
@@ -353,7 +382,12 @@ impl Store {
         remove_tree(&dst)?;
         io_at(fs::rename(&staging, &dst), "rename", &staging)?;
         fsx::sync_dir(&self.root.join("slots"))?;
-        Ok(SlotRef { id: r.id.clone(), sequence: r.sequence, hot_only: self.is_hot_only(comps, base) })
+        Ok(SlotRef {
+            id: r.id.clone(),
+            sequence: r.sequence,
+            hot_only: self.is_hot_only(comps, base),
+            native_live: self.is_native_live(comps, base),
+        })
     }
 
     /// Delete slots not in `state.keep()`, stale staging dirs, partial downloads not in

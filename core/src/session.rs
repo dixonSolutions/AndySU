@@ -51,6 +51,9 @@ pub enum CheckOutcome {
         sequence: u64,
         mandatory: bool,
         hot_only: bool,
+        /// Only native code and content differ from the running slot (see `SlotRef::native_live`).
+        #[serde(default)]
+        native_live: bool,
         download_bytes: u64,
         notes_url: Option<String>,
         already_staged: bool,
@@ -202,6 +205,8 @@ impl Session {
                 let comps = components_for(&release, abi.as_deref());
                 let base = st.current.as_ref().and_then(|c| self.store.read_slot_index(&c.id));
                 let hot_only = self.store.is_hot_only(&comps, base.as_ref());
+                let running = self.store.running(st.current.as_ref());
+                let native_live = self.store.is_native_live(&comps, running.as_ref().map(|r| &r.1));
                 let download_bytes =
                     if already_staged { 0 } else { self.plan()?.iter().map(|f| f.size - f.offset).sum() };
                 Ok(CheckOutcome::Update {
@@ -209,6 +214,7 @@ impl Session {
                     sequence: release.sequence,
                     mandatory: release.mandatory,
                     hot_only,
+                    native_live,
                     download_bytes,
                     notes_url: release.notes_url.clone(),
                     already_staged,
@@ -367,16 +373,20 @@ impl Session {
                 desc.host_api_min, self.cfg.device.host_api
             )));
         }
-        if slot.hot_only {
-            // Hot apply keeps the running code, so the code-facing descriptor fields must match.
-            let old = st
-                .current
-                .as_ref()
-                .and_then(|c| fs::read(self.store.slot_dir(&c.id).join(crate::manifest::DESCRIPTOR_PATH)).ok());
-            let same = old.and_then(|b| crate::payload::Descriptor::parse(&b).ok()).is_some_and(|o| {
-                o.entry == desc.entry && o.dex == desc.dex && o.native_dir == desc.native_dir && o.needs == desc.needs
-            });
-            slot.hot_only = same;
+        // native_live is judged against what the app runs from, which is the payload built into the
+        // host until the first slot is installed; hot_only still needs a current slot.
+        let running = self.store.running(st.current.as_ref());
+        slot.native_live = self.store.is_native_live(&comps, running.as_ref().map(|r| &r.1));
+        if slot.hot_only || slot.native_live {
+            // Hot and live-native apply keep the running Java code, so the code-facing descriptor
+            // fields must match (native libraries may change for native_live).
+            let old = running.as_ref().and_then(|(dir, _)| fs::read(dir.join(crate::manifest::DESCRIPTOR_PATH)).ok());
+            let old = old.and_then(|b| crate::payload::Descriptor::parse(&b).ok());
+            let java_same =
+                old.as_ref().is_some_and(|o| o.entry == desc.entry && o.dex == desc.dex && o.needs == desc.needs);
+            let same = java_same && old.as_ref().is_some_and(|o| o.native_dir == desc.native_dir);
+            slot.hot_only = slot.hot_only && same;
+            slot.native_live = slot.native_live && java_same;
         }
         self.store.update_state(|s| {
             s.stage(slot.clone());

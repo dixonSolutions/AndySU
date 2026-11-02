@@ -12,9 +12,10 @@ import com.andysu.api.ServiceHandler
 import com.andysu.api.UpdateClient
 import java.io.File
 
-/** Host API level 1, one instance per generation (g == null: transparent mode). */
+/** Host API level 2 (level 1 plus [setLiveSwapHandler]), one instance per generation (g == null: transparent mode). */
 class HostApiImpl internal constructor(private val g: Generation?) : HostApi {
-    override fun apiLevel() = 1
+    override fun apiLevel() = 2
+    override fun setLiveSwapHandler(handler: com.andysu.api.LiveSwapHandler?) { AndySU.liveSwapHandler = handler }
     override fun context(): Context = AndySU.app
     override fun activity(): Activity? = AndySU.resumed ?: AndySU.activities.lastOrNull()
     override fun slotDir(): File = g?.dir ?: Transparent.slotDir ?: AndySU.root

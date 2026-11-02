@@ -240,3 +240,16 @@ The Xonotic work showed that the native part can be swapped live by an app-side 
   file name before `dlopen`, so `--no-rename` stays for transparent payloads.
 - The slot the process booted from stays on disk until the next cold start. It is the
   `previous` slot and GC keeps it.
+Implementation notes (milestone 2b, 2026-11-03):
+- The host asks the handler *before* promoting the slot (`begin_live` only after the app has
+  accepted), so a declined swap leaves the state untouched and the core needed no cancel call.
+- From acceptance to `started()` the deadline is `max(watchdog_ms, 60 s)`, because an engine can
+  take a while to come up. `started()` re-arms the configured watchdog.
+- With no current slot (the built-in payload is running), `native_live` is judged against the
+  first base directory.
+- On acceptance the host points the app's view of its slot (version, `nativeLibraryDir`, assets
+  loader) at the new slot, and points it back on `failed`. GC skips a run that would delete the
+  slot the process booted from.
+- **Follow-up:** the host AAR now implements Host API level 2, but release selection still uses
+  `host_api` from `config.json` (default 1). A payload can feature-detect level 2 at runtime, as
+  Xonotic does, but cannot yet *require* it with `host_api_min = 2`.

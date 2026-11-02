@@ -21,7 +21,7 @@ local.
 | 6 Gradle plugin + split | done |
 | 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back, with the game engine verified running at each step. Live `.so` swap in Xonotic: designed (`testbeds/patches/xonotic-touch/LIVE_SWAP.md`), both feasibility probes positive, not built yet |
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
-| 9 Publishing | live: release v0.1.13 on GitHub, every registry installed from the live URLs in CI (Homebrew pending a fix) |
+| 9 Publishing | live: v0.1.33 fully green (all tests, registries installed from the live URLs, `brew install` on Linux and macOS, signed checksums, live demo channel verified blob by blob) |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
 | 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated |
 
@@ -314,6 +314,26 @@ with three rollback layers. Two feasibility probes ran:
   - Next, **2b**: drive it from AndySU instead of the test hook. That needs a `LiveSwapHandler`
     on the Host API, live apply in transparent mode with the slot and asset switch, `pack`
     renaming only `libmain`, `markHealthy` wiring, and the watchdog as rollback layer 3.
+- **Milestone 2b: AndySU drives the live swap** (D29). The worker implemented it; the lead
+  reviewed the API, host flow and core change, rebuilt the four variants and re-ran the bed.
+  - The core reports `native_live`: every differing component is native or content.
+  - Host API level 2 adds `LiveSwapHandler`, `LiveSwapCallback` and
+    `HostApi.setLiveSwapHandler`. In transparent mode with `apply = live`, the host offers a
+    `native_live` release to the app's handler.
+  - Xonotic's patch 0004 registers the handler through reflection and hands the new slot's
+    `libmain` to its loader.
+  - `testbed_tests.py --live` (API 34), all in **one process** (pid 2116):
+    - built-in A runs through the loader;
+    - B is checked, staged and swapped in live, then **committed by AndySU**;
+    - a deliberately broken F fails its engine init, rolls back in-process (`live_rollback`,
+      F marked bad, B runs again);
+    - a cold start boots B;
+    - a Java-changing D is staged with `native_live=false` and falls back to the next start.
+  - Rust tests, clippy and fmt pass; `device_tests` on API 24 and 34 still pass.
+  - **Not covered yet:** watchdog expiry on a live trial (by construction it reports and
+    relaunches), a native crash during a live trial (the engine installs its own signal
+    handlers, so `max_boot_attempts` decides), a second live swap after a cold start, real
+    devices, and re-unpacking Java-side game data after an in-process rollback.
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |
@@ -369,9 +389,18 @@ with the Actions secrets set by `scripts/setup-secrets.sh` (CI test keys) and Pa
   Maven, pub, C and Godot.** pub works from static Pages files. Verified independently from this
   machine: `sha256sum -c` passes, and `andysu verify-file SHA256SUMS` reports root
   `64529963522e286d`.
-- Homebrew failed on that run (`Formula/` did not exist yet; fixed in PR #3), so `brew install`
-  has not been verified yet. The crates.io and npmjs jobs skipped themselves (no tokens), as
-  intended.
+- Homebrew failed on that run (`Formula/` did not exist yet; fixed in PR #3). The crates.io and
+  npmjs jobs skipped themselves (no tokens), as intended.
+- **v0.1.25** published the first demo channel. Its verification found two bugs, fixed in PR #7:
+  `transport::get` cut every body at the 8 MiB manifest limit, so `andysu verify --blobs` failed
+  on a 14 MB blob and `pack` skipped deltas against large remote blobs; and the Homebrew check
+  pointed at a non-existent action ref.
+- **v0.1.33** is the first fully green release: every job passed, including `brew install` from
+  the tap on Linux and macOS and `andysu verify --blobs` against the live demo channel.
+- CI device-test flakes so far: two infrastructure failures (a corrupt emulator download, an
+  emulator boot timeout) and two unexplained ones (API 34: a payload log line not seen; API 31:
+  a download stuck in `downloading`). Since PR #6, failures upload full logcat, thread dumps,
+  app data and the server log, to explain the next one.
 `actions/publish/test.sh` covers both remote types: three releases with deltas and a 50%
 rollout, against a bare git repo and a stand-in `gh`, then a simulated client updates from each.
 
