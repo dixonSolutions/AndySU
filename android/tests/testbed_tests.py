@@ -55,7 +55,8 @@ def log(m):
 
 DATA_SRC = os.path.expanduser(os.environ.get("XONOTIC_DATA_DIR", "~/.cache/xt-perf/base/data"))
 REQUIRED_PK3 = ("-data.pk3", "-maps.pk3", "-music.pk3")
-ENGINE_TAGS = ["SDL:V", "app_process:D", "XonoticTouch:I"]
+LOADER = False  # set by --apk-a/--apk-b: APKs built with patch 0002 start the engine through the loader
+ENGINE_TAGS = ["SDL:V", "app_process:D", "XonoticTouch:I", "AndySU-Event:I"]
 
 
 def seed_xonotic(d, pkg, extra_args=""):
@@ -130,16 +131,29 @@ class EngineLog:
             f.write("\n".join(self.lines) + "\n")
 
 
-def engine_ran(el, since, slot_hint, what):
+def engine_ran(el, since, slot_hint, what, loader=False):
     """The engine really started from the payload: SDL_main ran from libmain.so inside the AndySU
-    slot, the engine initialised, and GL came up. Returns the evidence lines."""
-    main = el.wait(r"Running main function SDL_main from library .*libmain\.so", f"{what}: SDL_main start", since)
-    if "/andysu/" not in main or slot_hint not in main:
-        raise dt.Fail(f"{what}: SDL_main did not run from the payload ({slot_hint}): {main}")
+    slot, the engine initialised, and GL came up. Returns the evidence lines.
+
+    loader=True (APKs built with patch 0002): SDL runs the resident loader's AndySU_SDL_main from
+    libandysu_xonotic_loader.so, the loader reports loading libmain from the slot, and the engine's
+    entry (andysu_engine_v1 run) reports itself, before the usual init banner and GL line."""
+    if loader:
+        main = el.wait(r"Running main function AndySU_SDL_main from library .*libandysu_xonotic_loader\.so",
+                       f"{what}: loader SDL main", since)
+        loaded = el.wait(r'"event":"loader_engine_loaded".*libmain[^"]*\.so', f"{what}: loader dlopen of libmain", since)
+        entry = el.wait(r'"event":"engine_entry"', f"{what}: engine entry (andysu_engine_v1 run)", since)
+        if "/andysu/" not in main or slot_hint not in main or slot_hint not in loaded:
+            raise dt.Fail(f"{what}: loader/engine did not come from the payload ({slot_hint}): {main} / {loaded}")
+    else:
+        main = el.wait(r"Running main function SDL_main from library .*libmain\.so", f"{what}: SDL_main start", since)
+        loaded = entry = ""
+        if "/andysu/" not in main or slot_hint not in main:
+            raise dt.Fail(f"{what}: SDL_main did not run from the payload ({slot_hint}): {main}")
     init = el.wait(r"========Initialized=========", f"{what}: engine init banner", since)
     gl = el.wait(r"GL_RENDERER: ", f"{what}: GL renderer line", since)
-    log(f"[engine] {what}: {main.strip()} | {init.strip()} | {gl.strip()}")
-    return [main, init, gl]
+    log(f"[engine] {what}: {main.strip()} | {loaded.strip()} | {entry.strip()} | {init.strip()} | {gl.strip()}")
+    return [main, loaded, entry, init, gl]
 
 
 def screenshot(d, name):
@@ -228,7 +242,7 @@ def bed(d, name, spec, work, results):
             raise dt.Fail(f"{va} should boot transparently from the built-in payload: {ev}")
         engine_note = ""
         if el:
-            ev_lines = engine_ran(el, 0, "/factory/", f"{va} built-in")
+            ev_lines = engine_ran(el, 0, "/factory/", f"{va} built-in", LOADER)
             engine_note = "; engine ran (SDL_main from the payload's libmain.so, init banner, GL renderer)"
         time.sleep(15)
         screenshot(d, f"{name}-1-builtin-{va}")
@@ -242,7 +256,7 @@ def bed(d, name, spec, work, results):
         if not ev.get("trial"):
             raise dt.Fail(f"{vb} should boot in trial: {ev}")
         if el:
-            engine_ran(el, mark, f"/slots/{vb}/", f"{vb} updated")
+            engine_ran(el, mark, f"/slots/{vb}/", f"{vb} updated", LOADER)
         d.event("committed", timeout=240)
         time.sleep(10)
         screenshot(d, f"{name}-2-updated-{vb}")
@@ -272,7 +286,7 @@ def bed(d, name, spec, work, results):
             raise dt.Fail(f"expected a committed {vb} after the rollback: {launch_ev}")
         booted(vb)
         if el:
-            engine_ran(el, mark, f"/slots/{vb}/", f"{vb} after rollback")
+            engine_ran(el, mark, f"/slots/{vb}/", f"{vb} after rollback", LOADER)
         relaunches = sum(1 for e in d.events if e.get("event") == "init") - inits - 1
         if relaunches != 1:
             raise dt.Fail(f"expected exactly one relaunch after the broken start, saw {relaunches}")
@@ -355,6 +369,9 @@ def main():
     ap.add_argument("--api", default=None, help="default 34 (36 for the vid_restart probe: screenshots)")
     ap.add_argument("--device")
     ap.add_argument("--keep", action="store_true", help="keep the emulator running and the work dir")
+    ap.add_argument("--apk-a", help="Xonotic APK to split as version A (default: testbeds/apks/...); locally built "
+                    "APKs (testbeds/patches/xonotic-touch/build.sh) start the engine through the resident loader")
+    ap.add_argument("--apk-b", help="Xonotic APK for the update, version B (needs --apk-a)")
     ap.add_argument("--probe-vid-restart", action="store_true", help="R1 probe on the stock Xonotic APK (no AndySU)")
     args = ap.parse_args()
     dt.CONTAINER = not args.device
@@ -363,6 +380,13 @@ def main():
         probe_vid_restart(args)
         return
     args.api = args.api or "34"
+    if bool(args.apk_a) != bool(args.apk_b):
+        ap.error("--apk-a and --apk-b go together")
+    if args.apk_a:
+        global LOADER
+        LOADER = True
+        BEDS["xonotic"]["a"] = os.path.abspath(args.apk_a)  # os.path.join(TB, absolute) is the absolute path
+        BEDS["xonotic"]["b"] = os.path.abspath(args.apk_b)
     work = tempfile.mkdtemp(prefix="andysu-testbeds-")
     dt.run(["cargo", "build", "-q", "-p", "andysu-cli"], cwd=dt.REPO)
     dt.gradle(":host-template:andysuHostTemplate")

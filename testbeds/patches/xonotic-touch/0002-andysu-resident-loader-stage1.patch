@@ -1,0 +1,75 @@
+diff --git a/android/app/src/main/cpp/CMakeLists.txt b/android/app/src/main/cpp/CMakeLists.txt
+index f6dde69..85bfb61 100644
+--- a/android/app/src/main/cpp/CMakeLists.txt
++++ b/android/app/src/main/cpp/CMakeLists.txt
+@@ -53,6 +53,24 @@ set(DP_SDL
+ 
+ add_library(main SHARED ${DP_COMMON} ${DP_MENU} ${DP_SND} ${DP_SDL})
+ 
++##### AndySU live-swap scaffolding (testbeds/patches/xonotic-touch/LIVE_SWAP.md) ###############
++# The engine sits behind a one-symbol ABI (andysu_engine_v1, see andysu/andysu_swap.h) and a small
++# resident loader runs it: SDLActivity is pointed at libandysu_xonotic_loader.so (see
++# XonoticActivity). The andysu/ directory is installed from testbeds/patches/xonotic-touch/loader/
++# by build.sh; without it this build is the stock one.
++set(ANDYSU_DIR "${CMAKE_CURRENT_SOURCE_DIR}/andysu")
++if(EXISTS "${ANDYSU_DIR}/andysu_loader.c")
++    target_sources(main PRIVATE "${ANDYSU_DIR}/andysu_engine.c")
++    target_include_directories(main PRIVATE "${ANDYSU_DIR}")
++    target_compile_definitions(main PRIVATE ANDYSU_BUILD_ID="${XONOTIC_VERSION}")
++    # libmain exports exactly one symbol, so two copies of it never see each other's.
++    target_link_options(main PRIVATE "-Wl,--version-script=${ANDYSU_DIR}/andysu_engine.map" -Wl,--exclude-libs,ALL)
++    add_library(andysu_xonotic_loader SHARED "${ANDYSU_DIR}/andysu_loader.c")
++    target_include_directories(andysu_xonotic_loader PRIVATE "${ANDYSU_DIR}")
++    target_compile_options(andysu_xonotic_loader PRIVATE -O2 -Wall)
++    target_link_libraries(andysu_xonotic_loader log dl)
++endif()
++
+ ##### Prebuilt dependencies ####################################################
+ 
+ add_library(SDL2 SHARED IMPORTED)
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
+index 35dd7e9..eafdb8e 100644
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
+@@ -638,8 +638,20 @@ public final class XonoticActivity extends SDLActivity {
+ 
+     @Override
+     protected String[] getLibraries() {
+-        // libpng is absent on purpose: image_png.c dlopen()s it by name.
+-        return new String[] { "SDL2", "main" };
++        // libpng is absent on purpose: image_png.c dlopen()s it by name. libmain is not loaded here
++        // any more: the resident loader dlopen()s it (AndySU live engine swap, see
++        // testbeds/patches/xonotic-touch/LIVE_SWAP.md) and answers nativeInputDevices for it.
++        return new String[] { "SDL2", "andysu_xonotic_loader" };
++    }
++
++    @Override
++    protected String getMainSharedObject() {
++        return getApplicationInfo().nativeLibraryDir + "/libandysu_xonotic_loader.so";
++    }
++
++    @Override
++    protected String getMainFunction() {
++        return "AndySU_SDL_main";
+     }
+ 
+     @Override
+diff --git a/engine/darkplaces/vid_touchdetect.c b/engine/darkplaces/vid_touchdetect.c
+index 8401a18..1bed65e 100644
+--- a/engine/darkplaces/vid_touchdetect.c
++++ b/engine/darkplaces/vid_touchdetect.c
+@@ -383,6 +383,14 @@ JNIEXPORT void JNICALL Java_io_github_dixonsolutions_xonotictouch_XonoticActivit
+ 	(void)cls;
+ 	__atomic_store_n(&vid_android_state, v, __ATOMIC_RELEASE);
+ }
++
++// AndySU loader ABI (andysu_swap.h): the loader owns the JNI entry above's job now, because
++// libmain is no longer loaded by System.loadLibrary, and forwards here.
++void Andysu_InputDevices(int touch, int keyboard, int mouse)
++{
++	int v = VID_ANDROID_VALID | (touch ? VID_ANDROID_TOUCH : 0) | (keyboard ? VID_ANDROID_KEYBOARD : 0) | (mouse ? VID_ANDROID_MOUSE : 0);
++	__atomic_store_n(&vid_android_state, v, __ATOMIC_RELEASE);
++}
+ #endif
+ 
+ #ifdef VID_LINUX_PROBES

@@ -272,7 +272,15 @@ with three rollback layers. Two feasibility probes ran:
   the same surface and keeps rendering. The engine's own post-restart screenshot shows the menu.
 - **R2:** bionic loads a second copy of identical bytes, under another name or with
   `android_dlopen_ext(FORCE_LOAD)`, with separate globals (API 34, adb shell namespace).
-Next: the implementation (a 5-8 day estimate in the design).
+- **Milestone 1** (the worker built it; the lead reviewed the code and re-ran the acceptance): a
+  reproducible Xonotic Touch build from the clone (`testbeds/patches/xonotic-touch/build.sh`,
+  53 s for two variants, NDK 27.2 where the project pins 27.3). The engine now runs through the
+  resident loader. SDL starts `AndySU_SDL_main` in `libandysu_xonotic_loader.so`, which
+  `dlopen`s `libmain` `RTLD_LOCAL` through its single exported `andysu_engine_v1`. `libmain`'s
+  only JNI method (`nativeInputDevices`) is forwarded by the loader. The test bed with the
+  locally built A/B APKs (`--apk-a/--apk-b`) passes on API 34: the loader runs the engine from
+  the factory slot, from `slots/1.2.9002` after the update, and again after the rollback. No
+  swapping yet: that is milestone 2.
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |
