@@ -30,7 +30,16 @@ class Config(val json: JSONObject) {
     val checkIntervalMinutes: Long = json.optLong("check_interval_minutes", 360)
     val watchdogMs: Long = json.optLong("watchdog_ms", 10_000)
     val maxBootAttempts: Int = json.optInt("max_boot_attempts", 2)
-    val hostApi: Int = json.optInt("host_api", 1)
+    /**
+     * Host API level used for release selection: what andysu.toml declares (the level `pack`
+     * checks payloads against), but never more than this AAR implements.
+     */
+    val hostApi: Int = json.optInt("host_api", 1).let { declared ->
+        if (declared > HostApiImpl.LEVEL) {
+            android.util.Log.w("AndySU", "config declares host_api $declared; this host implements ${HostApiImpl.LEVEL}")
+        }
+        minOf(declared, HostApiImpl.LEVEL)
+    }
     val shellVersion: Long = json.optLong("shell_version", 0)
     val stubActivities: Int = json.optInt("stub_activities", 4)
     val stubServices: Int = json.optInt("stub_services", 2)
