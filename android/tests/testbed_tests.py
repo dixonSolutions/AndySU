@@ -65,7 +65,7 @@ def bed(d, name, spec, work, results):
     cp = os.path.join(w, "config.json")
     json.dump(cfg, open(cp, "w"))
     tpl = os.path.join(dt.ANDROID, "host-template/build/andysu/andysu-host-template.zip")
-    ks = ["--keystore", os.path.expanduser("~/.android/debug.keystore"), "--ks-pass", "pass:android",
+    ks = ["--keystore", dt.debug_keystore(), "--ks-pass", "pass:android",
           "--key-alias", "androiddebugkey"]
     log(f"[{name}] splitting {spec['a']} (host + built-in payload) and {spec['b']} (update)")
     ra = json.loads(dt.run([dt.ANDYSU, "split", os.path.join(TB, spec["a"]), "--out", os.path.join(w, "a"), "--transparent",

@@ -88,7 +88,7 @@ EOF
   pub)
     need flutter || continue
     d="$work/pub" && mkdir -p "$d" && cd "$d"
-    flutter create -q --platforms android consumer >/dev/null && cd consumer
+    flutter create --platforms android consumer >/dev/null && cd consumer
     flutter pub add "andysu:{\"hosted\":\"$base/pub\",\"version\":\"$version\"}"
     printf "import 'package:andysu/andysu.dart';\nvoid main() => print(AndySU);\n" > lib/check.dart
     dart analyze lib/check.dart

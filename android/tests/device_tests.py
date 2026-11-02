@@ -71,6 +71,17 @@ def run(cmd, check=True, timeout=1800, **kw):
     return r.stdout
 
 
+
+def debug_keystore():
+    """The Android debug keystore, created like the SDK does when missing (fresh CI runners)."""
+    ks = os.path.expanduser("~/.android/debug.keystore")
+    if not os.path.exists(ks):
+        os.makedirs(os.path.dirname(ks), exist_ok=True)
+        run(["keytool", "-genkeypair", "-keystore", ks, "-storepass", "android", "-keypass", "android",
+             "-alias", "androiddebugkey", "-keyalg", "RSA", "-keysize", "2048", "-validity", "10000",
+             "-dname", "CN=Android Debug,O=Android,C=US"])
+    return ks
+
 def gradle(*args):
     return run([os.path.join(ANDROID, "gradlew"), "-q", "-p", ANDROID, "-Pandysu.abis=x86_64", *args], timeout=3600)
 
@@ -148,7 +159,7 @@ class Build:
         rep = json.loads(run([ANDYSU, "split", os.path.join(ANDROID, "testapp/payload/build/outputs/apk/release/payload-release-unsigned.apk"),
                               "--out", self.split_dir, "--entry-class", "com.andysu.testpayload.TestPayload",
                               "--host-template", self.template, "--config", cp,
-                              "--keystore", os.path.expanduser("~/.android/debug.keystore"), "--ks-pass", "pass:android",
+                              "--keystore", debug_keystore(), "--ks-pass", "pass:android",
                               "--key-alias", "androiddebugkey", "--cleartext"]))
         self.split_apk = rep["host"]["apk"]
         self.split_version = rep["version"]

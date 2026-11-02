@@ -6,6 +6,8 @@ import android.os.Bundle
 import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.LinearLayout
+import android.widget.TextView
 import com.andysu.api.HostApi
 import com.andysu.api.PayloadAdapter
 import org.json.JSONObject
@@ -38,7 +40,14 @@ class WebPayload : PayloadAdapter() {
             }
         }
         web = w
-        activity.setContentView(w)
+        // A native label with the payload version (the page itself shows the content version).
+        val label = TextView(activity).apply { text = "Payload version ${host.version()}"; setPadding(32, 24, 32, 0) }
+        activity.setContentView(LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            fitsSystemWindows = true // edge to edge on Android 15+: keep clear of the system bars
+            addView(label)
+            addView(w, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
+        })
         load()
     }
 
