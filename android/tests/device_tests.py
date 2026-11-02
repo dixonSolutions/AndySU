@@ -26,6 +26,17 @@ per API level, boots a headless emulator and checks:
 
 Usage: python3 android/tests/device_tests.py [--api 24 29 31 34 36 36-16k] [--keep]
 Writes a JSON report and a Markdown summary to android/tests/reports/.
+
+When a scenario fails, android/tests/reports/ also gets, per API level (stamp = run time):
+  device-<stamp>-api<API>-logcat.txt    full logcat (threadtime) since the last `logcat -c`
+  device-<stamp>-api<API>-events.jsonl  every AndySU-Event the harness saw
+  device-<stamp>-api<API>-threads.txt   Java thread stacks of the app (SIGQUIT) and native stacks (root only)
+  device-<stamp>-api<API>-appdata.txt   no_backup/andysu listing, state.json, state.lock present or not
+  device-<stamp>-api<API>-server.log    `andysu serve` request log / stderr
+The job log names these files. CI uploads the whole reports/ directory.
+
+ANDYSU_TEST_FORCE_FAIL=<scenario> (e.g. hot, gc, crash-loop) makes the run fail right after that
+scenario's check passes, to exercise the failure dumps above.
 """
 import argparse
 import json
@@ -92,6 +103,9 @@ class Fail(Exception):
 
 SLOW = 1.0  # --slow: multiplies every timeout (software-emulated devices)
 CONTAINER = False  # --container: run emulators inside the andysu-emulator podman image
+FORCE_FAIL = os.environ.get("ANDYSU_TEST_FORCE_FAIL", "")  # scenario name: fail after it (tests the dumps)
+STAMP = time.strftime("%Y%m%d-%H%M%S")
+REPORTS = os.path.join(ANDROID, "tests", "reports")
 
 
 # ----------------------------------------------------------------------------- build
@@ -177,6 +191,7 @@ class Remote:
         self.port = port
         self.site = None
         self.srv = None
+        self.logpath = os.path.join(build.work, "server.log")  # `andysu serve` stderr: one line per request
 
     def reset(self):
         self.stop()
@@ -186,8 +201,11 @@ class Remote:
 
     def serve(self, *extra):
         self.stop()
-        self.srv = subprocess.Popen([ANDYSU, "serve", self.site, "--addr", f"127.0.0.1:{self.port}", *extra],
-                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        with open(self.logpath, "ab") as lf:
+            lf.write(f"--- {time.strftime('%H:%M:%S')} serve {self.site} {' '.join(extra)}\n".encode())
+            lf.flush()
+            self.srv = subprocess.Popen([ANDYSU, "serve", self.site, "--addr", f"127.0.0.1:{self.port}", *extra],
+                                        stdout=subprocess.DEVNULL, stderr=lf)
         time.sleep(0.4)
 
     def stop(self):
@@ -327,6 +345,89 @@ class Device:
                 ["andysu", "AndySU", "AndroidRuntime", "ANR", "FATAL", "\"main\"", "  at ", "PID", "Phoenix", "DEBUG"])]
         return "\n".join(keep[-150:])
 
+    def dump_failure(self, remote=None, error=""):
+        """Write everything needed to understand a failure into reports/ and return the file names."""
+        os.makedirs(REPORTS, exist_ok=True)
+        base = os.path.join(REPORTS, f"device-{STAMP}-api{self.api}")
+        files = []
+
+        def put(suffix, text):
+            path = f"{base}-{suffix}"
+            try:
+                with open(path, "w", errors="replace") as f:
+                    f.write(text)
+                files.append(path)
+            except Exception as e:
+                log(f"[{self.api}] could not write {path}: {e}")
+
+        def safe(fn, *a, **kw):
+            try:
+                return fn(*a, **kw)
+            except Exception as e:
+                return f"(failed: {e})\n"
+
+        # a. events (nothing here can hang: pure data), b. app data, c. server log
+        put("events.jsonl", "".join(json.dumps(e) + "\n" for e in list(self.events)))
+        ad = [f"error: {error}\n"]
+        for title, cmd in [("ls -lR no_backup/andysu", f"run-as {PKG} ls -lR no_backup/andysu"),
+                           ("state.json", f"run-as {PKG} cat no_backup/andysu/state.json"),
+                           ("state.lock", f"run-as {PKG} ls -l no_backup/andysu/state.lock"),
+                           ("ps", "ps -A -o PID,PPID,STAT,WCHAN:20,NAME | grep -E 'andysu|PID'")]:
+            ad.append(f"=== {title}\n{safe(self.sh, cmd, check=False, timeout=20)}\n")
+        put("appdata.txt", "".join(ad))
+        if remote is not None:
+            try:
+                with open(remote.logpath, errors="replace") as f:
+                    put("server.log", f.read())
+            except Exception as e:
+                put("server.log", f"(no server log: {e})\n")
+
+        # Java thread stacks: SIGQUIT makes ART dump every thread (the app is debuggable, so run-as may
+        # signal it); the dump lands in logcat (and /data/anr). Then, only on emulators where `adb root`
+        # works, read /data/anr and ask debuggerd for native stacks. Root comes last: it restarts adbd.
+        th = []
+        pids = safe(self.sh, f"pidof {PKG}", check=False, timeout=20).split()
+        th.append(f"app pids: {pids}\n")
+        marker = time.strftime("%m-%d %H:%M:%S")
+        for pid in pids:
+            th.append(f"=== kill -3 {pid}: {safe(self.sh, f'run-as {PKG} kill -3 {pid}', check=False, timeout=20)}\n")
+        time.sleep(3)
+        for pid in pids:
+            th.append(f"=== debuggerd -j {pid} (non-root)\n{safe(self.sh, f'debuggerd -j {pid} 2>&1', check=False, timeout=30)}\n")
+        root = False
+        if self.serial.startswith("emulator-"):
+            r = safe(self.adb, "root", check=False, timeout=30)
+            root = "cannot run as root" not in r and "(failed" not in r and "production builds" not in r
+            th.append(f"=== adb root: {r.strip()}\n")
+            if root:
+                safe(self.adb, "wait-for-device", timeout=60)
+                time.sleep(2)
+        if root:
+            th.append("=== /data/anr\n" + safe(self.sh, "ls -l /data/anr", check=False, timeout=20) + "\n")
+            th.append("=== newest /data/anr files\n" + safe(
+                self.sh, "for f in $(ls -t /data/anr/* 2>/dev/null | head -3); do echo \"##### $f\"; cat $f; done",
+                check=False, timeout=60) + "\n")
+            for pid in pids:
+                th.append(f"=== debuggerd -b {pid} (native, root)\n{safe(self.sh, f'debuggerd -b {pid} 2>&1', check=False, timeout=60)}\n")
+        full = safe(self.adb, "logcat", "-d", "-v", "threadtime", check=False, timeout=120)
+        put("logcat.txt", full)
+        block = []  # the "----- pid N at ... -----" thread dump blocks that SIGQUIT wrote into logcat
+        on = False
+        for line in full.splitlines():
+            if "----- pid " in line and " at " in line:
+                on = True
+            if on:
+                block.append(line)
+            if "----- end " in line:
+                on = False
+        th.append("=== SIGQUIT thread dump from logcat\n" + ("\n".join(block) if block else
+                  "(none found in logcat; see /data/anr output above)") + "\n")
+        put("threads.txt", "".join(th))
+        if root:
+            safe(self.adb, "unroot", check=False, timeout=30)
+            safe(self.adb, "wait-for-device", timeout=60)
+        return files
+
     # -- app control
 
     def install(self, apk):
@@ -360,6 +461,7 @@ class Device:
     def watch(self):
         if self.logcat:
             self.logcat.kill()
+        self.adb("logcat", "-G", "16M", check=False)  # keep the whole run for the failure dump
         self.adb("logcat", "-c")
         self.q = queue.Queue()
         self.events = []
@@ -413,6 +515,8 @@ def scenarios(d, b, r, results):
     def ok(name, detail=""):
         results.append({"api": d.api, "sdk": d.sdk, "scenario": name, "ok": True, "detail": detail})
         log(f"[{d.api}] ok  {name}  {detail}")
+        if FORCE_FAIL == name:
+            raise Fail(f"forced failure after scenario {name} (ANDYSU_TEST_FORCE_FAIL)")
 
     def count(name):
         return sum(1 for e in d.events if e.get("event") == name)
@@ -752,15 +856,20 @@ def main():
             d.start()
             scenarios(d, b, r, results)
         except Exception as e:
+            try:
+                files = d.dump_failure(r, str(e))
+            except Exception as e2:
+                files = [f"(dump failed: {e2})"]
             diag = d.diagnostics()
-            failures.append({"api": api, "error": str(e), "diagnostics": diag})
-            log(f"[{api}] FAILED: {e}\n--- diagnostics ---\n{diag}")
+            names = [os.path.relpath(f, REPO) if f.startswith(REPO) else f for f in files]
+            failures.append({"api": api, "error": str(e), "diagnostics": diag, "dump_files": names})
+            log(f"[{api}] FAILED: {e}\n--- diagnostics ---\n{diag}\n--- full dumps (CI artifact) ---\n" + "\n".join(names))
         finally:
             r.stop()
             d.stop()
 
-    os.makedirs(os.path.join(ANDROID, "tests", "reports"), exist_ok=True)
-    stamp = time.strftime("%Y%m%d-%H%M%S")
+    os.makedirs(REPORTS, exist_ok=True)
+    stamp = STAMP
     rep = {"when": stamp, "results": results, "failures": failures}
     with open(os.path.join(ANDROID, "tests", "reports", f"device-{stamp}.json"), "w") as f:
         json.dump(rep, f, indent=2)
@@ -770,6 +879,7 @@ def main():
             f.write(f"| {x['api']} | {x['sdk']} | {x['scenario']} | {x['detail']} |\n")
         for x in failures:
             f.write(f"\n**FAILED on {x['api']}:**\n\n```\n{x['error'][:4000]}\n```\n")
+            f.write("\nDumps: " + ", ".join(f"`{os.path.basename(n)}`" for n in x.get("dump_files", [])) + "\n")
     if not args.keep:
         shutil.rmtree(work, ignore_errors=True)
     log(f"{len(results)} checks passed, {len(failures)} API levels failed")
