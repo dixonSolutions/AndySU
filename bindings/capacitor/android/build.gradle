@@ -1,0 +1,25 @@
+// Capacitor plugin. In an app it is linked by `npx cap sync`; in the AndySU repo it compiles
+// against :api. The host provides the one runtime copy of the API (compileOnly).
+apply plugin: "com.android.library"
+def andysuVersion = project.findProperty("andysuVersion") ?: "0.1.0"
+android {
+    namespace "com.andysu.capacitor"
+    compileSdk 36
+    defaultConfig { minSdk 24 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+dependencies {
+    if (findProject(":capacitor-android") != null) {
+        implementation project(":capacitor-android")
+    } else {
+        compileOnly "com.capacitorjs:core:8.6.0"
+    }
+    if (findProject(":api") != null) {
+        compileOnly project(":api")
+    } else {
+        compileOnly "io.github.dixonsolutions.andysu:api:${andysuVersion}"
+    }
+}

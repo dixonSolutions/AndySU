@@ -172,3 +172,26 @@ fn sigkill_mid_write() {
     assert!(checked >= 20, "only {checked} rounds got far enough to write");
     eprintln!("sigkill_mid_write: {checked} rounds, {writes} completed writes before kills");
 }
+
+#[test]
+fn concurrent_state_updates_are_never_lost() {
+    // The Android host's crash handler and its updater thread both write the state; without the
+    // state lock a stale writer undid a rollback (found on a device with the Xonotic test bed).
+    let d = tempfile::tempdir().unwrap();
+    let store = std::sync::Arc::new(andysu_core::store::Store::open(d.path()).unwrap());
+    store.load_state([3; 16]).unwrap();
+    let threads: Vec<_> = (0..8)
+        .map(|_| {
+            let s = store.clone();
+            std::thread::spawn(move || {
+                for _ in 0..40 {
+                    s.update_state(|st| st.live_swaps += 1).unwrap();
+                }
+            })
+        })
+        .collect();
+    for t in threads {
+        t.join().unwrap();
+    }
+    assert_eq!(store.load_state([3; 16]).unwrap().live_swaps, 320);
+}

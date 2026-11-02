@@ -144,3 +144,20 @@ across releases and a live swap reuses the loaded copy. That is within the contr
 may run again on a copy after `suspend()`, which must release everything), and it keeps deltas
 and downloads minimal. A generation that must not share state with the previous one gets a
 fresh copy whenever its bytes differ.
+
+## D23. Apply policy: live by default, restart and next start configurable (2026-11-02, owner request)
+The owner asked for update-on-restart alongside live updates, live by default and configurable.
+`[policy] apply` in andysu.toml (host `config.json`):
+- `live` (default): swap the payload in-process while the app runs (stub mode with
+  `suspend()`/`start(state)`; hot content updates in place).
+- `restart`: the app restarts itself to apply: `restart_when = "now"` (default) relaunches once
+  through the phoenix activity as soon as the update is staged; `"background"` ends the process
+  once the user has left the app, so the next open is on the new version. If nothing is on
+  screen the process just ends.
+- `next_start`: stage only; the next cold start applies it.
+`live_fallback` (`next_start` default, or `restart`) says what `live` does where a live swap is
+impossible (transparent mode). Apps can change the policy per install at runtime with
+`UpdateClient.setApplyPolicy("live" | "restart" | "next_start" | null)` (persisted in
+`noBackupFilesDir/andysu/apply_policy`; null returns to the configured policy), exposed in the
+React Native binding as `setApplyPolicy`. The desktop host takes `--apply live|restart|next_start`.
+Every policy goes through the same TRIAL/commit/rollback path.

@@ -16,8 +16,12 @@ class Config(val json: JSONObject) {
     val manifestUrl: String = json.getString("manifest_url")
     /** auto | download_only | check_only | off */
     val mode: String = json.optString("mode", "auto")
-    /** live | next_start */
+    /** How staged updates apply: live (in-process swap, default) | restart | next_start */
     val apply: String = json.optString("apply", "live")
+    /** For apply = restart: now (one relaunch right away) | background (when the app is next in the background) */
+    val restartWhen: String = json.optString("restart_when", "now")
+    /** What apply = live does when a live swap is impossible (transparent mode): restart | next_start */
+    val liveFallback: String = json.optString("live_fallback", "next_start")
     /** any | unmetered */
     val network: String = json.optString("network", "any")
     val charging: Boolean = json.optBoolean("charging", false)
@@ -31,8 +35,11 @@ class Config(val json: JSONObject) {
     val stubActivities: Int = json.optInt("stub_activities", 4)
     val stubServices: Int = json.optInt("stub_services", 2)
 
-    /** Config object for the core session. */
-    fun coreConfig(): String = JSONObject()
+    /** Config object for the core session. The built-in payload (factory dirs under `root`)
+     *  serves as a delta base and source of unchanged bundles. */
+    fun coreConfig(root: java.io.File): String = JSONObject()
+        .put("base_dirs", JSONArray(java.io.File(root, "factory").listFiles()
+            ?.filter { java.io.File(it, "andysu-slot.json").isFile }?.map { it.path } ?: emptyList<String>()))
         .put("app", app)
         .put("channel", channel)
         .put("roots", JSONArray(roots))

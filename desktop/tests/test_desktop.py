@@ -56,11 +56,13 @@ def build_payload(d, version, behavior=0, factory=False):
 
 
 class Host:
-    def __init__(self, t, url, live):
+    def __init__(self, t, url, live, apply=None):
         args = [HOST, "--root", t.dev, "--factory", t.factory, "--url", url, "--pub", t.pub, "--app", APP,
                 "--watchdog-ms", "1500"]
         if live:
             args.append("--live")
+        if apply:
+            args += ["--apply", apply]
         self.p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   text=True, bufsize=1)
         self.q = queue.Queue()
@@ -240,6 +242,17 @@ def main():
         assert swaps[-1]["live_swaps"] == 3, swaps
         h.quit()
         ok("H three live swaps in one process, each generation with its own dependency copy")
+        publish("10.0")
+        h = Host(t, url, live=False, apply="restart")
+        h.payload("9.0")
+        h.send("check")
+        h.wait(lambda e: e.get("event") == "relaunch" and e.get("reason") == "applying update", "restart to apply")
+        launch = h.wait(lambda e: e.get("event") == "launch", "launch after restart")
+        assert launch["result"]["ok"]["in_trial"] is True, launch
+        h.payload("10.0")
+        h.wait(lambda e: e.get("event") == "committed", "commit of 10.0")
+        h.quit()
+        ok("I --apply restart: 10.0 staged, the host restarted itself once, 10.0 booted in trial and committed")
         gc = json.loads(run(ANDYSU, "client", "--root", t.dev, "gc"))
         ok(f"GC after the run removed {len(gc['removed_slots'])} slots, {gc['removed_blobs']} blobs")
     finally:

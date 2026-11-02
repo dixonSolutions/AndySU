@@ -1,0 +1,67 @@
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUCompat.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUCompat.java
+new file mode 100644
+index 0000000..4ef6bbd
+--- /dev/null
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUCompat.java
+@@ -0,0 +1,32 @@
++package io.github.dixonsolutions.xonotictouch;
++
++/**
++ * Optional AndySU integration, by reflection so the same code builds and runs without it.
++ * Under an AndySU host: the running payload's version, and the APK updater stands down (AndySU
++ * updates the app; installing a full APK would replace the frozen host).
++ */
++final class AndySUCompat {
++    private AndySUCompat() {}
++
++    private static Object host() {
++        try {
++            return Class.forName("com.andysu.api.Host").getMethod("current").invoke(null);
++        } catch (Throwable t) {
++            return null;
++        }
++    }
++
++    static boolean present() {
++        return host() != null;
++    }
++
++    static String payloadVersion() {
++        Object h = host();
++        if (h == null) return null;
++        try {
++            return (String) h.getClass().getMethod("version").invoke(h);
++        } catch (Throwable t) {
++            return null;
++        }
++    }
++}
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AppUpdater.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AppUpdater.java
+index a435717..fd6f45c 100644
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AppUpdater.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AppUpdater.java
+@@ -126,6 +126,9 @@ final class AppUpdater {
+     // ----------------------------------------------------------------- check
+ 
+     static boolean isEnabled(Context context) {
++        // Under AndySU the app updates through its payload; a full APK install would replace the
++        // frozen host, so the APK updater stands down.
++        if (AndySUCompat.present()) return false;
+         return prefs(context).getBoolean(PREF_ENABLED, true);
+     }
+ 
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java
+index 7f3f81d..3777e07 100644
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java
+@@ -505,6 +505,10 @@ final class GameData {
+     }
+ 
+     private String appVersion() {
++        // Under AndySU the installed APK is a frozen host; the running payload's version is what
++        // the bundled data belongs to.
++        String payload = AndySUCompat.payloadVersion();
++        if (payload != null) return payload;
+         try {
+             return context.getPackageManager()
+                     .getPackageInfo(context.getPackageName(), 0).versionName;

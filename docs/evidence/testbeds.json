@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "bed": "stk",
+      "step": "builtin",
+      "detail": "1.0.29 runs from the payload built into the host APK"
+    },
+    {
+      "bed": "stk",
+      "step": "update",
+      "detail": "1.0.31 applied on next start and committed; installed APK still versionName 1.0.29"
+    },
+    {
+      "bed": "stk",
+      "step": "rollback",
+      "detail": "1.0.31-broken failed on start; rolled back by the crash handler; one relaunch; back on 1.0.31"
+    }
+  ],
+  "failures": []
+}

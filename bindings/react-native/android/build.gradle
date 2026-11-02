@@ -1,0 +1,24 @@
+// React Native autolinks this module. Inside the AndySU repo it compiles against :api; in an app it
+// uses the published API artifact (compileOnly: the host provides the one runtime copy).
+apply plugin: "com.android.library"
+
+def andysuVersion = project.findProperty("andysuVersion") ?: "0.1.0"
+
+android {
+    namespace "com.andysu.reactnative"
+    compileSdk 36
+    defaultConfig { minSdk 21 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    compileOnly "com.facebook.react:react-android:0.88.1"
+    if (findProject(":api") != null) {
+        compileOnly project(":api")
+    } else {
+        compileOnly "io.github.dixonsolutions.andysu:api:${andysuVersion}"
+    }
+}

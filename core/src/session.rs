@@ -35,6 +35,9 @@ pub struct Config {
     pub device: Device,
     #[serde(default)]
     pub low_storage: bool,
+    /// Read-only slot directories usable as delta bases (e.g. the payload built into the host).
+    #[serde(default)]
+    pub base_dirs: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -94,6 +97,8 @@ const CACHED_URL: &str = "manifest.url";
 impl Session {
     /// `random16` seeds the install id if this is the first run.
     pub fn new(store: Store, cfg: Config, random16: [u8; 16]) -> Result<Session> {
+        let mut store = store;
+        store.base_dirs = cfg.base_dirs.iter().map(std::path::PathBuf::from).collect();
         store.load_state(random16)?;
         let roots = cfg.roots.iter().map(|r| PublicKey::parse_any(r)).collect::<Result<Vec<_>>>()?;
         if roots.is_empty() {
@@ -116,40 +121,45 @@ impl Session {
         now: i64,
     ) -> Result<CheckOutcome> {
         let url = Url::parse(manifest_url).map_err(|e| Error::Usage(format!("manifest url: {e}")))?;
-        let mut st = self.state()?;
-        let eff_now = now.max(st.last_manifest.as_ref().map_or(0, |l| l.issued));
-        // 1. signature before anything else is parsed
-        sig::verify(manifest, sigb, &self.roots, eff_now)?;
-        // 2. parse + validate
-        let m = Manifest::parse(manifest)?;
-        // 3. app + channel
-        if m.app != self.cfg.app {
-            return Err(Error::WrongApp { expected: self.cfg.app.clone(), got: m.app });
-        }
-        if m.channel != self.cfg.channel {
-            return Err(Error::WrongChannel { expected: self.cfg.channel.clone(), got: m.channel });
-        }
-        // 4. freshness
-        if m.expires_ts() <= eff_now {
-            return Err(Error::Expired { expires: m.expires_ts(), now: eff_now });
-        }
-        // 5. monotonic sequence
-        let sha = sha256_hex(manifest);
-        if let Some(l) = &st.last_manifest {
-            if m.sequence < l.sequence {
-                return Err(Error::SequenceRollback { last: l.sequence, got: m.sequence });
+        let (store, cfg, roots) = (&self.store, &self.cfg, &self.roots);
+        let (st, m) = store.locked(|| {
+            let mut st =
+                crate::state::load(&store.state_path())?.ok_or_else(|| Error::State("state.json vanished".into()))?;
+            let eff_now = now.max(st.last_manifest.as_ref().map_or(0, |l| l.issued));
+            // 1. signature before anything else is parsed
+            sig::verify(manifest, sigb, roots, eff_now)?;
+            // 2. parse + validate
+            let m = Manifest::parse(manifest)?;
+            // 3. app + channel
+            if m.app != cfg.app {
+                return Err(Error::WrongApp { expected: cfg.app.clone(), got: m.app });
             }
-            if m.sequence == l.sequence && sha != l.sha256 {
-                return Err(Error::SequenceReuse(m.sequence));
+            if m.channel != cfg.channel {
+                return Err(Error::WrongChannel { expected: cfg.channel.clone(), got: m.channel });
             }
-        }
-        // 6. remember, and cache the exact bytes for 304 responses
-        let dir = &self.store.root;
-        atomic_write(&dir.join(CACHED_MANIFEST), manifest)?;
-        atomic_write(&dir.join(CACHED_SIG), sigb)?;
-        atomic_write(&dir.join(CACHED_URL), manifest_url.as_bytes())?;
-        st.last_manifest = Some(LastManifest { sequence: m.sequence, issued: m.issued_ts(), sha256: sha, etag });
-        self.store.save_state(&st)?;
+            // 4. freshness
+            if m.expires_ts() <= eff_now {
+                return Err(Error::Expired { expires: m.expires_ts(), now: eff_now });
+            }
+            // 5. monotonic sequence
+            let sha = sha256_hex(manifest);
+            if let Some(l) = &st.last_manifest {
+                if m.sequence < l.sequence {
+                    return Err(Error::SequenceRollback { last: l.sequence, got: m.sequence });
+                }
+                if m.sequence == l.sequence && sha != l.sha256 {
+                    return Err(Error::SequenceReuse(m.sequence));
+                }
+            }
+            // 6. remember, and cache the exact bytes for 304 responses
+            let dir = &store.root;
+            atomic_write(&dir.join(CACHED_MANIFEST), manifest)?;
+            atomic_write(&dir.join(CACHED_SIG), sigb)?;
+            atomic_write(&dir.join(CACHED_URL), manifest_url.as_bytes())?;
+            st.last_manifest = Some(LastManifest { sequence: m.sequence, issued: m.issued_ts(), sha256: sha, etag });
+            store.save_state(&st)?;
+            Ok((st, m))
+        })?;
         self.manifest = Some((m, url));
         self.decide(&st)
     }
@@ -234,6 +244,9 @@ impl Session {
             }
             if self.store.has_blob(&c.sha256) {
                 continue;
+            }
+            if c.archive.is_some() && self.store.find_local_tree(&c.sha256, &slots).is_some() {
+                continue; // already extracted locally; staging copies it
             }
             if let Some(p) = self.store.find_local(&c.sha256, &slots) {
                 // Present in an installed slot: re-ingest it into the cache, no download.
@@ -337,10 +350,10 @@ impl Session {
         if !missing.is_empty() {
             return Err(Error::Usage(format!("{} downloads outstanding", missing.len())));
         }
-        let mut st = self.state()?;
+        let st = self.state()?;
         let base = st.current.as_ref().and_then(|c| self.store.read_slot_index(&c.id));
         let comps = components_for(&r, abi.as_deref());
-        let mut slot = self.store.build_slot(&r, &comps, abi.as_deref(), base.as_ref())?;
+        let mut slot = self.store.build_slot_from(&r, &comps, abi.as_deref(), base.as_ref(), &self.kept_slots())?;
         // Validate the descriptor now, so a broken payload never reaches TRIAL.
         let dp = self.store.slot_dir(&r.id).join(crate::manifest::DESCRIPTOR_PATH);
         let desc = crate::payload::Descriptor::parse(&io_at(fs::read(&dp), "read", &dp)?)?;
@@ -364,8 +377,9 @@ impl Session {
             });
             slot.hot_only = same;
         }
-        st.stage(slot.clone());
-        self.store.save_state(&st)?;
+        self.store.update_state(|s| {
+            s.stage(slot.clone());
+        })?;
         Ok(slot)
     }
 

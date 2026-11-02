@@ -12,18 +12,18 @@ import com.andysu.api.ServiceHandler
 import com.andysu.api.UpdateClient
 import java.io.File
 
-/** Host API level 1, one instance per generation. */
-class HostApiImpl internal constructor(private val g: Generation) : HostApi {
+/** Host API level 1, one instance per generation (g == null: transparent mode). */
+class HostApiImpl internal constructor(private val g: Generation?) : HostApi {
     override fun apiLevel() = 1
     override fun context(): Context = AndySU.app
     override fun activity(): Activity? = AndySU.resumed ?: AndySU.activities.lastOrNull()
-    override fun slotDir(): File = g.dir
-    override fun version() = g.version
-    override fun isFactory() = g.isFactory
+    override fun slotDir(): File = g?.dir ?: Transparent.slotDir ?: AndySU.root
+    override fun version() = g?.version ?: Transparent.version
+    override fun isFactory() = g?.isFactory ?: Transparent.isFactory
     override fun markHealthy() {
-        if (AndySU.generation === g) AndySU.markHealthy()
+        if (g == null || AndySU.generation === g) AndySU.markHealthy()
     }
-    override fun log(message: String) { Log.i(AndySU.TAG, "payload ${g.version}: $message") }
+    override fun log(message: String) { Log.i(AndySU.TAG, "payload ${version()}: $message") }
     override fun updates(): UpdateClient = AndySU.updater
     override fun stubActivityCount() = Stubs.activities.size
     override fun stubActivity(index: Int): Class<out Activity> = Stubs.activities[index]
@@ -40,7 +40,7 @@ class HostApiImpl internal constructor(private val g: Generation) : HostApi {
         return when (method) {
             "state" -> Core.state(root)
             "version" -> Core.version()
-            "load_plan" -> Core.loadPlan(g.dir.path, Generation.abi)
+            "load_plan" -> Core.loadPlan(slotDir().path, Generation.abi)
             "gc" -> Core.gc(root, false)
             "etag" -> Core.etag(root)
             else -> """{"error":{"code":"usage","message":"unknown core method $method"}}"""

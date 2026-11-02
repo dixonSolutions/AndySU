@@ -333,9 +333,10 @@ class Device:
     def force_stop(self):
         self.sh(f"am force-stop {PKG}")
 
-    def broadcast(self, action):
+    def broadcast(self, action, **extras):
         # -f 0x20: FLAG_INCLUDE_STOPPED_PACKAGES (the app may have been force-stopped)
-        self.sh(f"am broadcast -f 0x20 -n {PKG}/.TestCommands -a {action}", timeout=45)
+        es = "".join(f" --es {k} {v}" for k, v in extras.items())
+        self.sh(f"am broadcast -f 0x20 -n {PKG}/.TestCommands -a {action}{es}", timeout=45)
 
     def state(self):
         return json.loads(self.sh(f"run-as {PKG} cat no_backup/andysu/state.json"))
@@ -631,6 +632,39 @@ def scenarios(d, b, r, results):
             raise Fail(f"payload saw page size {d.last_payload.get('page_size')}")
         ok("16k", "16 KB page kernel: core, host bridge and renamed payload libraries all loaded and ran")
 
+    # apply policy = restart (set at runtime): one relaunch applies the update
+    d.broadcast("policy", policy="restart")
+    d.event("apply_policy", policy="restart")
+    inits = count("init")
+    r.publish("8.0")
+    d.broadcast("check")
+    d.wait(lambda e: e.get("event") == "relaunch" and e.get("reason") == "applying update", "restart to apply")
+    launch = d.event("launch")
+    if not launch.get("in_trial"):
+        raise Fail(f"8.0 should boot in trial after the restart: {launch}")
+    d.payload("8.0")
+    d.event("committed", version="8.0")
+    if count("init") - inits != 1:
+        raise Fail("expected exactly one restart")
+    ok("apply-restart", "policy restart: 8.0 staged, the app restarted itself once, booted in trial, committed")
+
+    # apply policy = next_start while the app is in the foreground: staged, not applied until the next start
+    d.broadcast("policy", policy="next_start")
+    d.event("apply_policy", policy="next_start")
+    r.publish("8.5")
+    d.broadcast("check")
+    d.status("staged")
+    time.sleep(3 * SLOW)
+    if any(e.get("event") in ("live_swapped", "relaunch") for e in d.events[-30:]):
+        raise Fail("next_start policy applied the update early")
+    d.force_stop()
+    d.launch()
+    d.payload("8.5")
+    d.event("committed", version="8.5")
+    d.broadcast("policy")  # back to the configured policy (live)
+    d.event("apply_policy", policy="live")
+    ok("apply-next-start", "policy next_start: 8.5 staged while the app was in front, applied on the next start; reset to live")
+
     # andysu split: the host built from a finished APK boots its built-in payload and updates
     d.adb("uninstall", PKG, check=False)
     d.install(b.split_apk)
@@ -638,11 +672,10 @@ def scenarios(d, b, r, results):
     ev = d.payload(b.split_version)
     if not ev.get("factory"):
         raise Fail(f"split host should start on its built-in payload: {ev}")
-    d.event("live_swapped", to="7.6", timeout=120)
-    # 7.6 is content-only on top of 7.5's code: its dex still says 7.5, the content says 7.6.
-    d.wait(lambda e: e.get("event") == "payload_started" and e.get("motd") == "hot motd 7.6", "7.6 content running")
+    d.event("live_swapped", to="8.5", timeout=120)
+    d.payload("8.5")
     d.event("committed")
-    ok("split", f"host APK made by `andysu split` from the payload's own APK: built-in {b.split_version} ran, live update to 7.6 committed")
+    ok("split", f"host APK made by `andysu split` from the payload's own APK: built-in {b.split_version} ran, live update to 8.5 committed")
 
     # no dialogs
     bad_focus = [f for f in d.focus_log if any(x in f.lower() for x in
@@ -689,6 +722,9 @@ def main():
     b.payload("7.5", "ok", blob_kb=6000)
     # The remote is reached through `adb reverse`, the same on emulators, VMs and phones.
     b.host(f"http://127.0.0.1:{port}/stable/update.json")
+    # Built after the host: `split` above used the 7.5 APK, so these are real updates for it too.
+    b.payload("8.0", "ok")
+    b.payload("8.5", "ok")
 
     results, failures = [], []
     targets = [args.device] if args.device else args.api

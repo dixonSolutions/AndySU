@@ -17,3 +17,8 @@ android/gradle-plugin/.kotlin/
 android/**/.cxx/
 android/tests/__pycache__/
 docs/evidence/*.jsonl
+bindings/*/node_modules/
+bindings/*/lib/
+bindings/*/dist/
+bindings/unity/Tests/Compile/bin/
+bindings/unity/Tests/Compile/obj/

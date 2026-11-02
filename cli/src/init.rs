@@ -38,8 +38,15 @@ pub struct Policy {
     pub mode: String,
     #[serde(default = "any")]
     pub network: String,
+    /// live (default) | restart | next_start
     #[serde(default = "live")]
     pub apply: String,
+    /// apply = restart: now | background
+    #[serde(default = "now")]
+    pub restart_when: String,
+    /// apply = live when a live swap is impossible: restart | next_start
+    #[serde(default = "next_start")]
+    pub live_fallback: String,
     #[serde(default)]
     pub charging: bool,
     #[serde(default = "yes")]
@@ -58,6 +65,12 @@ fn any() -> String {
 }
 fn live() -> String {
     "live".into()
+}
+fn now() -> String {
+    "now".into()
+}
+fn next_start() -> String {
+    "next_start".into()
 }
 fn yes() -> bool {
     true
@@ -127,7 +140,20 @@ pub struct AndySUToml {
 impl AndySUToml {
     pub fn load(p: &Path) -> R<AndySUToml> {
         let s = fs::read_to_string(p).map_err(|e| format!("{}: {e}", p.display()))?;
-        toml::from_str(&s).map_err(|e| format!("{}: {e}", p.display()))
+        let t: AndySUToml = toml::from_str(&s).map_err(|e| format!("{}: {e}", p.display()))?;
+        let check = |what: &str, v: &str, ok: &[&str]| -> R<()> {
+            if ok.contains(&v) {
+                Ok(())
+            } else {
+                Err(format!("{}: policy.{what} = {v:?}, expected one of {ok:?}", p.display()))
+            }
+        };
+        check("mode", &t.policy.mode, &["auto", "download_only", "check_only", "off"])?;
+        check("apply", &t.policy.apply, &["live", "restart", "next_start"])?;
+        check("restart_when", &t.policy.restart_when, &["now", "background"])?;
+        check("live_fallback", &t.policy.live_fallback, &["restart", "next_start"])?;
+        check("network", &t.policy.network, &["any", "unmetered"])?;
+        Ok(t)
     }
 
     /// Manifest URL the host fetches.
@@ -164,7 +190,8 @@ impl AndySUToml {
         let s = self.host.stubs.clone().unwrap_or(Stubs { activities: 4, services: 2, receivers: 2, providers: 1 });
         Ok(serde_json::json!({
             "app": self.app, "channel": self.remote.channel, "roots": [pem], "manifest_url": self.manifest_url()?,
-            "mode": self.policy.mode, "apply": self.policy.apply, "network": self.policy.network,
+            "mode": self.policy.mode, "apply": self.policy.apply, "restart_when": self.policy.restart_when,
+            "live_fallback": self.policy.live_fallback, "network": self.policy.network,
             "charging": self.policy.charging, "battery_not_low": self.policy.battery_not_low,
             "check_interval_minutes": self.policy.check_interval_minutes, "watchdog_ms": self.policy.watchdog_ms,
             "host_api": self.host_api, "shell_version": self.host.shell_version,
@@ -294,7 +321,7 @@ pub fn init(dir: &Path, app: Option<String>, repo: Option<String>, keys: bool) -
     };
     let t = format!(
         "app = \"{app}\"\nhost_api = 1\npublic_key = \"andysu-public.pem\"\n\n[remote]\ntype = \"{kind_r}\"\n{repo_line}\nchannel = \"stable\"\n\n\
-         [policy]\nmode = \"auto\"          # auto | download_only | check_only | off\nnetwork = \"any\"        # any | unmetered\napply = \"live\"          # live | next_start\n\n\
+         [policy]\nmode = \"auto\"          # auto | download_only | check_only | off\nnetwork = \"any\"        # any | unmetered\napply = \"live\"          # live | restart | next_start\nrestart_when = \"now\"    # for apply = restart: now | background\n\n\
          [host]\n# Everything the app may ever need, declared once in the frozen host:\npermissions = []\nstubs = {{ activities = 4, services = 2 }}\n"
     );
     write(&toml_path, t.as_bytes())?;

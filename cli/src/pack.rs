@@ -274,6 +274,9 @@ fn zip_dir(dir: &Path) -> R<Vec<u8>> {
     Ok(buf.into_inner())
 }
 
+/// Above this many loose files, `pack` bundles content directories into zip components.
+pub const AUTO_ARCHIVE_LIMIT: usize = 400;
+
 pub fn pack(o: &Options) -> R<Report> {
     let mut rep = Report::default();
     let dpath = o.payload.join(DESCRIPTOR_PATH);
@@ -288,7 +291,56 @@ pub fn pack(o: &Options) -> R<Report> {
 
     // logical path -> (bytes, kind, abi)
     let mut files: BTreeMap<String, (Vec<u8>, Kind, Option<String>)> = BTreeMap::new();
-    let archives: Vec<String> = o.archive.iter().map(|a| a.trim_matches('/').to_string()).collect();
+    let mut archives: Vec<String> = o.archive.iter().map(|a| a.trim_matches('/').to_string()).collect();
+    // Keep releases small in components (the spec allows 4096; a GitHub release holds 1000 assets):
+    // bundle the largest content directories
+    // (by file count) into zip components until at most AUTO_ARCHIVE_LIMIT files remain loose.
+    let all = walk(&o.payload)?;
+    let loose = |archives: &Vec<String>| {
+        all.iter().filter(|r| !archives.iter().any(|a| r.starts_with(&format!("{a}/")))).count()
+    };
+    if loose(&archives) > AUTO_ARCHIVE_LIMIT {
+        let mut dirs: BTreeMap<String, usize> = BTreeMap::new();
+        for r in &all {
+            let parts: Vec<&str> = r.split('/').collect();
+            // Candidate directories: anything below the top level except code (dex/, lib/).
+            for depth in 1..parts.len() {
+                let d = parts[..depth].join("/");
+                if d == "dex"
+                    || d == "lib"
+                    || d.starts_with("lib/")
+                    || depth == 1 && parts[0] != "assets" && parts[0] != "res"
+                {
+                    continue;
+                }
+                *dirs.entry(d).or_default() += 1;
+            }
+        }
+        // Prefer deeper directories (smaller archives update better), largest first.
+        let mut cands: Vec<(String, usize)> = dirs.into_iter().filter(|(d, n)| *n >= 16 && d.contains('/')).collect();
+        cands.sort_by_key(|(d, n)| (std::cmp::Reverse(d.matches('/').count().min(2)), std::cmp::Reverse(*n)));
+        for (d, _) in cands {
+            if loose(&archives) <= AUTO_ARCHIVE_LIMIT {
+                break;
+            }
+            if archives.iter().any(|a| d.starts_with(&format!("{a}/")) || a.starts_with(&format!("{d}/")) || *a == d) {
+                continue;
+            }
+            archives.push(d);
+        }
+        if loose(&archives) > AUTO_ARCHIVE_LIMIT {
+            let top: Vec<String> = all
+                .iter()
+                .filter_map(|r| r.split_once('/').map(|x| x.0.to_string()))
+                .filter(|t| t == "assets")
+                .collect();
+            if !top.is_empty() && !archives.contains(&"assets".to_string()) {
+                archives.retain(|a| !a.starts_with("assets/"));
+                archives.push("assets".into());
+            }
+        }
+        rep.warnings.push(format!("{} files: bundled {} directories into zip components", all.len(), archives.len()));
+    }
     for rel in walk(&o.payload)? {
         if rel == DESCRIPTOR_PATH || archives.iter().any(|a| rel.starts_with(&format!("{a}/"))) {
             continue;
@@ -551,6 +603,25 @@ pub fn pack(o: &Options) -> R<Report> {
                 write(&dir.join(&c.path), &b)?;
             }
         }
+        // A slot index, so clients can use this built-in payload as a delta base.
+        let ix = andysu_core::store::SlotIndex {
+            id: release.id.clone(),
+            sequence: release.sequence,
+            abi: None,
+            components: release
+                .components
+                .iter()
+                .map(|c| andysu_core::store::IndexEntry {
+                    name: c.name.clone(),
+                    path: c.path.clone(),
+                    sha256: c.sha256.clone(),
+                    kind: c.kind,
+                    apply: c.apply,
+                    archive: c.archive,
+                })
+                .collect(),
+        };
+        write(&dir.join(andysu_core::store::BUILTIN_INDEX), &serde_json::to_vec_pretty(&ix).unwrap())?;
     }
     let rp = o.site.join("releases").join(format!("{id}.json"));
     write(&rp, &serde_json::to_vec_pretty(&release).unwrap())?;

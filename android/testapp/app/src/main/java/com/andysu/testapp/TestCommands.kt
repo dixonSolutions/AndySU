@@ -16,6 +16,7 @@ class TestCommands : BroadcastReceiver() {
             "apply" -> AndySU.applyLive()
             "state" -> AndySU.emit("state", JSONObject().put("state", JSONObject(Core.state(AndySU.root.path))))
             "gc" -> AndySU.updater.gcAsync()
+            "policy" -> AndySU.setApplyPolicy(intent.getStringExtra("policy"))
         }
     }
 }

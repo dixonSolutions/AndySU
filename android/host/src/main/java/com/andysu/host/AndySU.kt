@@ -108,6 +108,7 @@ object AndySU {
         emit("launch", Transparent.launchEvent ?: JSONObject())
         emit("booted", JSONObject().put("version", Transparent.version).put("factory", Transparent.isFactory)
             .put("trial", inTrial).put("transparent", true))
+        com.andysu.api.Host.install(HostApiImpl(null))
         val autoHealthy = config.json.optLong("auto_healthy_ms", 8_000)
         TransparentCallbacks(autoHealthy).installOn(app)
         if (inTrial) {
@@ -166,6 +167,7 @@ object AndySU {
                 return
             }
         }
+        generation?.let { com.andysu.api.Host.install(it.api) }
         emit("booted", JSONObject().put("version", generation?.version).put("factory", generation?.isFactory).put("trial", inTrial))
         if (inTrial) armWatchdog(live = false)
     }
@@ -248,10 +250,57 @@ object AndySU {
 
     // ---------------------------------------------------------------- live swap
 
+    // ---------------------------------------------------------------- apply policy
+
+    private val policyFile get() = File(root, "apply_policy")
+    private var restartWhenBackgrounded = false
+    internal var startedActivities = 0
+
+    /** The configured policy, unless the app overrode it at runtime (UpdateClient.setApplyPolicy). */
+    fun applyPolicy(): String {
+        val p = runCatching { policyFile.readText().trim() }.getOrNull()
+        return if (p in setOf("live", "restart", "next_start")) p!! else config.apply
+    }
+
+    fun setApplyPolicy(policy: String?) {
+        require(policy == null || policy in setOf("live", "restart", "next_start")) { "unknown apply policy $policy" }
+        if (policy == null) policyFile.delete() else policyFile.writeText(policy)
+        emit("apply_policy", JSONObject().put("policy", applyPolicy()))
+    }
+
     /** Called by the updater after staging, on the main thread. */
     internal fun onStaged(outcome: JSONObject) {
-        if (transparent) return // applied on the next start
-        if (config.mode == "auto" && config.apply == "live" && resumed != null) applyLive()
+        if (config.mode != "auto") return
+        var policy = applyPolicy()
+        if (policy == "live" && transparent) policy = config.liveFallback
+        when (policy) {
+            "live" -> if (resumed != null && !applyLive()) restartToApply()
+            "restart" -> restartToApply()
+            else -> Unit // next_start: the next cold start promotes it
+        }
+    }
+
+    /** Apply by restarting the process. With restart_when = background (or when nothing is on
+     *  screen) the process just ends once the user has left, and the next start applies it. */
+    private fun restartToApply() {
+        if (inTrial) return
+        if (startedActivities == 0) {
+            emit("restart_to_apply", JSONObject().put("when", "background"))
+            android.os.Process.killProcess(android.os.Process.myPid())
+        } else if (config.restartWhen == "background") {
+            restartWhenBackgrounded = true
+            emit("restart_to_apply", JSONObject().put("when", "on_background"))
+        } else {
+            Phoenix.relaunch(app, "applying update")
+        }
+    }
+
+    /** All activities stopped: finish a deferred restart-to-apply. */
+    internal fun onBackgrounded() {
+        if (restartWhenBackgrounded && !inTrial) {
+            emit("restart_to_apply", JSONObject().put("when", "background"))
+            android.os.Process.killProcess(android.os.Process.myPid())
+        }
     }
 
     /** Apply the staged release now, in-process. Returns false if there was nothing to apply. */
@@ -285,6 +334,7 @@ object AndySU {
             return true
         }
         generation = ng
+        com.andysu.api.Host.install(ng.api)
         emit("live_swapped", JSONObject().put("from", old.version).put("to", ng.version))
         armWatchdog(live = true)
         try {
@@ -340,6 +390,7 @@ object AndySU {
         previous = null
         if (back == null || back === bad) return
         generation = back
+        com.andysu.api.Host.install(back.api)
         try {
             startGeneration(back, swapState)
             if (!back.isNative) activities.toList().forEach { attachPayload(it, null) }
@@ -376,6 +427,11 @@ object AndySU {
 
     internal fun activityEvent(activity: Activity, event: Int) {
         when (event) {
+            ActivityEvent.START -> startedActivities++
+            ActivityEvent.STOP -> if (--startedActivities <= 0) {
+                startedActivities = 0
+                onBackgrounded()
+            }
             ActivityEvent.RESUME -> resumed = activity
             ActivityEvent.PAUSE -> if (resumed === activity) resumed = null
             ActivityEvent.DESTROY -> activities -= activity

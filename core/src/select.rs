@@ -57,12 +57,12 @@ impl Device {
     }
 
     fn meets_os(&self, r: &Release) -> bool {
-        r.requires.api_min.map_or(true, |m| self.api_level >= m) && self.abi_for(r).is_some()
+        r.requires.api_min.is_none_or(|m| self.api_level >= m) && self.abi_for(r).is_some()
     }
 
     fn meets_host(&self, r: &Release) -> bool {
-        r.requires.host_api_min.map_or(true, |m| self.host_api >= m)
-            && r.requires.shell_min.map_or(true, |m| self.shell_version >= m)
+        r.requires.host_api_min.is_none_or(|m| self.host_api >= m)
+            && r.requires.shell_min.is_none_or(|m| self.shell_version >= m)
     }
 }
 
@@ -78,7 +78,7 @@ pub fn select<'a>(
     let mut cands: Vec<&Release> = m
         .releases
         .iter()
-        .filter(|r| installed_sequence.map_or(true, |_| r.sequence > floor))
+        .filter(|r| installed_sequence.is_none_or(|_| r.sequence > floor))
         .filter(|r| !bad.contains(&r.id))
         .filter(|r| dev.meets_os(r))
         .filter(|r| r.includes(install_id))

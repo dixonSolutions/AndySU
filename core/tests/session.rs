@@ -326,3 +326,64 @@ fn zip_slip_component_is_refused_at_stage() {
     let st = andysu_core::state::load(&dev.path().join("state.json")).unwrap().unwrap();
     assert!(st.pending.is_none());
 }
+
+#[test]
+fn builtin_payload_serves_as_delta_base_and_archive_source() {
+    use std::io::Write;
+    let remote = Remote::new();
+    // An asset bundle (zip component) that does not change between releases.
+    let mut z = std::io::Cursor::new(Vec::new());
+    {
+        let mut w = zip::ZipWriter::new(&mut z);
+        for i in 0..20 {
+            w.start_file(format!("tracks/t{i}.dat"), zip::write::SimpleFileOptions::default()).unwrap();
+            w.write_all(&vec![i as u8; 3000]).unwrap();
+        }
+        w.finish().unwrap();
+    }
+    let zipb = z.into_inner();
+    let lib1: Vec<u8> = (0..60_000u32).map(|i| (i.wrapping_mul(2654435761) >> 9) as u8).collect();
+    let mut lib2 = lib1.clone();
+    lib2[777] ^= 0x5a;
+    let files = |lib: &[u8]| {
+        vec![
+            File { path: "lib/x86_64/libgame.so", kind: Kind::Native, apply: Apply::Restart, data: lib.to_vec() },
+            File { path: "assets/data", kind: Kind::Content, apply: Apply::Restart, data: zipb.clone() },
+        ]
+    };
+    let mut r1 = remote.release("1.0", 1, &files(&lib1));
+    r1.components[2].archive = Some(andysu_core::manifest::Archive::Zip);
+    // The "built-in payload": r1 staged elsewhere (like `pack --emit-slot`), used read-only.
+    let factory_store = tempfile::tempdir().unwrap();
+    {
+        let (b, s) = remote.publish(&Remote::manifest(1, vec![r1.clone()]));
+        let mut sess = session(factory_store.path());
+        sess.check(&remote.manifest_url(), &b, &s, None, NOW).unwrap();
+        download_all(&mut sess);
+        sess.stage().unwrap();
+    }
+    let factory = factory_store.path().join("slots/1.0");
+
+    let mut r2 = remote.release("2.0", 2, &files(&lib2));
+    r2.components[2].archive = Some(andysu_core::manifest::Archive::Zip);
+    remote.add_delta(&mut r2, "lib/x86_64/libgame.so", &lib1, &lib2, PatchFormat::Zstd);
+    let (b, s) = remote.publish(&Remote::manifest(2, vec![r2.clone()]));
+    let dev = tempfile::tempdir().unwrap();
+    let mut cfg = config();
+    cfg.base_dirs = vec![factory.to_string_lossy().to_string()];
+    let mut sess =
+        andysu_core::session::Session::new(andysu_core::store::Store::open(dev.path()).unwrap(), cfg, [7; 16]).unwrap();
+    sess.check(&remote.manifest_url(), &b, &s, None, NOW).unwrap();
+    let plan = sess.plan().unwrap();
+    // Only the new descriptor (tiny) and the library delta; no full library, no bundle.
+    assert!(plan.iter().any(|f| f.kind == "delta"), "{plan:?}");
+    assert!(!plan.iter().any(|f| f.key == r2.components[1].sha256), "full library not fetched");
+    assert!(!plan.iter().any(|f| f.key == r2.components[2].sha256), "unchanged bundle not fetched");
+    let bytes: u64 = plan.iter().map(|f| f.size).sum();
+    assert!(bytes < 2_000, "downloaded {bytes} bytes");
+    download_all(&mut sess);
+    sess.stage().unwrap();
+    let slot = dev.path().join("slots/2.0");
+    assert_eq!(fs::read(slot.join("lib/x86_64/libgame.so")).unwrap(), lib2);
+    assert_eq!(fs::read(slot.join("assets/data/tracks/t7.dat")).unwrap(), vec![7u8; 3000]);
+}

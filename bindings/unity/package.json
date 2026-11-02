@@ -1,0 +1,9 @@
+{
+  "name": "com.andysu.unity",
+  "version": "0.1.0",
+  "displayName": "AndySU",
+  "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+  "unity": "2021.3",
+  "license": "Apache-2.0",
+  "author": { "name": "dixonSolutions", "url": "https://github.com/dixonSolutions/AndySU" }
+}

@@ -192,7 +192,7 @@ internal class TransparentCallbacks(private val autoHealthyMs: Long) : Applicati
         if (Build.VERSION.SDK_INT >= 30 && loader != null) activity.resources.addLoaders(loader as ResourcesLoader)
     }
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) { AndySU.activities += activity }
-    override fun onActivityStarted(activity: Activity) {}
+    override fun onActivityStarted(activity: Activity) { AndySU.startedActivities++ }
     override fun onActivityResumed(activity: Activity) {
         AndySU.resumed = activity
         if (AndySU.inTrial) {
@@ -204,7 +204,12 @@ internal class TransparentCallbacks(private val autoHealthyMs: Long) : Applicati
         if (AndySU.resumed === activity) AndySU.resumed = null
         main.removeCallbacks(healthy)
     }
-    override fun onActivityStopped(activity: Activity) {}
+    override fun onActivityStopped(activity: Activity) {
+        if (--AndySU.startedActivities <= 0) {
+            AndySU.startedActivities = 0
+            AndySU.onBackgrounded()
+        }
+    }
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
     override fun onActivityDestroyed(activity: Activity) { AndySU.activities -= activity }
 }

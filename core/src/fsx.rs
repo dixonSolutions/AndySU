@@ -46,9 +46,12 @@ pub fn sync_dir(dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// A temp name unique to this process and call, so concurrent writers never share one.
 fn tmp_path(path: &Path) -> PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(0);
     let mut s = path.as_os_str().to_owned();
-    s.push(".tmp");
+    s.push(format!(".tmp.{}.{}", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
     PathBuf::from(s)
 }
 

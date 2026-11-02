@@ -1,0 +1,32 @@
+diff --git a/engine/android/src/main/java/STKUpdateChecker.java b/engine/android/src/main/java/STKUpdateChecker.java
+index 78ed2af..c26347f 100644
+--- a/engine/android/src/main/java/STKUpdateChecker.java
++++ b/engine/android/src/main/java/STKUpdateChecker.java
+@@ -138,6 +138,16 @@ public class STKUpdateChecker
+      * using plain ofstream, and a second of latency on a button that starts a
+      * 30 MB download does not justify a FileObserver.
+      */
++    /** True when running under an AndySU host (reflection: builds and runs without AndySU). */
++    private static boolean underAndySU()
++    {
++        try {
++            return Class.forName("com.andysu.api.Host").getMethod("current").invoke(null) != null;
++        } catch (Throwable t) {
++            return false;
++        }
++    }
++
+     public void startRequestService()
+     {
+         if (m_service != null && m_service.isAlive())
+@@ -359,6 +369,10 @@ public class STKUpdateChecker
+      */
+     public void checkInBackground()
+     {
++        // Under AndySU the app updates through its payload; installing a full APK would replace
++        // the frozen host, so this APK updater stands down.
++        if (underAndySU())
++            return;
+         if (!prefs().getBoolean(PREF_ENABLED, true))
+             return;
+         m_last_check_ms = SystemClock.elapsedRealtime();

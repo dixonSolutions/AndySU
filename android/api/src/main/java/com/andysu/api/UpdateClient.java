@@ -25,4 +25,15 @@ public interface UpdateClient {
 
     /** Replace the listener (null to remove). */
     void setListener(Listener listener);
+
+    /**
+     * How staged updates are applied, overriding the host's configured policy for this install
+     * (persisted): {@code "live"} (swap in-process; the default), {@code "restart"} (restart the
+     * app to apply), {@code "next_start"} (wait for the next start), or null to go back to the
+     * configured policy.
+     */
+    void setApplyPolicy(String policy);
+
+    /** The policy in effect: "live", "restart" or "next_start". */
+    String applyPolicy();
 }

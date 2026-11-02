@@ -95,6 +95,10 @@ def bed(d, name, spec, work, results):
                            stderr=subprocess.DEVNULL)
     try:
         d.adb("uninstall", pkg, check=False)
+        # No internet for the emulator: the games' own first-run downloads (Xonotic fetches
+        # 1.16 GB of pk3s) are not part of this test. The remote is reached over adb reverse.
+        d.sh("svc wifi disable", check=False)
+        d.sh("svc data disable", check=False)
         d.install(ra["host"]["apk"])
         d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
         d.watch()
@@ -119,7 +123,7 @@ def bed(d, name, spec, work, results):
         results.append({"bed": name, "step": "builtin", "detail": f"{va} runs from the payload built into the host APK"})
         st = d.status("staged", timeout=900)
         log(f"[{name}] {vb} staged: {st['status'].get('download_bytes')} bytes")
-        d.force_stop()
+        d.sh(f"am force-stop {pkg}")
         launch()
         ev = booted(vb)
         if not ev.get("trial"):
@@ -136,23 +140,28 @@ def bed(d, name, spec, work, results):
         # Broken release: rolled back after one relaunch.
         dt.run([dt.ANDYSU, "pack", broken, "--site", site, "--no-rename"], timeout=3600)
         dt.run([dt.ANDYSU, "publish", "--site", site, "--release", vb + "-broken", "--key", key])
-        d.force_stop()
+        d.sh(f"am force-stop {pkg}")
         launch()
         booted(vb)
         d.status("staged", timeout=900)
-        d.force_stop()
+        d.sh(f"am force-stop {pkg}")
         inits = sum(1 for e in d.events if e.get("event") == "init")
         launch()
         booted(vb + "-broken")
-        launch_ev = d.wait(lambda e: e.get("event") == "launch" and any(
-            x.get("event") == "rolled_back" for x in e.get("events", [])), "rollback on relaunch", 180)
+        # The crash handler rolls back, then relaunches once; that launch runs B again.
+        d.wait(lambda e: e.get("event") == "relaunch", "relaunch after the broken start", 180)
+        launch_ev = d.wait(lambda e: e.get("event") == "launch", "launch after relaunch", 180)
+        if (launch_ev.get("slot") or {}).get("id") != vb or launch_ev.get("in_trial"):
+            raise dt.Fail(f"expected a committed {vb} after the rollback: {launch_ev}")
         booted(vb)
-        relaunches = sum(1 for e in d.events if e.get("event") == "init") - inits
+        relaunches = sum(1 for e in d.events if e.get("event") == "init") - inits - 1
+        if relaunches != 1:
+            raise dt.Fail(f"expected exactly one relaunch after the broken start, saw {relaunches}")
         time.sleep(10)
         screenshot(d, f"{name}-3-rolled-back-{vb}")
         st = d.state() if False else None
         results.append({"bed": name, "step": "rollback",
-                        "detail": f"{vb}-broken failed on start; {relaunches - 1} relaunch; back on {vb}"})
+                        "detail": f"{vb}-broken failed on start; rolled back by the crash handler; one relaunch; back on {vb}"})
     finally:
         srv.kill()
         with open(os.path.join(EVIDENCE, f"{name}-events.jsonl"), "w") as f:
@@ -165,6 +174,7 @@ def main():
     ap.add_argument("--only", choices=list(BEDS))
     ap.add_argument("--api", default="34")
     ap.add_argument("--device")
+    ap.add_argument("--keep", action="store_true", help="keep the emulator running and the work dir")
     args = ap.parse_args()
     dt.CONTAINER = not args.device
     work = tempfile.mkdtemp(prefix="andysu-testbeds-")
@@ -184,8 +194,11 @@ def main():
                 failures.append({"bed": name, "error": str(e), "diagnostics": d.diagnostics()})
                 log(f"[{name}] FAILED: {e}\n{failures[-1]['diagnostics'][-3000:]}")
     finally:
-        d.stop()
-        shutil.rmtree(work, ignore_errors=True)
+        if not args.keep:
+            d.stop()
+            shutil.rmtree(work, ignore_errors=True)
+        else:
+            log(f"kept: emulator {d.serial}, work dir {work}")
     os.makedirs(EVIDENCE, exist_ok=True)
     with open(os.path.join(EVIDENCE, "testbeds.json"), "w") as f:
         json.dump({"results": results, "failures": failures}, f, indent=2)

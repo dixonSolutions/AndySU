@@ -46,6 +46,7 @@ typedef struct gen {
 static struct {
     const char *root, *url, *pub_path, *app, *channel, *abi, *factory;
     int live, max_attempts;
+    const char *apply; /* live | restart | next_start (--live is apply=live) */
     long watchdog_ms, check_ms;
 } O = {.channel = "stable", .abi = "x86_64", .max_attempts = 2, .watchdog_ms = 5000};
 
@@ -363,6 +364,12 @@ static void do_check(void) {
         andysu_free(s);
     }
     if (staged && O.live && !in_trial) apply_live();
+    else if (staged && O.apply && !strcmp(O.apply, "restart") && !in_trial) {
+        /* Apply by restarting: suspend cleanly, then re-execute; the launch promotes the slot. */
+        size_t len = 0;
+        free(cur->p->suspend ? cur->p->suspend(&len) : NULL);
+        relaunch("applying update");
+    }
 }
 
 /* ---------- main ---------- */
@@ -383,7 +390,8 @@ static char *slurp(const char *path) {
 static void usage(void) {
     fprintf(stderr,
             "usage: andysu-desktop-host --root DIR --factory DIR --url MANIFEST_URL --pub KEY.pem --app ID\n"
-            "       [--channel stable] [--abi x86_64] [--live] [--watchdog-ms 5000] [--check-ms 0]\n"
+            "       [--channel stable] [--abi x86_64] [--apply live|restart|next_start] [--live]\n"
+            "       [--watchdog-ms 5000] [--check-ms 0]\n"
             "       [--max-attempts 2]\n");
     exit(2);
 }
@@ -395,6 +403,11 @@ int main(int argc, char **argv) {
         const char *v = i + 1 < argc ? argv[i + 1] : NULL;
 #define OPT(name, field) else if (!strcmp(a, name) && v) { O.field = v; i++; }
         if (!strcmp(a, "--live")) O.live = 1;
+        else if (!strcmp(a, "--apply") && v) {
+            O.apply = v;
+            O.live = !strcmp(v, "live");
+            i++;
+        }
         OPT("--root", root) OPT("--url", url) OPT("--pub", pub_path) OPT("--app", app) OPT("--channel", channel)
         OPT("--abi", abi) OPT("--factory", factory)
         else if (!strcmp(a, "--watchdog-ms") && v) { O.watchdog_ms = atol(v); i++; }

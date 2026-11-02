@@ -1,0 +1,22 @@
+// Flutter plugin (Android). In an app, Flutter's Gradle plugin supplies the embedding; in the
+// AndySU repo the embedding comes from download.flutter.io for a compile check.
+apply plugin: "com.android.library"
+def andysuVersion = project.findProperty("andysuVersion") ?: "0.1.0"
+def flutterEngine = project.findProperty("flutterEngine") ?: "89c39edfdfae2949f6806e4a315c0c08522238b7"
+android {
+    namespace "com.andysu.flutter"
+    compileSdk 36
+    defaultConfig { minSdk 21 }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+dependencies {
+    if (findProject(":api") != null) {
+        compileOnly project(":api")
+        compileOnly "io.flutter:flutter_embedding_release:1.0.0-${flutterEngine}"
+    } else {
+        compileOnly "io.github.dixonsolutions.andysu:api:${andysuVersion}"
+    }
+}

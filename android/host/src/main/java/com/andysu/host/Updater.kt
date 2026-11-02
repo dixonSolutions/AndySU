@@ -31,6 +31,8 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
     override fun checkNow() = checkAsync("user")
     override fun status(): String = status.toString()
     override fun setListener(listener: UpdateClient.Listener?) { this.listener = listener }
+    override fun setApplyPolicy(policy: String?) = AndySU.setApplyPolicy(policy)
+    override fun applyPolicy(): String = AndySU.applyPolicy()
     override fun applyNow() = main.post {
         if (status.optString("state") == "shell_update") exec.execute { ShellUpdate.install(ctx, status) }
         else if (!AndySU.applyLive()) restartNow()
@@ -55,6 +57,9 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
     }
 
     private fun networkAllowed(): Boolean {
+        // A loopback remote (development, adb reverse) needs no network.
+        val host = runCatching { URL(cfg.manifestUrl).host }.getOrDefault("")
+        if (host == "127.0.0.1" || host == "localhost") return true
         val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         @Suppress("DEPRECATION")
         val active = cm.activeNetworkInfo
@@ -82,7 +87,7 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
             return
         }
         setStatus("checking", JSONObject().put("trigger", trigger))
-        val h = (Core.ok(Core.sessionNew(root.path, cfg.coreConfig(), AndySU.random16())) as Number).toLong()
+        val h = (Core.ok(Core.sessionNew(root.path, cfg.coreConfig(root), AndySU.random16())) as Number).toLong()
         try {
             val etag = Core.ok(Core.etag(root.path)) as String?
             val cached = File(root, "manifest.json").exists()

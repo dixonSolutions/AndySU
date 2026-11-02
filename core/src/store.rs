@@ -15,6 +15,8 @@ use crate::state::{self, LaunchDecision, SlotRef, State};
 use crate::{Error, Result};
 
 pub const SLOT_INDEX: &str = ".andysu-slot.json";
+/// The index of a built-in payload. Not a dot-file: aapt2 drops those from APK assets.
+pub const BUILTIN_INDEX: &str = "andysu-slot.json";
 const MAX_UNPACKED: u64 = 4 << 30;
 
 /// What a slot contains; written into every slot so later updates can diff against it.
@@ -46,6 +48,9 @@ pub struct GcReport {
 
 pub struct Store {
     pub root: PathBuf,
+    /// Extra read-only slot directories (with a slot index) whose files can serve as delta bases
+    /// or be reused: on Android, the payload built into the host.
+    pub base_dirs: Vec<PathBuf>,
 }
 
 fn check_id(id: &str) -> Result<()> {
@@ -73,6 +78,20 @@ fn dir_size(p: &Path) -> u64 {
     }
 }
 
+fn copy_tree(from: &Path, to: &Path) -> Result<()> {
+    io_at(fs::create_dir_all(to), "mkdir", to)?;
+    for e in io_at(fs::read_dir(from), "readdir", from)?.flatten() {
+        let ft = e.file_type()?;
+        let dst = to.join(e.file_name());
+        if ft.is_dir() {
+            copy_tree(&e.path(), &dst)?;
+        } else if ft.is_file() {
+            link_or_copy(&e.path(), &dst)?;
+        }
+    }
+    Ok(())
+}
+
 fn readonly_tree(p: &Path) -> Result<()> {
     for e in io_at(fs::read_dir(p), "readdir", p)?.flatten() {
         let ft = e.file_type()?;
@@ -91,7 +110,7 @@ impl Store {
         for d in [root.join("blobs/sha256"), root.join("slots")] {
             io_at(fs::create_dir_all(&d), "mkdir", &d)?;
         }
-        Ok(Store { root })
+        Ok(Store { root, base_dirs: vec![] })
     }
 
     pub fn state_path(&self) -> PathBuf {
@@ -104,16 +123,32 @@ impl Store {
         self.root.join("crash.marker")
     }
 
+    /// Run `f` holding an exclusive lock on `<root>/state.lock`. Every read-modify-write of the
+    /// state goes through here, so threads (the crash handler, the updater) and processes never
+    /// overwrite each other's transitions. Plain reads need no lock: writes are atomic renames.
+    pub fn locked<T>(&self, f: impl FnOnce() -> Result<T>) -> Result<T> {
+        let p = self.root.join("state.lock");
+        let file =
+            io_at(fs::OpenOptions::new().create(true).truncate(false).read(true).write(true).open(&p), "open", &p)?;
+        io_at(file.lock(), "lock", &p)?;
+        let r = f();
+        let _ = file.unlock();
+        r
+    }
+
     /// Load the state, creating it (with a fresh install id from `random16`) on first run.
     pub fn load_state(&self, random16: [u8; 16]) -> Result<State> {
-        match state::load(&self.state_path())? {
+        if let Some(s) = state::load(&self.state_path())? {
+            return Ok(s);
+        }
+        self.locked(|| match state::load(&self.state_path())? {
             Some(s) => Ok(s),
             None => {
                 let s = State::new(state::uuid_from_bytes(random16));
                 self.save_state(&s)?;
                 Ok(s)
             }
-        }
+        })
     }
 
     pub fn save_state(&self, s: &State) -> Result<()> {
@@ -178,17 +213,41 @@ impl Store {
     }
 
     /// Find a local copy of a blob: the cache, or a non-archive file in an installed slot.
+    /// Installed slots and base directories, with their indexes.
+    fn local_indexes(&self, slots: &[String]) -> Vec<(PathBuf, SlotIndex)> {
+        let mut v: Vec<(PathBuf, SlotIndex)> =
+            slots.iter().filter_map(|id| self.read_slot_index(id).map(|ix| (self.slot_dir(id), ix))).collect();
+        for d in &self.base_dirs {
+            let read = |n: &str| fs::read(d.join(n)).ok().and_then(|b| serde_json::from_slice::<SlotIndex>(&b).ok());
+            if let Some(ix) = read(SLOT_INDEX).or_else(|| read(BUILTIN_INDEX)) {
+                v.push((d.clone(), ix));
+            }
+        }
+        v
+    }
+
     pub fn find_local(&self, sha: &str, slots: &[String]) -> Option<PathBuf> {
         if self.has_blob(sha) {
             return Some(self.blob_path(sha));
         }
-        for id in slots {
-            if let Some(ix) = self.read_slot_index(id) {
-                if let Some(e) = ix.components.iter().find(|e| e.sha256 == sha && e.archive.is_none()) {
-                    let p = self.slot_dir(id).join(&e.path);
-                    if p.is_file() {
-                        return Some(p);
-                    }
+        for (dir, ix) in self.local_indexes(slots) {
+            if let Some(e) = ix.components.iter().find(|e| e.sha256 == sha && e.archive.is_none()) {
+                let p = dir.join(&e.path);
+                if p.is_file() {
+                    return Some(p);
+                }
+            }
+        }
+        None
+    }
+
+    /// An already extracted copy of zip component `sha` (verified when that slot was staged).
+    pub fn find_local_tree(&self, sha: &str, slots: &[String]) -> Option<PathBuf> {
+        for (dir, ix) in self.local_indexes(slots) {
+            if let Some(e) = ix.components.iter().find(|e| e.sha256 == sha && e.archive.is_some()) {
+                let p = dir.join(&e.path);
+                if p.is_dir() {
+                    return Some(p);
                 }
             }
         }
@@ -218,6 +277,19 @@ impl Store {
         abi: Option<&str>,
         base: Option<&SlotIndex>,
     ) -> Result<SlotRef> {
+        self.build_slot_from(r, comps, abi, base, &[])
+    }
+
+    /// Like `build_slot`; zip components whose blob is absent are copied from an extracted copy
+    /// in `slots` or the base directories.
+    pub fn build_slot_from(
+        &self,
+        r: &Release,
+        comps: &[&Component],
+        abi: Option<&str>,
+        base: Option<&SlotIndex>,
+        slots: &[String],
+    ) -> Result<SlotRef> {
         check_id(&r.id)?;
         let staging = self.staging_dir(&r.id);
         let dst = self.slot_dir(&r.id);
@@ -228,9 +300,17 @@ impl Store {
         for c in comps {
             check_rel_path(&c.path)?;
             let blob = self.blob_path(&c.sha256);
-            verify_file(&blob, &c.sha256, c.size)?;
             let target = staging.join(&c.path);
+            let reuse =
+                if c.archive.is_some() && !blob.is_file() { self.find_local_tree(&c.sha256, slots) } else { None };
+            if reuse.is_none() {
+                verify_file(&blob, &c.sha256, c.size)?;
+            }
             match c.archive {
+                Some(Archive::Zip) if reuse.is_some() => {
+                    copy_tree(reuse.as_deref().unwrap(), &target)?;
+                    readonly_tree(&target)?;
+                }
                 Some(Archive::Zip) => {
                     io_at(fs::create_dir_all(&target), "mkdir", &target)?;
                     let cap = c.unpacked_size.unwrap_or_else(|| c.size.saturating_mul(64)).min(MAX_UNPACKED);
@@ -311,7 +391,12 @@ impl Store {
         apply_pending: bool,
         max_attempts: u32,
     ) -> Result<LaunchDecision> {
-        let mut st = self.load_state(random16)?;
+        self.load_state(random16)?;
+        self.locked(|| self.launch_locked(now, apply_pending, max_attempts))
+    }
+
+    fn launch_locked(&self, now: i64, apply_pending: bool, max_attempts: u32) -> Result<LaunchDecision> {
+        let mut st = state::load(&self.state_path())?.ok_or_else(|| Error::State("no state.json".into()))?;
         st.cold_start();
         let mut early = vec![];
         let marker = self.crash_marker_path();
@@ -344,9 +429,11 @@ impl Store {
 
     /// Load-modify-save helpers for the bootloader.
     pub fn update_state<T>(&self, f: impl FnOnce(&mut State) -> T) -> Result<T> {
-        let mut st = state::load(&self.state_path())?.ok_or_else(|| Error::State("no state.json".into()))?;
-        let r = f(&mut st);
-        self.save_state(&st)?;
-        Ok(r)
+        self.locked(|| {
+            let mut st = state::load(&self.state_path())?.ok_or_else(|| Error::State("no state.json".into()))?;
+            let r = f(&mut st);
+            self.save_state(&st)?;
+            Ok(r)
+        })
     }
 }

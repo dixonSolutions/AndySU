@@ -1,0 +1,23 @@
+// Godot 4 Android plugin (v2). Packaged as an AAR inside addons/andysu/ by the release workflow.
+apply plugin: "com.android.library"
+def andysuVersion = project.findProperty("andysuVersion") ?: "0.1.0"
+android {
+    namespace "com.andysu.godot"
+    compileSdk 36
+    defaultConfig {
+        minSdk 24
+        manifestPlaceholders = [:]
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+dependencies {
+    compileOnly "org.godotengine:godot:4.7.2.stable"
+    if (findProject(":api") != null) {
+        compileOnly project(":api")
+    } else {
+        compileOnly "io.github.dixonsolutions.andysu:api:${andysuVersion}"
+    }
+}

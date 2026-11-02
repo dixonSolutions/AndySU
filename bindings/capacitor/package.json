@@ -1,0 +1,14 @@
+{
+  "name": "@andysu/capacitor",
+  "version": "0.1.0",
+  "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/dixonSolutions/AndySU", "directory": "bindings/capacitor" },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist", "src", "android/build.gradle", "android/src", "README.md"],
+  "capacitor": { "android": { "src": "android" } },
+  "scripts": { "build": "tsc -p tsconfig.json", "test": "node test/smoke.js" },
+  "peerDependencies": { "@capacitor/core": ">=5" },
+  "devDependencies": { "typescript": "^5.6.0" }
+}
