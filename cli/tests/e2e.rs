@@ -294,3 +294,47 @@ fn release_files_are_signed_and_tampering_is_caught() {
     fs::write(e.p("SHA256SUMS"), "abd  andysu\n").unwrap();
     e.fails(&["verify-file", "SHA256SUMS", "--pub", "ci-public.pem"]);
 }
+
+/// `verify --blobs` over HTTP and `pack`'s fetch of earlier blobs read whole blobs; a blob larger
+/// than the manifest size limit (8 MiB) must not be cut off (it was, until v0.1.25).
+#[test]
+fn large_blobs_verify_over_http_and_serve_as_delta_bases() {
+    let e = Env { t: tempfile::tempdir().unwrap() };
+    e.ok(&["keygen"]);
+    let big: Vec<u8> = (0..9 * 1024 * 1024u32).map(|i| (i.wrapping_mul(2654435761) >> 13) as u8).collect();
+    for (v, tweak) in [("1.0", 0u8), ("2.0", 1u8)] {
+        let d = e.p(&format!("p{v}"));
+        fs::create_dir_all(d.join("assets")).unwrap();
+        fs::create_dir_all(d.join("dex")).unwrap();
+        let mut b = big.clone();
+        b[4096] ^= tweak;
+        fs::write(d.join("assets/big.bin"), &b).unwrap();
+        fs::write(d.join("dex/classes.dex"), b"dex").unwrap();
+        fs::write(
+            d.join("andysu-payload.json"),
+            format!(r#"{{"schema":1,"app":"{APP}","version":"{v}","host_api_min":1,"entry":{{"dex_class":"a.B"}}}}"#),
+        )
+        .unwrap();
+    }
+    // Release 1.0 lives only on the "remote" (blob URLs absolute); the packing site for 2.0 has no
+    // local copy of 1.0's blobs, so the delta base must come over HTTP.
+    let remote = e.p("remote");
+    let srv = serve::spawn(&remote, "127.0.0.1:0", serve::Faults::default()).unwrap();
+    let base = format!("{}/blobs/sha256", srv.url());
+    let r = remote.to_str().unwrap();
+    e.ok(&["pack", "p1.0", "--site", r, "--base-url", &base]);
+    e.ok(&["publish", "--site", r, "--release", "1.0", "--key", "andysu-root.key"]);
+    let out = e.ok(&["verify", &format!("{}/stable/update.json", srv.url()), "--pub", "andysu-public.pem", "--blobs"]);
+    assert!(out.contains("all blobs verified"), "{out}");
+
+    let site = e.p("site2");
+    fs::create_dir_all(site.join("stable")).unwrap();
+    fs::copy(remote.join("stable/update.json"), site.join("stable/update.json")).unwrap();
+    let s = site.to_str().unwrap();
+    let rep: Value = serde_json::from_str(&e.ok(&["pack", "p2.0", "--site", s, "--base-url", &base])).unwrap();
+    let deltas = rep["deltas"].as_array().unwrap();
+    assert!(
+        deltas.iter().any(|d| d.as_str().unwrap().starts_with("assets.big.bin")),
+        "no delta for the 9 MiB asset from the remote 1.0 blob: {rep}"
+    );
+}
