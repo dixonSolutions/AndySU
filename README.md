@@ -30,6 +30,11 @@ update **rolls back** by itself.
 Status: [docs/PROGRESS.md](docs/PROGRESS.md). Design: [docs/BRIEF.md](docs/BRIEF.md) and
 [docs/DECISIONS.md](docs/DECISIONS.md). Protocol: [spec/SPEC.md](spec/SPEC.md).
 
+**Try it:** every release on GitHub carries `andysu-demo-compose-<version>.apk`, a Compose app
+whose payload is published to a demo channel on this repository's Pages. Install it once
+(Android 6+, sideloaded) and it updates itself live to each newer release, with no prompt
+and no permission. The demo is signed with the CI *test* keys ([docs/KEYS.md](docs/KEYS.md)).
+
 ## How it works
 
 ```

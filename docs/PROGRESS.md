@@ -301,6 +301,17 @@ pub, Homebrew and the live GitHub URLs are verified only in CI, once the reposit
 `actions/publish/test.sh` covers both remote types: three releases with deltas and a 50%
 rollout, against a bare git repo and a stand-in `gh`, then a simulated client updates from each.
 
+### Demo channel (2026-11-03, owner request: "remote and self GitHub release ... so we can hot swap it")
+Each release now runs `scripts/demo.sh`. It publishes the Compose sample's payload to
+`<Pages>/demo/stable/update.json`, signed with `ANDYSU_SIGNING_KEY`, with deltas against earlier
+demo releases. It also attaches `andysu-demo-compose-<version>.apk`, a host with that version
+built in, signed with the CI test keystore, to the GitHub Release. An APK installed from any
+release then live-updates to every later one. `verify-signature` checks the live channel with
+`andysu verify --blobs`.
+Verified locally by `android/tests/demo_test.py` (API 36): two demo releases built exactly as
+CI builds them. The first release's APK booted its built-in 0.1.900, found 0.1.901, swapped it in
+live, committed, and showed "Payload version 0.1.901". The channel verified, every blob included.
+
 ## Step 10 — `templates/remote` (2026-11-02)
 A GitHub template for an app's update remote, served by Pages. `channels.toml` on `main` says
 what each channel offers. Merging a PR applies it (`apply`), `ingest` adds a payload and opens

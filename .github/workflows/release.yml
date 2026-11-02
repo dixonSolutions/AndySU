@@ -107,6 +107,30 @@ jobs:
             mkdir site
           fi
       - run: scripts/package.sh site "$PAGES_URL"
+      - name: Demo channel (the Compose sample on Pages; its host APK goes into the release)
+        env:
+          ANDYSU_SIGNING_KEY: ${{ secrets.ANDYSU_SIGNING_KEY }}
+          ANDYSU_SIGNING_CERT: ${{ secrets.ANDYSU_SIGNING_CERT }}
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          umask 077
+          printf '%s\n' "$ANDYSU_SIGNING_KEY" > "$RUNNER_TEMP/demo.key"
+          export ANDYSU_KEY_FILE="$RUNNER_TEMP/demo.key"
+          if [ -n "$ANDYSU_SIGNING_CERT" ]; then
+            printf '%s\n' "$ANDYSU_SIGNING_CERT" > "$RUNNER_TEMP/demo.cert.json"
+            export ANDYSU_CERT_FILE="$RUNNER_TEMP/demo.cert.json" ANDYSU_ROOT_PUB=keys/andysu-ci-test-public.pem
+          fi
+          if [ -n "$ANDROID_KEYSTORE_B64" ]; then
+            printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/demo.jks"
+            printf '%s' "$ANDROID_KEYSTORE_PASSWORD" > "$RUNNER_TEMP/demo.jks.pass"
+            export ANDROID_KEYSTORE="$RUNNER_TEMP/demo.jks" ANDROID_KEYSTORE_PASS_FILE="$RUNNER_TEMP/demo.jks.pass"
+            export ANDROID_KEY_ALIAS
+          fi
+          umask 022
+          scripts/demo.sh site "$PAGES_URL" "${{ needs.version.outputs.version }}" dist/release
+          rm -f "$RUNNER_TEMP"/demo.*
       - name: Checksums, signed with the CI key
         env:
           ANDYSU_SIGNING_KEY: ${{ secrets.ANDYSU_SIGNING_KEY }}
@@ -247,7 +271,7 @@ jobs:
           andysu --version | grep -q "${{ needs.version.outputs.version }}"
 
   verify-signature:
-    needs: [version, github-release]
+    needs: [version, github-release, pages]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -260,6 +284,10 @@ jobs:
           sha256sum -c --ignore-missing SHA256SUMS
           chmod +x andysu-x86_64-unknown-linux-musl
           ./andysu-x86_64-unknown-linux-musl verify-file SHA256SUMS --pub ../keys/andysu-ci-test-public.pem
+      - name: The live demo channel verifies like a client would (signature, expiry, every blob)
+        run: >-
+          r/andysu-x86_64-unknown-linux-musl verify "$PAGES_URL/demo/stable/update.json"
+          --pub keys/andysu-ci-test-public.pem --app com.andysu.sample.compose --blobs
 
   # Optional public registries: these jobs run only once the owner adds the token secret.
   crates-io:
