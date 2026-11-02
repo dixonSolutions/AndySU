@@ -278,3 +278,19 @@ fn publish_update_resume_commit_delta_rollback_and_attacks() {
     let g = e.dev(&["gc"]);
     assert!(g["removed_slots"].as_array().unwrap().iter().any(|x| x == "2.0"), "{g}");
 }
+
+#[test]
+fn release_files_are_signed_and_tampering_is_caught() {
+    let e = Env { t: tempfile::tempdir().unwrap() };
+    e.ok(&["keygen", "--name", "ci"]);
+    e.ok(&["keygen", "--name", "other"]);
+    let public = e.ok(&["pubkey", "--key", "ci-root.key"]);
+    assert_eq!(public, fs::read_to_string(e.p("ci-public.pem")).unwrap());
+    fs::write(e.p("SHA256SUMS"), "abc  andysu\n").unwrap();
+    e.ok(&["sign-file", "SHA256SUMS", "--key", "ci-root.key"]);
+    assert!(e.ok(&["verify-file", "SHA256SUMS", "--pub", "ci-public.pem"]).contains("signed by root"));
+    e.fails(&["verify-file", "SHA256SUMS", "--pub", "other-public.pem"]);
+    // A file signature is not a manifest signature: the domain-separated message differs.
+    fs::write(e.p("SHA256SUMS"), "abd  andysu\n").unwrap();
+    e.fails(&["verify-file", "SHA256SUMS", "--pub", "ci-public.pem"]);
+}

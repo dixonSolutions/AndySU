@@ -1,0 +1,12 @@
+{
+  "name": "@andysu/cli",
+  "version": "0.1.0",
+  "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/dixonSolutions/AndySU", "directory": "cli/npm" },
+  "bin": { "andysu": "bin/andysu.js" },
+  "files": ["bin", "vendor"],
+  "os": ["linux", "darwin"],
+  "cpu": ["x64", "arm64"],
+  "engines": { "node": ">=18" }
+}

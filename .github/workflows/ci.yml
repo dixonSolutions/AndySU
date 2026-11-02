@@ -22,6 +22,8 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --features andysu-core/jni,andysu-core/transport -- -D warnings
       - run: cargo test --workspace
+      - name: The publish action (pages and github remotes, against local stand-ins)
+        run: cargo build -p andysu-cli && bash actions/publish/test.sh
       - name: C header is up to date
         run: |
           cargo install cbindgen --locked --version 0.29.4
@@ -47,7 +49,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
       - run: cargo install cargo-ndk --locked
       - name: Build the host AAR for all ABIs, the API and the test APKs
         working-directory: android
@@ -80,7 +82,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: 21
       - run: cargo install cargo-ndk --locked
       - uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -96,6 +98,81 @@ jobs:
         with:
           name: device-report-${{ matrix.api }}-${{ matrix.target }}
           path: android/tests/reports/
+
+  bindings:
+    # Each ecosystem binding: its own build and smoke test, plus the Android libraries compiled
+    # against the API (React Native, Capacitor, Flutter, Godot).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: cargo install cargo-ndk --locked
+      - name: React Native and Capacitor (TypeScript build + smoke test)
+        run: |
+          for b in react-native capacitor; do
+            (cd bindings/$b && npm ci && npm run build && npm test)
+          done
+      - name: Flutter (unit tests)
+        working-directory: bindings/flutter
+        run: flutter pub get && flutter test
+      - name: Unity (compiles against stub UnityEngine types; Unity itself needs a licence)
+        run: dotnet build bindings/unity/Tests/Compile/Compile.csproj
+      - name: C/CMake (install, then build and run a consumer)
+        run: sh bindings/c/test.sh
+      - name: Android libraries of the bindings
+        working-directory: android
+        run: >-
+          ./gradlew -Pandysu.bindings=true :binding-react-native:assembleRelease :binding-capacitor:assembleRelease
+          :binding-flutter:assembleRelease :binding-godot:assembleRelease
+
+  packages:
+    # The release packaging, published to a throwaway local site and installed from it by fresh
+    # consumer projects: the same scripts the release runs against GitHub Pages.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: cargo install cargo-ndk --locked && (python3 -c "import yaml" || sudo apt-get install -y python3-yaml)
+      - name: Package into a local site
+        run: |
+          cargo build --release -p andysu-cli
+          mkdir -p dist/cli && cp target/release/andysu dist/cli/andysu-x86_64-unknown-linux-musl
+          scripts/package.sh "$RUNNER_TEMP/site" http://127.0.0.1:8765
+      - name: Install every package from it
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 -d "$RUNNER_TEMP/site" >/dev/null 2>&1 &
+          sleep 1
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          scripts/verify-consumers.sh http://127.0.0.1:8765 "$version" dist/release cargo npm upm maven pub c godot
 
   fuzz-smoke:
     runs-on: ubuntu-latest

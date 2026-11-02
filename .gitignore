@@ -22,3 +22,4 @@ bindings/*/lib/
 bindings/*/dist/
 bindings/unity/Tests/Compile/bin/
 bindings/unity/Tests/Compile/obj/
+/dist/

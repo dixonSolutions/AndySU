@@ -5,5 +5,20 @@
   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
   "unity": "2021.3",
   "license": "Apache-2.0",
-  "author": { "name": "dixonSolutions", "url": "https://github.com/dixonSolutions/AndySU" }
+  "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+  },
+  "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU",
+    "directory": "bindings/unity"
+  }
 }

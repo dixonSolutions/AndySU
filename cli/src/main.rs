@@ -108,6 +108,27 @@ enum Cmd {
         #[arg(long, default_value_t = 90)]
         days: i64,
     },
+    /// Print the public key (PEM) of a private key, e.g. to derive a host's root from a CI secret.
+    Pubkey {
+        #[arg(long, env = "ANDYSU_KEY_FILE")]
+        key: PathBuf,
+    },
+    /// Write a detached signature (<file>.sig) for release files such as SHA256SUMS.
+    SignFile {
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        #[arg(long, env = "ANDYSU_KEY_FILE")]
+        key: PathBuf,
+        #[arg(long, env = "ANDYSU_CERT_FILE")]
+        cert: Option<PathBuf>,
+    },
+    /// Check detached signatures written by sign-file.
+    VerifyFile {
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        #[arg(long = "pub", required = true)]
+        public: Vec<PathBuf>,
+    },
     /// Set up AndySU in a project: detect its type, generate keys, write andysu.toml and CI.
     Init {
         #[arg(default_value = ".")]
@@ -128,6 +149,11 @@ enum Cmd {
         config_out: PathBuf,
         #[arg(long)]
         host_out: Option<PathBuf>,
+    },
+    /// Print the remote that andysu.toml describes, as JSON (type, repo, base, channel, manifest_url).
+    Remote {
+        #[arg(long, default_value = "andysu.toml")]
+        toml: PathBuf,
     },
     /// Split a finished APK into a frozen host APK and a payload directory.
     Split(andysu_cli::split::SplitArgs),
@@ -299,6 +325,23 @@ fn run(cli: Cli) -> R<()> {
             let (k, c) = keys::release_key(&dir, &name, &root, now() - 300, days)?;
             println!("release key {} certified for {days} days\n  certificate: {}", k.display(), c.display());
         }
+        Cmd::Pubkey { key } => {
+            print!("{}", keys::load_secret(&key)?.public().to_pem());
+        }
+        Cmd::SignFile { files, key, cert } => {
+            let sk = keys::load_secret(&key)?;
+            let cert = cert.map(|c| keys::load_cert(&c)).transpose()?;
+            for f in files {
+                println!("{}", keys::sign_file(&f, &sk, cert.clone())?.display());
+            }
+        }
+        Cmd::VerifyFile { files, public } => {
+            let roots = roots(&public)?;
+            for f in files {
+                let v = keys::verify_file(&f, None, &roots, now())?;
+                println!("{}: signed by root {}", f.display(), v.root_id);
+            }
+        }
         Cmd::Init { dir, app, repo, no_keys } => {
             println!("{}", andysu_cli::init::init(&dir, app, repo, !no_keys)?);
         }
@@ -310,6 +353,12 @@ fn run(cli: Cli) -> R<()> {
                 write(&h, json(&t.host_spec()).as_bytes())?;
             }
             println!("manifest URL: {}", t.manifest_url()?);
+        }
+        Cmd::Remote { toml } => {
+            let t = andysu_cli::init::AndySUToml::load(&toml)?;
+            let mut v = serde_json::to_value(&t.remote).unwrap();
+            v["manifest_url"] = t.manifest_url()?.into();
+            println!("{}", json(&v));
         }
         Cmd::Split(a) => {
             println!("{}", json(&andysu_cli::split::split(&a)?));

@@ -1,0 +1,65 @@
+name: AndySU publish
+description: Pack a payload, sign the channel manifest and publish it to GitHub Releases or GitHub Pages
+branding:
+  icon: upload-cloud
+  color: green
+inputs:
+  payload:
+    description: Payload directory (from `andysu split`, the Gradle plugin, or your build)
+    required: true
+  config:
+    description: andysu.toml (remote type, repository, channel)
+    default: andysu.toml
+  signing-key:
+    description: Signing key PEM (a secret, e.g. secrets.ANDYSU_SIGNING_KEY)
+    required: true
+  signing-cert:
+    description: Root certificate (JSON) when signing-key is a certified release key
+    default: ""
+  version:
+    description: Release id (default: the payload's version)
+    default: ""
+  channel:
+    description: Channel (default: the one in andysu.toml)
+    default: ""
+  pack-args:
+    description: Extra arguments for `andysu pack` (e.g. --hot assets/ --archive assets/data --no-rename)
+    default: ""
+  rollout:
+    description: Staged rollout percentage for this release (1-100)
+    default: ""
+  pages-branch:
+    description: Branch that GitHub Pages serves (remote type "pages")
+    default: gh-pages
+  andysu-version:
+    description: AndySU CLI release to use (a version like 0.1.42, or "latest")
+    default: latest
+  token:
+    description: Token with contents:write on the repository
+    default: ${{ github.token }}
+outputs:
+  manifest-url:
+    description: URL of the signed channel manifest
+    value: ${{ steps.publish.outputs.manifest-url }}
+  release:
+    description: The release id that was published
+    value: ${{ steps.publish.outputs.release }}
+runs:
+  using: composite
+  steps:
+    - id: publish
+      shell: bash
+      env:
+        INPUT_PAYLOAD: ${{ inputs.payload }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_SIGNING_KEY: ${{ inputs.signing-key }}
+        INPUT_SIGNING_CERT: ${{ inputs.signing-cert }}
+        INPUT_VERSION: ${{ inputs.version }}
+        INPUT_CHANNEL: ${{ inputs.channel }}
+        INPUT_PACK_ARGS: ${{ inputs.pack-args }}
+        INPUT_ROLLOUT: ${{ inputs.rollout }}
+        INPUT_PAGES_BRANCH: ${{ inputs.pages-branch }}
+        INPUT_ANDYSU_VERSION: ${{ inputs.andysu-version }}
+        GH_TOKEN: ${{ inputs.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+      run: bash "${{ github.action_path }}/publish.sh"

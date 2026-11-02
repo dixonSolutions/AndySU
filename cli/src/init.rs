@@ -280,7 +280,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Build your app's payload here (for Gradle: ./gradlew andysuPayloadRelease).
-      - uses: dixonSolutions/AndySU/actions/publish@v0
+      - uses: dixonSolutions/AndySU/actions/publish@main
         with:
           payload: build/andysu/payload
           config: andysu.toml
