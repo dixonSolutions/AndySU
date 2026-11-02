@@ -45,9 +45,9 @@ scripts/setup-secrets.sh
 
 | Secret | Used by | When it is missing |
 |---|---|---|
-| `ANDYSU_SIGNING_KEY` | release: `SHA256SUMS.sig`; the publish action: channel manifests | the release fails |
+| `ANDYSU_SIGNING_KEY` | release: `SHA256SUMS.sig` and the demo channel; the publish action: channel manifests | the release fails |
 | `ANDYSU_SIGNING_CERT` | optional; set it when the signing key is a release key certified by an offline root (`andysu keygen --release-from root.key`) | the key signs as a root |
-| `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` | release APKs of the samples and the demo host (not wired into the release yet; see PROGRESS) | nothing uses them yet |
+| `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` | the demo APK in each release (`scripts/demo.sh`) | the demo APK is signed with the debug key |
 | `CARGO_REGISTRY_TOKEN` | the `crates-io` job: `cargo publish` of `andysu-core` and `andysu-cli` | the job skips itself |
 | `NPM_TOKEN` | the `npmjs` job: `npm publish` of `@andysu/*` and `com.andysu.unity` | the job skips itself |
 

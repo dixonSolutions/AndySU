@@ -21,7 +21,7 @@ local.
 | 6 Gradle plugin + split | done |
 | 7 Test beds | STK: built-in → next-start update → broken release rolled back, game running. Xonotic: the same AndySU steps pass, but the engine never started (no game data on the emulator); being fixed. Live `.so` swap in Xonotic: designed, not built |
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
-| 9 Publishing | verified locally against a local site; live GitHub run: see step 9 |
+| 9 Publishing | live: release v0.1.13 on GitHub, every registry installed from the live URLs in CI (Homebrew pending a fix) |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
 | 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated |
 
@@ -320,9 +320,34 @@ installing it from a clean project with `scripts/verify-consumers.sh`:
 - C: `find_package(AndySU)` from the release tarball; build and run;
 - Godot: the addon zip with its AAR.
 
-pub, Homebrew and the live GitHub URLs are verified only in CI, once the repository exists.
+**On GitHub (2026-11-03).** The owner authorised creating `dixonSolutions/AndySU`. It is public,
+with the Actions secrets set by `scripts/setup-secrets.sh` (CI test keys) and Pages served from
+`gh-pages`.
+- The first release run (v0.1.10) failed on: the debug keystore missing on runners, the local
+  registry not yet up when cargo read it, `bindings/flutter/lib/` being git-ignored, and GNU sed
+  on macOS. Fixed in PR #1, whose CI passed every job, including all six emulator levels.
+- **v0.1.13** (the merge of PR #1) is the first published release. Every test job passed; the CLI
+  was built for Linux and macOS; the GitHub Release, Pages registries and signed `SHA256SUMS`
+  were published. **Consumer verification against the live URLs passed for cargo, npm, UPM,
+  Maven, pub, C and Godot.** pub works from static Pages files. Verified independently from this
+  machine: `sha256sum -c` passes, and `andysu verify-file SHA256SUMS` reports root
+  `64529963522e286d`.
+- Homebrew failed on that run (`Formula/` did not exist yet; fixed in PR #3), so `brew install`
+  has not been verified yet. The crates.io and npmjs jobs skipped themselves (no tokens), as
+  intended.
 `actions/publish/test.sh` covers both remote types: three releases with deltas and a 50%
 rollout, against a bare git repo and a stand-in `gh`, then a simulated client updates from each.
+
+### Demo channel (2026-11-03, owner request: "remote and self GitHub release ... so we can hot swap it")
+Each release now runs `scripts/demo.sh`. It publishes the Compose sample's payload to
+`<Pages>/demo/stable/update.json`, signed with `ANDYSU_SIGNING_KEY`, with deltas against earlier
+demo releases. It also attaches `andysu-demo-compose-<version>.apk`, a host with that version
+built in, signed with the CI test keystore, to the GitHub Release. An APK installed from any
+release then live-updates to every later one. `verify-signature` checks the live channel with
+`andysu verify --blobs`.
+Verified locally by `android/tests/demo_test.py` (API 36): two demo releases built exactly as
+CI builds them. The first release's APK booted its built-in 0.1.900, found 0.1.901, swapped it in
+live, committed, and showed "Payload version 0.1.901". The channel verified, every blob included.
 
 ## Step 10 — `templates/remote` (2026-11-02)
 A GitHub template for an app's update remote, served by Pages. `channels.toml` on `main` says
