@@ -160,6 +160,9 @@ IDLE --download+verify--> STAGED --launch/live apply--> TRIAL --markHealthy--> C
   loaded code on Android 14+), everything is fsynced, then the directory is renamed to `<id>/`.
 - Garbage collection keeps the current slot, the previous slot and the pending one; on
   low-storage devices only the current one.
+  It also drops the cached blob of a plain (non-archive) component when a kept slot holds that
+  file with the same size (the slot copy still serves as a delta base or source); it always keeps
+  the cached zip of an archive component, because a slot holds only the extracted tree.
 
 ### 7.1 Base directories (the built-in payload)
 

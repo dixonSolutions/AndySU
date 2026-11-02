@@ -72,6 +72,19 @@ Verified (`cargo test -p andysu-core`, 40 tests):
 - libFuzzer (`core/fuzz`, nightly): `verify_and_parse` 494k runs, `parse_manifest` 1.58M runs,
   60 s each, no crashes.
 
+### GC of cached blobs held by slots (2026-11-03, owner request)
+After a commit, GC drops the cached blob of a plain (non-archive) component when a kept slot
+holds that file at the same size. On Android each slot file is a copy, so the cache doubled them.
+The cached zip of an archive component is always kept: a slot holds only the extracted tree,
+and the zip is the delta base for the next release. `plan` takes such components straight from
+the slot after a streaming SHA-256 check, with no copy back into the cache. Staging verifies the
+copy again. Implemented by a worker (Sonnet): `Store::gc`, the `build_slot_from` fallback,
+`core/tests/gc.rs` with 5 tests. Reviewed by the lead, who also replaced `plan`'s read-whole-file
+re-ingest with a verified streaming check. Verified by `cargo test --workspace`, clippy and fmt.
+The new tests: GC drops the plain blobs and keeps the zip; the next update uses both deltas
+(slot file and kept zip as bases, under 3,000 bytes); a deleted, truncated or same-size-corrupt
+slot file falls back to a full download.
+
 ## Step 3 — CLI (2026-11-02)
 `andysu keygen | pack | publish | sign | rollback | verify | diff | patch | elf | client | serve`.
 `pack` renames native libraries to `lib<name>.<hash8>.so` (rewriting SONAME, DT_NEEDED and
