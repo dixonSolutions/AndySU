@@ -255,3 +255,14 @@ Implementation notes (milestone 2b, 2026-11-03):
   runtime. A host can therefore never claim a level its code lacks. Declare `host_api = 2` in
   `andysu.toml` (with a level-2 AAR) to accept payloads with `host_api_min = 2`. A payload can
   also feature-detect level 2 at runtime, as Xonotic does.
+
+## D30. Payloads must leave the crash signals to the host (2026-11-03)
+AndySU detects a native crash during a trial with the host's signal handlers. They write the
+crash marker, after which the core rolls back, and relaunch once. An engine that installs its own
+`SIGSEGV`/`SIGABRT`/`SIGBUS`/`SIGILL`/`SIGFPE` handlers replaces them. Xonotic's
+`Sys_InitSignals` did exactly that. A crash in a live trial then hung in the engine's "Engine
+Crash" dialog: no marker was written, and the trial rolled back only when the watchdog fired, 30 s
+later, with the dialog on screen. The rule is that a payload must not replace those handlers, or
+must chain to the previous handler for those signals. The Xonotic patch 0006 drops the engine's
+handlers under the loader. Possible host follow-up: re-check the installed handlers after
+`start()` and warn, or re-install with chaining.

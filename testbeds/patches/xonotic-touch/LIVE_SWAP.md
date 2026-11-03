@@ -651,3 +651,31 @@ not be written; `max_boot_attempts` then decides), a second live swap after a co
 slot (the GC guard keeps the booted slot; reasoned, not run), a real device.
 After an in-process rollback the unpacked game data belongs to the failed release until the next
 start re-unpacks it (the data prepare only runs for the swap, not for the rollback).
+
+---------------------------------------------------------------------------------------------------
+
+## 9. Milestone 2c: failure paths of the AndySU-driven swap, 2026-11-03
+
+Patches `0005-andysu-test-variants.patch` (CMake/gradle: `ANDYSU_TEST_DEFS`; `build.sh` variants
+`:nohealthy` = ANDYSU_NO_HEALTHY, `:crash` = ANDYSU_CRASH_AFTER_START, a SIGSEGV 60 frames after the
+engine started) and `0006-andysu-keep-host-crash-handlers.patch` (engine: `Sys_InitSignals` no longer
+installs the engine's own SIGSEGV/ILL/ABRT/FPE/BUS handlers under the loader).
+Test: `scripts/heavy.sh python3 android/tests/testbed_tests.py --live-failures --api 34 --apk-a ..9001
+--apk-b ..9002 --apk-c ..9005 --apk-nohealthy ..9006 --apk-crash ..9007` (watchdog_ms 30000), exit 0:
+- **Watchdog:** W swaps in (`live_swapped`) but never reports healthy -> `watchdog` after 30 s, relaunch
+  (reason watchdog), new pid, B boots committed from `slots/B`, engine runs; W is not offered again
+  (`up_to_date`, i.e. marked bad).
+- **Second live swap after a cold start:** from that cold-booted B, C swaps in live and commits with
+  `state current=C previous=B`; the GC after the commit removed only W's slot, B was kept. (The
+  emulator is not low on storage, so this shows the booted slot survives, not the low-storage guard.)
+- **Native crash:** G swaps in, SIGSEGV 60 frames later: `native_crash` (signal 11), relaunch, new pid, C
+  boots committed from its slot and the engine runs; G not offered again.
+
+The gap found (before 0006): the engine's `Sys_InitSignals` replaced the host's crash handler with
+`Sys_HandleCrash`, which prints "Engine Crash", shuts the video down and blocks in an SDL message box
+(`Sys_SDL_Dialog`, on unless `-nocrashdialog`). The process stayed alive with the dialog, no crash
+marker was written, no `native_crash` event: the trial was rolled back only 30 s later by the
+watchdog (relaunch, previous slot), so the rollback happened but late and with a crash dialog on
+screen. With 0006 the host's handler runs (marker, pipe poke, relaunch from the crash-watch thread)
+and the rollback needs one relaunch. No host change was needed. In a plain (non-AndySU) APK the
+crash now goes to Android's default handler instead of the dialog.

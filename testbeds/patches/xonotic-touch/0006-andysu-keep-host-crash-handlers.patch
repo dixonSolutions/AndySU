@@ -1,0 +1,28 @@
+diff --git a/engine/darkplaces/sys_shared.c b/engine/darkplaces/sys_shared.c
+index 861270b..50c67f9 100644
+--- a/engine/darkplaces/sys_shared.c
++++ b/engine/darkplaces/sys_shared.c
+@@ -1104,16 +1104,23 @@ static void Sys_InitSignals(void)
+ {
+ 	// Windows only supports the C99 signals
+ 	signal(SIGINT,  Sys_HandleSignal);
++#ifndef ANDYSU_SWAP
++	// Under the AndySU loader the host owns the crash signals: its handler writes the crash marker
++	// (so the trial rolls back) and relaunches. Replacing it with Sys_HandleCrash left a trial
++	// crash hanging in the "Engine Crash" dialog until the watchdog fired.
+ 	signal(SIGILL,  Sys_HandleCrash);
+ 	signal(SIGABRT, Sys_HandleCrash);
+ 	signal(SIGFPE,  Sys_HandleCrash);
+ 	signal(SIGSEGV, Sys_HandleCrash);
++#endif
+ 	signal(SIGTERM, Sys_HandleSignal);
+ #ifndef WIN32
+ 	// POSIX has several others worth catching
+ 	signal(SIGHUP,  Sys_HandleSignal);
+ 	signal(SIGQUIT, Sys_HandleSignal);
++#ifndef ANDYSU_SWAP
+ 	signal(SIGBUS,  Sys_HandleCrash);
++#endif
+ 	signal(SIGPIPE, Sys_HandleSignal);
+ #endif
+ }

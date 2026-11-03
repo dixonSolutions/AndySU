@@ -330,10 +330,20 @@ with three rollback layers. Two feasibility probes ran:
     - a cold start boots B;
     - a Java-changing D is staged with `native_live=false` and falls back to the next start.
   - Rust tests, clippy and fmt pass; `device_tests` on API 24 and 34 still pass.
-  - **Not covered yet:** watchdog expiry on a live trial (by construction it reports and
-    relaunches), a native crash during a live trial (the engine installs its own signal
-    handlers, so `max_boot_attempts` decides), a second live swap after a cold start, real
-    devices, and re-unpacking Java-side game data after an in-process rollback.
+- **Milestone 2c: the failure paths of a live trial.** The worker implemented them and the
+  lead re-ran the bed from a clean rebuild. `testbed_tests.py --live-failures` (API 34) passes
+  all three:
+  - **Watchdog expiry:** a variant that swaps in but never reports healthy hits the watchdog
+    after `watchdog_ms`. The host relaunches into a new process, the previous release boots
+    committed with its engine running, and the bad release is not offered again.
+  - **Native crash in a live trial:** found a gap. Xonotic's own `Sys_InitSignals` replaced the
+    host's crash handlers, so a crash hung in an "Engine Crash" dialog until the watchdog fired.
+    Patch 0006 leaves those signals to the host (D30). Now it goes `native_crash` (SIGSEGV),
+    relaunch, previous release, and the bad release is not offered again.
+  - **A second live swap after a cold start:** from a cold-booted B, C swaps in live and
+    commits. GC keeps the booted slot B (`current=C previous=B`).
+  - **Still not covered:** real devices, the low-storage GC guard, and re-unpacking Java-side
+    game data after an in-process rollback.
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |

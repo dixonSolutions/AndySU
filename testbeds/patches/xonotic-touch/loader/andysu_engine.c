@@ -143,10 +143,18 @@ void Andysu_FrameHook(void)
 		dpsnprintf(ev, sizeof ev, "{\"event\":\"engine_frames\",\"build_id\":\"" ANDYSU_BUILD_ID "\",\"frames\":%u}", frames);
 		andysu_loader->emit(ev);
 	}
+#ifdef ANDYSU_CRASH_AFTER_START
+	// Test variant (build.sh ":crash"): a native crash a few seconds into the engine's life, before it
+	// would report healthy.
+	if (frames == 60)
+		*(volatile int *)0 = 1;
+#endif
 	if (frames == 180 && andysu_in_trial)
 	{
 		andysu_in_trial = false;
+#ifndef ANDYSU_NO_HEALTHY // test variant (build.sh ":nohealthy"): never reports healthy
 		andysu_loader->mark_healthy();
+#endif
 	}
 }
 

@@ -1,0 +1,30 @@
+diff --git a/android/app/build.gradle b/android/app/build.gradle
+index ee4b3ba..3c7c9b2 100644
+--- a/android/app/build.gradle
++++ b/android/app/build.gradle
+@@ -28,6 +28,10 @@ android {
+                 if (project.findProperty('andysu_fail_init')) {
+                     arguments "-DANDYSU_FAIL_INIT=ON"
+                 }
++                // build.sh variants ":nohealthy" / ":crash": a define for the engine (ANDYSU_NO_HEALTHY, ...)
++                if (project.findProperty('andysu_test_defs')) {
++                    arguments "-DANDYSU_TEST_DEFS=${project.findProperty('andysu_test_defs')}"
++                }
+                 // ccache when the host has it: the NDK compiler call is
+                 // wrapped and the second build of a commit costs seconds.
+                 def ccacheBin = ['/usr/bin/ccache', '/usr/local/bin/ccache',
+diff --git a/android/app/src/main/cpp/CMakeLists.txt b/android/app/src/main/cpp/CMakeLists.txt
+index d1fc681..239fd09 100644
+--- a/android/app/src/main/cpp/CMakeLists.txt
++++ b/android/app/src/main/cpp/CMakeLists.txt
+@@ -69,6 +69,10 @@ if(EXISTS "${ANDYSU_DIR}/andysu_loader.c")
+     endif()
+     # libmain exports exactly one symbol, so two copies of it never see each other's.
+     target_link_options(main PRIVATE "-Wl,--version-script=${ANDYSU_DIR}/andysu_engine.map" -Wl,--exclude-libs,ALL)
++    # Test variants (build.sh ":nohealthy", ":crash"): extra engine defines, e.g. ANDYSU_NO_HEALTHY.
++    foreach(def IN LISTS ANDYSU_TEST_DEFS)
++        target_compile_definitions(main PRIVATE ${def})
++    endforeach()
+     add_library(andysu_xonotic_loader SHARED "${ANDYSU_DIR}/andysu_loader.c")
+     target_include_directories(andysu_xonotic_loader PRIVATE "${ANDYSU_DIR}")
+     target_compile_options(andysu_xonotic_loader PRIVATE -O2 -Wall)
