@@ -122,6 +122,7 @@ object AndySU {
         if (inTrial) {
             // Generous: the app gets until well after its first activity has had time to settle.
             NativeBridge.setRelaunchOnCrash(true)
+            watchCrashHandlers()
             main.postDelayed(watchdog, maxOf(config.watchdogMs, autoHealthy + 60_000))
         }
         if (config.checkOnOpen && config.mode != "off") updater.checkAsync("open")
@@ -189,12 +190,14 @@ object AndySU {
     }
 
     private fun startGeneration(g: Generation, state: ByteArray?) {
+        NativeBridge.checkCrashHandlers(crashSignalsHost()) // also tells the native side which mode a later check uses
         if (g.isNative) {
             g.pendingStart = state
             g.pendingNativeStart = true
             NativeView.requestStart(g)
         } else {
             g.payload!!.start(g.api, state)
+            NativeBridge.checkCrashHandlers(crashSignalsHost())
         }
     }
 
@@ -223,8 +226,39 @@ object AndySU {
         }
     }
 
+    /** D30: while in trial, re-check that a payload has not replaced the host's crash signal handlers. */
+    private val handlerCheck = object : Runnable {
+        override fun run() {
+            if (!inTrial) return // committed or rolled back: stop
+            try { NativeBridge.checkCrashHandlers(crashSignalsHost()) } catch (t: Throwable) { Log.w(TAG, "handler check failed", t) }
+            main.postDelayed(this, 2_000)
+        }
+    }
+
+    private val crashSignalsFile get() = File(root, "crash_signals")
+
+    /** "payload" (default) | "host": the configured mode, unless a test or the app overrode it (file in the root). */
+    fun crashSignals(): String {
+        val p = runCatching { crashSignalsFile.readText().trim() }.getOrNull()
+        return if (p == "payload" || p == "host") p else config.crashSignals
+    }
+
+    private fun crashSignalsHost() = crashSignals() == "host"
+
+    fun setCrashSignals(mode: String?) {
+        require(mode == null || mode == "payload" || mode == "host") { "unknown crash_signals $mode" }
+        if (mode == null) crashSignalsFile.delete() else crashSignalsFile.writeText(mode)
+        emit("crash_signals", JSONObject().put("mode", crashSignals()))
+    }
+
+    private fun watchCrashHandlers() {
+        main.removeCallbacks(handlerCheck)
+        main.postDelayed(handlerCheck, 500)
+    }
+
     private fun armWatchdog(live: Boolean) {
         trialLive = live
+        watchCrashHandlers()
         NativeBridge.setRelaunchOnCrash(true)
         main.removeCallbacks(watchdog)
         main.postDelayed(watchdog, config.watchdogMs)
@@ -431,6 +465,7 @@ object AndySU {
         // generous; started() re-arms the configured watchdog.
         trialLive = true
         NativeBridge.setRelaunchOnCrash(true)
+        watchCrashHandlers()
         main.removeCallbacks(watchdog)
         main.postDelayed(watchdog, maxOf(config.watchdogMs, 60_000L))
         return true

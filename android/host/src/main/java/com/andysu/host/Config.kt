@@ -22,6 +22,8 @@ class Config(val json: JSONObject) {
     val restartWhen: String = json.optString("restart_when", "now")
     /** What apply = live does when a live swap is impossible (transparent mode): restart | next_start */
     val liveFallback: String = json.optString("live_fallback", "next_start")
+    /** Who owns the native crash signals during a trial (D30): payload (report a replaced handler only) | host (re-install, chain the payload's) */
+    val crashSignals: String = json.optString("crash_signals", "payload")
     /** any | unmetered */
     val network: String = json.optString("network", "any")
     val charging: Boolean = json.optBoolean("charging", false)

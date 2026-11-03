@@ -20,6 +20,9 @@ object Native {
     @JvmStatic external fun depInstances(): Int
     @JvmStatic external fun pageSize(): Int
     @JvmStatic external fun crash()
+    @JvmStatic external fun installOwnHandler()
+    @JvmStatic external fun installHandlingHandler()
+    @JvmStatic external fun faultHandled(): Int
 }
 
 /** Test payload: emits JSON events on logcat tag AndySU-Event; behaviour from BuildConfig. */
@@ -98,6 +101,25 @@ class TestPayload : PayloadAdapter() {
         when (behavior) {
             "crash_java" -> main.postDelayed({ throw RuntimeException("test payload crash on the main thread") }, 1000)
             "crash_native" -> thread(name = "payload-native") { Thread.sleep(1000); Native.crash() }
+            "own_handler_crash" -> {
+                // D30: install our own SIGSEGV handler (which hangs) a moment after start, crash on the main thread later.
+                thread(name = "payload-handler") { Thread.sleep(300); Native.installOwnHandler(); emit("own_handler_installed") }
+                main.postDelayed({ Native.crash() }, 5000)
+            }
+            "own_handler_thread" -> {
+                // Same, but the crash is on a payload thread (an engine's worker): the main thread stays free for the watchdog.
+                thread(name = "payload-handler") { Thread.sleep(300); Native.installOwnHandler(); emit("own_handler_installed") }
+                thread(name = "payload-native") { Thread.sleep(5000); Native.crash() }
+            }
+            "handled_segv" -> {
+                // D30 regression: a Mono-like runtime handles a SIGSEGV itself and resumes, then stays healthy.
+                thread(name = "payload-handler") { Thread.sleep(300); Native.installHandlingHandler() }
+                main.postDelayed({
+                    val handled = Native.faultHandled()
+                    emit("segv_handled", JSONObject().put("handled", handled))
+                    main.postDelayed({ host.markHealthy() }, 500)
+                }, 4000)
+            }
         }
     }
 

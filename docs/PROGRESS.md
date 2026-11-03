@@ -432,6 +432,20 @@ with the Actions secrets set by `scripts/setup-secrets.sh` (CI test keys) and Pa
     its pid matches the live app process, and logs a warning. Shown with a deliberately dropped
     line on API 31; the suite passes on API 31 and 34.
   - CI now retries an emulator job only when the emulator never reached the tests (PR #10).
+- **Crash handlers replaced by a payload** (D30 follow-up). A worker (Sonnet) implemented this;
+  the lead sent the first version back and re-ran the suite. The host checks after `start()`
+  and every 2 s during a trial whether a payload replaced its crash signal handlers.
+  - By default it **only reports** (`crash_handler_replaced`, `chained:false`). Runtimes such as
+    Mono/Unity use `SIGSEGV` for normal operation and chain to the previous handler only on real
+    crashes, so taking over would turn a handled null-reference exception into a "crash".
+  - `[policy] crash_signals = "host"` opts in to a takeover. The host re-installs its handler and
+    chains the payload's after writing the crash marker. It is meant for engines with a crash
+    dialog that never chain.
+  - `device_tests` scenario `crash-handler`, all three passing on API 34 (lead), 24 and 31 (worker):
+    - default mode, a Mono-style handled `SIGSEGV` resumes and the release commits (no relaunch);
+    - default mode, a hanging handler on a payload thread is rolled back by the watchdog;
+    - `host` mode, a hanging handler on the main thread writes the marker, relaunches once and
+      rolls back.
 `actions/publish/test.sh` covers both remote types: three releases with deltas and a 50%
 rollout, against a bare git repo and a stand-in `gh`, then a simulated client updates from each.
 

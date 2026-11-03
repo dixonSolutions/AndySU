@@ -15,6 +15,12 @@ object NativeBridge {
     @JvmStatic external fun frame(handle: Long, width: Int, height: Int): Int
     @JvmStatic external fun suspend(handle: Long): ByteArray?
     @JvmStatic external fun installCrashHandler(markerPath: String, notifyFd: Int)
+    /**
+     * Checks whether a payload replaced the host's signal handlers and emits crash_handler_replaced.
+     * With [takeover] the host's handlers are re-installed (the payload's chained); otherwise nothing changes.
+     * Returns the number of signals reported.
+     */
+    @JvmStatic external fun checkCrashHandlers(takeover: Boolean): Int
     @JvmStatic external fun setRelaunchOnCrash(on: Boolean)
     @JvmStatic external fun crashForTest()
 

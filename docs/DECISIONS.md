@@ -266,3 +266,22 @@ later, with the dialog on screen. The rule is that a payload must not replace th
 must chain to the previous handler for those signals. The Xonotic patch 0006 drops the engine's
 handlers under the loader. Possible host follow-up: re-check the installed handlers after
 `start()` and warn, or re-install with chaining.
+
+Host follow-up (revised): runtimes such as Mono/Unity use SIGSEGV for normal operation (a managed
+null dereference becomes an exception and execution resumes), so by default the host must not sit
+in front of the payload's handler. After a payload generation starts and every 2 s while a trial
+is open (`AndySU.watchCrashHandlers`; stops at commit or rollback), the host `sigaction()`-checks
+SIGSEGV/SIGABRT/SIGBUS/SIGFPE/SIGILL/SIGTRAP and emits `crash_handler_replaced {signals, chained}`
+once per replaced handler. Config `crash_signals` (andysu.toml `[policy]`, runtime override file
+`<root>/crash_signals`):
+- `payload` (default): detect and report only (`chained: false`), nothing about the handlers
+  changes. A payload that replaces them must chain to the previous handler for faults it does not
+  handle (as Mono does); if it does not, a crash during a trial is caught only by the watchdog (if
+  the main thread still runs) or the boot-attempt counter on the next launches.
+- `host`: re-install the host's handlers and keep the payload's as a chained one (`chained: true`).
+  `on_crash` writes the marker, pokes the relaunch pipe (so the process is relaunched even if the
+  payload handler never returns; on the main thread too when a handler is chained), calls the
+  chained handler (SA_SIGINFO or plain; re-entry guarded), then continues as before. For engines
+  that show a crash dialog or never chain; wrong for runtimes that use signals in normal operation.
+Device scenario `crash-handler` covers both modes and a Mono-style payload that handles a SIGSEGV
+and resumes (default mode: no relaunch, commits).
