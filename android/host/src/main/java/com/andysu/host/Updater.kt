@@ -1,6 +1,7 @@
 package com.andysu.host
 
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.net.ConnectivityManager
 import android.os.Build
 import android.os.Handler
@@ -42,7 +43,8 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
     fun checkAsync(trigger: String) = exec.execute { runCheck(trigger) }
     fun gcAsync() = exec.execute {
         try {
-            AndySU.gc(lowStorage())?.let { AndySU.emit("gc", JSONObject().put("result", it)) }
+            val low = lowStorage()
+            AndySU.gc(low)?.let { AndySU.emit("gc", JSONObject().put("result", it).put("low_storage", low)) }
         } catch (e: Exception) {
             Log.w(AndySU.TAG, "gc failed", e)
         }
@@ -67,13 +69,26 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
         return cfg.network != "unmetered" || !cm.isActiveNetworkMetered
     }
 
-    private fun allocatable(): Long = try {
+    private fun allocatable(): Long = testAllocatable() ?: try {
         if (Build.VERSION.SDK_INT >= 26) {
             val sm = ctx.getSystemService(StorageManager::class.java)
             sm.getAllocatableBytes(sm.getUuidForPath(root))
         } else root.usableSpace
     } catch (e: Exception) {
         root.usableSpace
+    }
+
+    /**
+     * Test hook: a decimal byte count in `<root>/test_allocatable_bytes` stands in for the real
+     * figure (read on every call). Only honoured by a debuggable app or a debuggable (userdebug
+     * or eng) system build; a missing or invalid file means the real value.
+     */
+    private fun testAllocatable(): Long? {
+        val debuggable = (ctx.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 || Build.TYPE != "user"
+        if (!debuggable) return null
+        val n = runCatching { File(root, "test_allocatable_bytes").readText().trim().toLong() }.getOrNull()?.takeIf { it >= 0 } ?: return null
+        Log.w(AndySU.TAG, "TEST: allocatable() overridden to $n bytes by test_allocatable_bytes")
+        return n
     }
 
     private fun lowStorage() = allocatable() < 200L * 1024 * 1024

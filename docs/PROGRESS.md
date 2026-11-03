@@ -21,7 +21,7 @@ local.
 | 6 Gradle plugin + split | done |
 | 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back, with the game engine verified running at each step. Live `.so` swap in Xonotic built (`testbeds/patches/xonotic-touch/`): in-process swap committed, rollback, watchdog expiry, native crash, second swap after a cold start. Java-side data is not re-unpacked after an in-process rollback |
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
-| 9 Publishing | live: every merge to `main` is a release. v0.1.33 and v0.1.41 fully green (all tests, registries installed from the live URLs, `brew install` on Linux and macOS, signed checksums, demo channel verified blob by blob). v0.1.46: only the Homebrew formula push failed (rebase conflict), fixed by PR #13 |
+| 9 Publishing | live: every merge to `main` is a release. v0.1.33 and v0.1.41 fully green (all tests, registries installed from the live URLs, `brew install` on Linux and macOS, signed checksums, demo channel verified blob by blob). v0.1.46: only the Homebrew formula push failed (rebase conflict); after the fix (PR #13), v0.1.49 is fully green including `brew install` |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
 | 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated |
 
@@ -183,7 +183,7 @@ dialog ever focused (20 checks per level, run 2026-11-02 21:46-22:18, JDK 21 bui
 
 The first run of the matrix also exposed a test bug in `apply-next-start` (it looked at events
 from the previous scenario). The rerun of 29 and 36 with both fixes was cut off by the out-of-memory
-kill on 2026-11-02 and is pending.
+kill on 2026-11-02; since then both pass in CI on every PR.
 
 Findings fixed along the way: Android 14 refuses *any* writable file on a class path (not only
 .dex) — slots and the factory are now entirely read-only; before API 26 `DexClassLoader` needs an
@@ -342,8 +342,22 @@ with three rollback layers. Two feasibility probes ran:
     relaunch, previous release, and the bad release is not offered again.
   - **A second live swap after a cold start:** from a cold-booted B, C swaps in live and
     commits. GC keeps the booted slot B (`current=C previous=B`).
-  - **Still not covered:** real devices, the low-storage GC guard, and re-unpacking Java-side
-    game data after an in-process rollback.
+  - **Low-storage GC guard** (`--low-storage`). A worker (Sonnet) built this; the lead reviewed
+    the diff and re-ran it on API 34. First re-run: four of five steps passed, then step c timed
+    out because logd dropped the loader's `engine_start` line, although the engine ran. The bed now
+    accepts `loader_engine_loaded` plus `engine_entry` with a warning. Second re-run: 5/5.
+    - Storage is faked with `<root>/test_allocatable_bytes`, an `Updater` test hook honoured only
+      on debuggable apps or userdebug/eng images (see THREAT_MODEL). The bed writes the file over
+      `adb root`.
+    - Under low storage, after a live swap from a cold-booted slot, the GC keeps that slot as
+      `previous`.
+    - After a second live swap the booted slot is neither current nor previous, so both the
+      after-commit GC and the pre-download GC are skipped (`gc_skipped`, then `no_space`), and the
+      slot stays on disk.
+    - After a cold start, the low-storage GC drops `previous` as usual.
+    - Breaking the guard on purpose makes step a fail (worker's check).
+  - **Still not covered:** real devices, and re-unpacking Java-side game data after an in-process
+    rollback.
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |

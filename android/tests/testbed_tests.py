@@ -21,6 +21,8 @@ GL renderer line. If the data is missing the bed fails loudly; it never passes o
 alone.
 
 Usage: python3 android/tests/testbed_tests.py [--only xonotic|stk] [--api 34]
+       python3 android/tests/testbed_tests.py --low-storage --apk-a A --apk-b B --apk-c C --apk-d D --apk-e E
+         (GC guard under faked low storage; see low_storage_bed)
        python3 android/tests/testbed_tests.py --probe-vid-restart [--api 36]
          (stock Xonotic APK, no AndySU: does rendering survive `vid_restart`? see LIVE_SWAP.md)
 """
@@ -393,6 +395,33 @@ def wait_event(el, since, name, what=None, timeout=240, **match):
                   "\n".join(json.dumps(e)[:300] for _, e in events_since(el, 0)[-14:]))
 
 
+def wait_engine_start(el, since, what, timeout=300, **match):
+    """`engine_start` after `since`. liblog drops writes while logd is busy (a cold start is a burst), so if
+    that line is missing but the loader's `loader_engine_loaded` and the engine's own `engine_entry` with the
+    same build and swap count are there, accept `loader_engine_loaded` (same pid, lib, build_id, swapped)."""
+    end = time.time() + timeout * dt.SLOW
+    seen = None
+    while time.time() < end:
+        loaded = entry = None
+        for i, e in events_since(el, since):
+            if not all(e.get(k) == v for k, v in match.items() if k in ("build_id", "swapped")):
+                continue
+            if e.get("event") == "engine_start" and all(e.get(k) == v for k, v in match.items()):
+                return e
+            if e.get("event") == "loader_engine_loaded" and loaded is None:
+                loaded = e
+            if e.get("event") == "engine_entry" and loaded is not None:
+                entry = e
+        if loaded and entry:
+            seen = seen or time.time()
+            if time.time() - seen > 10:
+                log(f"WARNING: {what}: engine_start log line missing; accepted loader_engine_loaded + engine_entry "
+                    f"(pid {loaded.get('pid')}, build {loaded.get('build_id')})")
+                return dict(loaded, _from="loader_engine_loaded")
+        time.sleep(0.5)
+    return wait_event(el, since, "engine_start", what, timeout=0, **match)[1]
+
+
 def extract_lib(apk, dest, abi="x86_64"):
     import zipfile
     with zipfile.ZipFile(apk) as z, open(dest, "wb") as f:
@@ -612,7 +641,7 @@ def live_bed(args):
         kw = {"build_id": build_id}
         if swapped is not None:
             kw["swapped"] = swapped
-        _, st = wait_event(el, mark, "engine_start", what, timeout=timeout, **kw)
+        st = wait_engine_start(el, mark, what, timeout, **kw)
         el.wait(r"========Initialized=========", f"{what}: init banner", mark, timeout=timeout)
         el.wait(r"GL_RENDERER: ", f"{what}: GL renderer", mark)
         wait_event(el, mark, "engine_frames", f"{what}: frames", build_id=build_id, timeout=timeout)
@@ -802,7 +831,7 @@ def live_failures_bed(args):
         kw = {"build_id": build_id}
         if swapped is not None:
             kw["swapped"] = swapped
-        _, st = wait_event(el, mark, "engine_start", what, timeout=timeout, **kw)
+        st = wait_engine_start(el, mark, what, timeout, **kw)
         el.wait(r"========Initialized=========", f"{what}: init banner", mark, timeout=timeout)
         el.wait(r"GL_RENDERER: ", f"{what}: GL renderer", mark)
         wait_event(el, mark, "engine_frames", f"{what}: frames", build_id=build_id, timeout=timeout)
@@ -919,6 +948,261 @@ def live_failures_bed(args):
             d.stop()
 
 
+# ----------------------------------------------------------------------------- low-storage GC guard (D29)
+
+
+def low_storage_bed(args):
+    """The GC guard under low storage, one host install, apply=live (AndySU.gc, Updater.allocatable):
+       the app's storage figure is faked through <root>/test_allocatable_bytes (needs a debuggable system image:
+       the file is written as root over `adb root`). Slot directories are checked on disk, not only by events.
+       a. A -> B live, cold restart (B booted; no previous: A is the built-in payload, not a slot); 190 MiB 'free' (low); C swaps in live and commits:
+          the GC runs low (low_storage=true) but keeps previous = B, the slot this process booted from
+       b. D swaps in live in the same process (B is neither current nor previous): GC is skipped (gc_skipped),
+          B stays on disk; then a pre-download GC (update E, 100 kB 'free') is skipped too, ending in no_space
+       c. cold start (booted D): the same pre-download GC now drops previous (C), the normal low-storage rule"""
+    need = {"--apk-a": args.apk_a, "--apk-b": args.apk_b, "--apk-c": args.apk_c, "--apk-d": args.apk_d, "--apk-e": args.apk_e}
+    missing = [k for k, v in need.items() if not v]
+    if missing:
+        raise SystemExit("--low-storage needs " + ", ".join(sorted(need)) + f" (missing {', '.join(missing)}); build them with "
+                         "testbeds/patches/xonotic-touch/build.sh --variants \"1.2.9001 1.2.9002 1.2.9005 1.2.9008 1.2.9007:crash\" "
+                         "(E is never applied; any further native-only release does)")
+    pkg = BEDS["xonotic"]["pkg"]
+    apk = {k: os.path.abspath(v) for k, v in {"A": args.apk_a, "B": args.apk_b, "C": args.apk_c, "D": args.apk_d, "E": args.apk_e}.items()}
+    work = tempfile.mkdtemp(prefix="lowstor-")
+    keys = os.path.join(work, "keys")
+    os.makedirs(keys)
+    dt.run([dt.ANDYSU, "keygen", "--dir", keys])
+    key = os.path.join(keys, "andysu-root.key")
+    site = os.path.join(work, "site")
+    os.makedirs(os.path.join(site, "stable"))
+    port = dt.free_port()
+    cfg = {"app": pkg, "channel": "stable", "roots": [open(os.path.join(keys, "andysu-public.pem")).read()],
+           "manifest_url": f"http://127.0.0.1:{port}/stable/update.json", "mode": "auto", "apply": "live",
+           "check_on_open": True, "watchdog_ms": 30000, "auto_healthy_ms": 600000, "max_boot_attempts": 2, "host_api": 1}
+    cp = os.path.join(work, "config.json")
+    json.dump(cfg, open(cp, "w"))
+    tpl = os.path.join(dt.ANDROID, "host-template/build/andysu/andysu-host-template.zip")
+    ks = ["--keystore", dt.debug_keystore(), "--ks-pass", "pass:android", "--key-alias", "androiddebugkey"]
+    ra = json.loads(dt.run([dt.ANDYSU, "split", apk["A"], "--out", os.path.join(work, "A"), "--transparent", "--host-template", tpl,
+                            "--config", cp, "--cleartext", *ks], timeout=3600))
+    rel = {"A": ra["version"]}
+    payload = {}
+    for k in "BCDE":
+        r = json.loads(dt.run([dt.ANDYSU, "split", apk[k], "--out", os.path.join(work, k), "--transparent"], timeout=3600))
+        rel[k] = r["version"]
+        payload[k] = os.path.join(work, k, "payload")
+    rootdir = f"/data/data/{pkg}/no_backup/andysu"
+    override = f"{rootdir}/test_allocatable_bytes"
+
+    def publish(k):
+        dt.run([dt.ANDYSU, "pack", payload[k], "--site", site, "--no-rename"], timeout=3600)
+        dt.run([dt.ANDYSU, "publish", "--site", site, "--release", rel[k], "--key", key])
+        log(f"[low] published {k} = {rel[k]}")
+
+    d = dt.Device(args.api, 3, existing=args.device)
+    srv = subprocess.Popen([dt.ANDYSU, "serve", site, "--addr", f"127.0.0.1:{port}"], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+    el = None
+    res = {"api": args.api, "versions": rel, "steps": []}
+
+    def step(name, detail):
+        res["steps"].append({"step": name, "detail": detail})
+        log(f"[low] OK {name}: {detail}")
+
+    def launch():
+        d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
+
+    def run_check():
+        d.sh(f"cmd jobscheduler run -f {pkg} {JOB_ID}", check=False)
+
+    def engine_up(mark, build_id, what, swapped=None, timeout=300):
+        kw = {"build_id": build_id}
+        if swapped is not None:
+            kw["swapped"] = swapped
+        st = wait_engine_start(el, mark, what, timeout, **kw)
+        el.wait(r"========Initialized=========", f"{what}: init banner", mark, timeout=timeout)
+        el.wait(r"GL_RENDERER: ", f"{what}: GL renderer", mark)
+        wait_event(el, mark, "engine_frames", f"{what}: frames", build_id=build_id, timeout=timeout)
+        return st
+
+    def live_to(k):
+        publish(k)
+        mark = el.mark()
+        run_check()
+        wait_event(el, mark, "live_swap_requested", f"host calls the handler for {k}", timeout=120, to=rel[k])
+        wait_event(el, mark, "engine_start", f"{k} started", swapped=1, build_id=rel[k], timeout=180)
+        wait_event(el, mark, "live_swapped", f"host sees started() for {k}", timeout=120)
+        return mark
+
+    def set_free(nbytes):
+        """Fake the app's allocatable storage (root shell: the app's data dir is not reachable otherwise)."""
+        if nbytes is None:
+            d.sh(f"rm -f {override}")
+            return
+        d.sh(f"echo {nbytes} > {override} && chown $(stat -c %u:%g /data/data/{pkg}) {override} && chmod 600 {override} && "
+             f"(restorecon {override} || true)")
+        if d.sh(f"cat {override}").strip() != str(nbytes):
+            raise dt.Fail("could not write the override file")
+
+    def slots():
+        return sorted(x for x in d.sh(f"ls {rootdir}/slots", check=False).split() if x)
+
+    def state():
+        return json.loads(d.sh(f"cat {rootdir}/state.json"))
+
+    def pid():
+        return d.sh(f"pidof {pkg}", check=False).strip()
+
+    def wait_gc(mark, want, timeout=90):
+        """first gc / gc_skipped event after `mark`; must be `want`."""
+        end = time.time() + timeout * dt.SLOW
+        while time.time() < end:
+            for _, e in events_since(el, mark):
+                if e.get("event") in ("gc", "gc_skipped"):
+                    if e["event"] != want:
+                        raise dt.Fail(f"expected {want}, got {json.dumps(e)}")
+                    return e
+            time.sleep(1)
+        raise dt.Fail(f"no {want} event after the commit")
+
+    def cold_start(what, version):
+        d.sh(f"am force-stop {pkg}", check=False)
+        time.sleep(2)
+        if pid():
+            raise dt.Fail("process survived force-stop")
+        mark = el.mark()
+        launch()
+        _, ev = wait_event(el, mark, "booted", f"{what} booted", timeout=120, version=version)
+        if ev.get("trial") or ev.get("factory"):
+            raise dt.Fail(f"{version} should boot committed from its slot: {ev}")
+        return mark, engine_up(mark, version, what, swapped=0)
+
+    try:
+        d.start()
+        r = d.adb("root", check=False)
+        if "cannot run as root" in r or "production builds" in r:
+            raise dt.Fail(f"--low-storage needs `adb root` (a userdebug image, e.g. the API 34 aosp_atd one): {r.strip()}")
+        d.adb("wait-for-device", timeout=60)
+        time.sleep(3)
+        d.adb("uninstall", pkg, check=False)
+        d.sh("svc wifi disable", check=False)
+        d.sh("svc data disable", check=False)
+        d.install(ra["host"]["apk"])
+        seed_xonotic(d, pkg)
+        d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
+        el = EngineLog(d)
+        d.watch()
+
+        # ---- 0. A boots built-in; B swaps in live, commits; then a cold start boots B from its slot
+        mark = el.mark()
+        launch()
+        wait_event(el, mark, "booted", "A booted", version=rel["A"])
+        st = engine_up(mark, rel["A"], "A", swapped=0)
+        time.sleep(5)
+        mark = live_to("B")
+        wait_event(el, mark, "committed", "B commits", timeout=180, version=rel["B"])
+        _, stb = cold_start("B (cold)", rel["B"])
+        if f"/slots/{rel['B']}/" not in stb["lib"]:
+            raise dt.Fail(f"B should run from its slot: {stb['lib']}")
+        pid1 = stb["pid"]
+        st0 = state()
+        if st0["current"]["id"] != rel["B"]:
+            raise dt.Fail(f"state after the cold start: {st0}")
+        step("setup", f"{rel['A']} -> {rel['B']} live, committed, cold restart: pid {pid1} runs {rel['B']} from slots/{rel['B']}; "
+             f"slots on disk {slots()}, previous={(st0.get('previous') or {}).get('id')}")
+
+        # ---- a. live swap to C under (faked) low storage: previous = B must survive the GC
+        time.sleep(5)
+        set_free(190 * 1024 * 1024)
+        mark = live_to("C")
+        wait_event(el, mark, "committed", "C commits", timeout=180, version=rel["C"])
+        gc_ev = wait_gc(mark, "gc")
+        if not gc_ev.get("low_storage"):
+            raise dt.Fail(f"the GC should have run under (faked) low storage: {gc_ev}")
+        stc = state()
+        on_disk = slots()
+        if stc["current"]["id"] != rel["C"] or (stc.get("previous") or {}).get("id") != rel["B"]:
+            raise dt.Fail(f"state after C: {stc}")
+        if rel["B"] not in on_disk or rel["C"] not in on_disk:
+            raise dt.Fail(f"the booted slot {rel['B']} was removed by a low-storage GC: slots {on_disk}, gc {gc_ev}")
+        if rel["B"] in gc_ev["result"].get("removed_slots", []):
+            raise dt.Fail(f"GC reports the booted slot as removed: {gc_ev}")
+        if pid() != str(pid1):
+            raise dt.Fail("the process changed")
+        step("low-storage GC keeps the booted slot", f"{rel['B']} (booted cold) -> {rel['C']} live in pid {pid1}; low_storage=true GC "
+             f"removed {gc_ev['result'].get('removed_slots')}; state current={rel['C']} previous={rel['B']}; slots on disk {on_disk}")
+
+        # ---- b. a second live swap: B is neither current nor previous any more
+        time.sleep(5)
+        mark = live_to("D")
+        wait_event(el, mark, "committed", "D commits", timeout=180, version=rel["D"])
+        gc_ev = wait_gc(mark, "gc_skipped")
+        std = state()
+        on_disk = slots()
+        if std["current"]["id"] != rel["D"] or (std.get("previous") or {}).get("id") != rel["C"]:
+            raise dt.Fail(f"state after D: {std}")
+        if rel["B"] in (std["current"]["id"], (std.get("previous") or {}).get("id")):
+            raise dt.Fail("the case needs B to be neither current nor previous")
+        if rel["B"] not in on_disk:
+            raise dt.Fail(f"the booted slot {rel['B']} is gone: {on_disk}")
+        if rel["B"] not in gc_ev.get("reason", ""):
+            raise dt.Fail(f"unexpected gc_skipped: {gc_ev}")
+        step("GC skipped when the booted slot is not kept", f"{rel['C']} -> {rel['D']} live in pid {pid1}; state current={rel['D']} "
+             f"previous={rel['C']}; {json.dumps(gc_ev)}; slots on disk {on_disk} (booted {rel['B']} still there)")
+
+        # ---- b2. the other GC path: the updater frees space before a download (E needs space, 100 kB 'free')
+        set_free(100_000)
+        publish("E")
+        mark = el.mark()
+        run_check()
+        gc_ev = wait_gc(mark, "gc_skipped", timeout=120)
+        _, nospace = wait_status(el, mark, "error", timeout=120)
+        if nospace.get("code") != "no_space":
+            raise dt.Fail(f"expected no_space, got {nospace}")
+        on_disk = slots()
+        if rel["B"] not in on_disk:
+            raise dt.Fail(f"the pre-download GC removed the booted slot: {on_disk}")
+        if "overridden to 100000 bytes" not in d.sh("logcat -d -s AndySU:W", check=False):
+            raise dt.Fail("the host did not log that the storage figure is overridden")
+        step("pre-download GC skipped too", f"{rel['E']} needs space with 100 kB free: gc_skipped ({gc_ev.get('reason')}), status "
+             f"no_space; slots on disk {on_disk}")
+
+        # ---- c. cold start (booted D, nothing live-swapped): the same pre-download GC follows the normal rule
+        mark, std2 = cold_start("D (cold)", rel["D"])
+        _, nospace = wait_status(el, mark, "error", timeout=120)  # check_on_open sees E, needs space, GCs, fails
+        if nospace.get("code") != "no_space":
+            raise dt.Fail(f"expected no_space, got {nospace}")
+        on_disk = slots()
+        stz = state()
+        if on_disk != [rel["D"]] or (stz.get("previous") or {}).get("id") != rel["C"]:
+            # previous stays in state.json, but its slot goes; this is the core's rule for low storage
+            raise dt.Fail(f"after a cold start a low-storage GC should leave only {rel['D']} on disk: {on_disk}, state {stz}")
+        if any(e.get("event") == "gc_skipped" for _, e in events_since(el, mark)):
+            raise dt.Fail("the GC must not be skipped in a freshly booted process")
+        step("cold start drops previous", f"booted {rel['D']} (pid {std2['pid']}) from its slot; pre-download GC under low storage left "
+             f"slots on disk {on_disk} (previous {rel['C']} dropped as usual)")
+
+        set_free(None)
+        if "No such file" not in d.sh(f"ls {override} 2>&1; true", check=False):
+            raise dt.Fail("override file still there")
+        res["verdict"] = "low-storage GC guard passes"
+        log("low storage result: " + json.dumps(res, indent=1))
+        os.makedirs(EVIDENCE, exist_ok=True)
+        with open(os.path.join(EVIDENCE, "low-storage.json"), "w") as f:
+            json.dump(res, f, indent=2)
+    finally:
+        srv.kill()
+        if el:
+            try:
+                set_free(None)
+            except Exception:
+                pass
+            el.stop()
+            el.save("low-storage-engine-log.txt")
+        if not args.keep:
+            d.stop()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=list(BEDS))
@@ -938,6 +1222,10 @@ def main():
     ap.add_argument("--apk-c", help="with --live-failures: a second native-only release after B")
     ap.add_argument("--apk-nohealthy", help="with --live-failures: engine that swaps in but never reports healthy (:nohealthy)")
     ap.add_argument("--apk-crash", help="with --live-failures: engine that SIGSEGVs after the swap (:crash)")
+    ap.add_argument("--low-storage", action="store_true",
+                    help="the GC guard under (faked) low storage after live swaps (needs --apk-a/b/c/d/e and a userdebug image)")
+    ap.add_argument("--apk-d", help="with --low-storage: a third native-only release after C (a healthy one)")
+    ap.add_argument("--apk-e", help="with --low-storage: one more release the updater is offered but never applies (any, e.g. :crash)")
     ap.add_argument("--live-swap-probe", action="store_true",
                     help="milestone 2a: in-process engine swaps A->B->A->B plus a forced-failure rollback (needs --apk-a/--apk-b)")
     ap.add_argument("--map", help="with --live-swap-probe: start this local map first and require it to be carried over every swap")
@@ -953,6 +1241,12 @@ def main():
         dt.run(["cargo", "build", "-q", "-p", "andysu-cli"], cwd=dt.REPO)
         dt.gradle(":host-template:andysuHostTemplate")
         live_failures_bed(args)
+        return
+    if args.low_storage:
+        args.api = args.api or "34"
+        dt.run(["cargo", "build", "-q", "-p", "andysu-cli"], cwd=dt.REPO)
+        dt.gradle(":host-template:andysuHostTemplate")
+        low_storage_bed(args)
         return
     if args.live:
         args.api = args.api or "34"
