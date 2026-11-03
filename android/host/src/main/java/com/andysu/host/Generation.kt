@@ -60,6 +60,8 @@ class Generation private constructor(
                         // verdict; a payload that really does not verify fails the same way again and rolls back.
                         if (attempt >= 2) throw e
                         Log.w("AndySU", "payload $version failed verification ($e); retrying with a fresh class loader")
+                        AndySU.emit("verify_retry", JSONObject().put("version", version).put("error", e.toString())
+                            .put("thread", Thread.currentThread().name))
                         attempt++
                     }
                 }

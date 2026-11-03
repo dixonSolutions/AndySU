@@ -532,6 +532,10 @@ class Device:
                     if IGNORE_EVENT and _matches_ignore(ev):
                         log(f"[{self.api}] ANDYSU_TEST_IGNORE_EVENT: dropping {json.dumps(ev)[:120]}")
                         continue
+                    if ev.get("event") == "verify_retry":
+                        # The payload VerifyError mitigation fired (see PROGRESS): rare, and invisible in a
+                        # passing job unless it is printed here.
+                        log(f"[{self.api}] WARNING: payload verification retried: {json.dumps(ev)[:300]}")
                     self.events.append(ev)
                     self.q.put(ev)
 
