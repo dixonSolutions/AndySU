@@ -209,7 +209,7 @@ by `andysu host-config` (or by the Gradle plugin). It is frozen with the host. K
 | `watchdog_ms` | 10000 | TRIAL deadline for `markHealthy()` |
 | `auto_healthy_ms` | 8000 | transparent mode: commit after an activity stayed resumed this long |
 | `max_boot_attempts` | 2 | cold boots of a TRIAL slot before rolling back without loading it |
-| `host_api`, `shell_version` | 1, 0 | what the frozen host offers (release requirements) |
+| `host_api`, `shell_version` | 1, 0 | what the frozen host offers (release requirements); the host uses `min(host_api, level its AAR implements)` |
 
 An app may override `apply` per install at runtime (`UpdateClient.setApplyPolicy`). The override
 is stored in `<root>/apply_policy`. Every policy goes through the same TRIAL, commit and rollback

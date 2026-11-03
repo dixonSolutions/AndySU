@@ -14,7 +14,7 @@ import java.io.File
 
 /** Host API level 2 (level 1 plus [setLiveSwapHandler]), one instance per generation (g == null: transparent mode). */
 class HostApiImpl internal constructor(private val g: Generation?) : HostApi {
-    override fun apiLevel() = 2
+    override fun apiLevel() = LEVEL
     override fun setLiveSwapHandler(handler: com.andysu.api.LiveSwapHandler?) { AndySU.liveSwapHandler = handler }
     override fun context(): Context = AndySU.app
     override fun activity(): Activity? = AndySU.resumed ?: AndySU.activities.lastOrNull()
@@ -46,5 +46,10 @@ class HostApiImpl internal constructor(private val g: Generation?) : HostApi {
             "etag" -> Core.etag(root)
             else -> """{"error":{"code":"usage","message":"unknown core method $method"}}"""
         }
+    }
+
+    companion object {
+        /** The Host API level this host AAR implements (levels are additive). */
+        const val LEVEL = 2
     }
 }

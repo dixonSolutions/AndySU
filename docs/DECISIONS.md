@@ -250,6 +250,8 @@ Implementation notes (milestone 2b, 2026-11-03):
 - On acceptance the host points the app's view of its slot (version, `nativeLibraryDir`, assets
   loader) at the new slot, and points it back on `failed`. GC skips a run that would delete the
   slot the process booted from.
-- **Follow-up:** the host AAR now implements Host API level 2, but release selection still uses
-  `host_api` from `config.json` (default 1). A payload can feature-detect level 2 at runtime, as
-  Xonotic does, but cannot yet *require* it with `host_api_min = 2`.
+- Release selection uses `min(host_api declared in andysu.toml, level the host AAR implements)`.
+  The declaration is what `pack` checks payloads against; the AAR level is what exists at
+  runtime. A host can therefore never claim a level its code lacks. Declare `host_api = 2` in
+  `andysu.toml` (with a level-2 AAR) to accept payloads with `host_api_min = 2`. A payload can
+  also feature-detect level 2 at runtime, as Xonotic does.
