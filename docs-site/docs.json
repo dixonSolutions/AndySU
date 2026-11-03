@@ -1,0 +1,131 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "AndySU",
+  "description": "Developer documentation for AndySU: permission-free, signed self-updates for Android apps that ship outside the app stores.",
+  "colors": {
+    "primary": "#0E9F6E",
+    "light": "#34D399",
+    "dark": "#047857"
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://github.com/dixonSolutions/AndySU"
+  },
+  "favicon": "/favicon.svg",
+  "appearance": {
+    "default": "system"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": ["index", "quickstart"]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/host-and-payload",
+              "concepts/update-lifecycle",
+              "concepts/watchdog-and-crashes",
+              "concepts/manifests-and-signatures",
+              "concepts/apply-policies",
+              "concepts/deltas-and-gc"
+            ]
+          },
+          {
+            "group": "Android integration",
+            "pages": [
+              "android/gradle-plugin",
+              "android/host-config",
+              "android/host-api",
+              "android/transparent-mode",
+              "android/native-libraries",
+              "android/permissions"
+            ]
+          },
+          {
+            "group": "Remotes and publishing",
+            "pages": [
+              "publishing/remotes",
+              "publishing/publish-flow",
+              "publishing/keys-and-certificates",
+              "publishing/rollouts-and-channels"
+            ]
+          },
+          {
+            "group": "Bindings",
+            "pages": [
+              "bindings/overview",
+              "bindings/flutter",
+              "bindings/react-native",
+              "bindings/capacitor",
+              "bindings/unity",
+              "bindings/godot",
+              "bindings/c",
+              "bindings/registries"
+            ]
+          },
+          {
+            "group": "Security and help",
+            "pages": ["security", "troubleshooting"]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/cli",
+              "reference/config",
+              "reference/events",
+              "reference/status-and-errors",
+              "reference/manifest-format"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "How we work",
+        "groups": [
+          {
+            "group": "Working on AndySU",
+            "pages": [
+              "contributing/repo-layout",
+              "contributing/build-and-test",
+              "contributing/test-suites",
+              "contributing/pr-flow",
+              "contributing/release-pipeline",
+              "contributing/decisions-and-progress",
+              "contributing/keys-policy",
+              "contributing/testbeds"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Releases",
+        "href": "https://github.com/dixonSolutions/AndySU/releases"
+      }
+    ],
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/dixonSolutions/AndySU"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/dixonSolutions/AndySU"
+    }
+  }
+}

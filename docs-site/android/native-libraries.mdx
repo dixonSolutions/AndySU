@@ -1,0 +1,70 @@
+---
+title: "Native libraries and 16 KB pages"
+description: "Unique names, hot swaps and page alignment for .so files."
+---
+
+## Unique names
+
+Every native library in a payload gets a unique file name and SONAME,
+`lib<name>.<hash8>.so`, where `hash8` is the first 8 hex digits of the SHA-256 of the original
+library. Every `DT_NEEDED` entry that refers to a renamed library is rewritten to match.
+
+This matters because bionic and glibc key loaded libraries by path and SONAME. Loading a new
+generation under a new name maps a **fresh copy** instead of reusing the old one, so a live swap
+really runs new code.
+
+`andysu pack` does this automatically. Because the new name is longer, the string table has to
+grow; pack appends a read-only `PT_LOAD` segment holding a relocated program header table and the new
+strings. Its alignment follows the library's own `p_align`, so 16 KB stays 16 KB. The result was
+verified by loading two generations side by side with `dlopen` and checking that each binds to its
+own dependency copy.
+
+Inspect a library with:
+
+```sh
+andysu elf libgame.so      # SONAME, DT_NEEDED, ABI, alignment
+```
+
+## Names are content hashes
+
+The hash is of the original bytes, so an unchanged library keeps its name across releases and a live
+swap reuses the loaded copy. That is within the contract: `start()` may run again on a copy after
+`suspend()`, which must release everything. A generation that must not share state with the previous
+one gets a fresh copy whenever its bytes differ.
+
+## Load order
+
+`pack` writes `native: { <abi>: [{ name, path }] }` into the descriptor, dependencies first. The host
+preloads in that order by absolute path, so renamed `DT_NEEDED` entries resolve to the copies of the
+same generation. On Android, `System.loadLibrary("x")` in a payload is mapped to the renamed file
+through the payload class loader's `findLibrary`.
+
+## Transparent mode keeps the names
+
+In [transparent mode](/android/transparent-mode), packing uses `--no-rename`. Engines that
+`dlopen("libmain.so")` by name keep working, and there is one generation per process. A live native
+swap then has the app's own loader copy each library to a unique file name before `dlopen`.
+
+## 16 KB pages
+
+Android 15+ devices may use 16 KB memory pages, and libraries for them must have `LOAD` segments
+aligned to 16 KB.
+
+- `andysu pack` **warns** when a library is not 16 KB aligned. Pass `--require-16k` to fail instead.
+- Hosts made by `split` store libraries uncompressed and 16 KB aligned with `extractNativeLibs=false`.
+  An earlier version let a 16 KB kernel raise `SIGBUS` when an incremental install extracted the
+  libraries; both install modes are verified now.
+- The device test suite runs on an API 36 image with 16 KB pages in CI (`36-16k`).
+
+## Read-only code
+
+Android 14+ refuses to load writable files as dynamic code, any file on a class path included. Slots
+are built in `.staging`, made read-only, and then renamed. You do not need to do anything, but a
+payload must never write into its own slot directory.
+
+## Other rules
+
+- Only `dlopen` `.so` files. Android 10+ does not allow `exec()` of app-private files, so never ship
+  executables.
+- Do not replace the host's crash signal handlers without chaining. See
+  [Watchdog and crash detection](/concepts/watchdog-and-crashes#crash-signals-policy).

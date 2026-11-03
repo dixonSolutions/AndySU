@@ -1,0 +1,120 @@
+---
+title: "Test suites"
+description: "What device_tests, sample_tests and testbed_tests cover, and how to run them."
+---
+
+All Python drivers live in `android/tests/`. They run on Android emulators (or a device you point them
+at), build what they need, serve a signed remote with `andysu serve`, and write reports to
+`android/tests/reports/`. Wrap every run in `scripts/heavy.sh`.
+
+## device_tests.py
+
+The host on emulators, across API levels. It builds the CLI, a set of test payloads (good, throwing,
+crashing in Java and in native code, never healthy, crash looping, large, content-only), the factory
+slot and the test host APK, and checks, per API level:
+
+| Scenario | Checks |
+|---|---|
+| `permissions` | only normal permissions requested or granted, nothing runtime or dangerous |
+| `factory` | first launch runs the payload built into the APK |
+| `live` | live swap, state carried over, a fresh copy of the renamed native dependency, commit |
+| `init-throw` | `start()` throws, live rollback in the same process |
+| `native-crash` | SIGSEGV on a payload thread in trial, one relaunch, previous slot |
+| `java-crash` | uncaught exception in trial, one relaunch, previous slot |
+| `crash-handler` | a payload that replaces the SIGSEGV handler: reported only by default, rolled back by `crash_signals = host` |
+| `watchdog` | `markHealthy` never called, live rollback |
+| `background-trial` | app sent HOME during a trial for longer than `watchdog_ms`: paused, resumed, committed (D31) |
+| `resume-kill`, `resume-net` | a download resumes after the process is killed, and with Range after a dropped connection |
+| `next-start` | staged in the background, applied on the next launch, committed |
+| `crash-loop` | a payload that kills the process in `start()`: rolled back before loading |
+| `hot` | content-only update applied hot, payload notified |
+| `reject` | tampered, replayed (downgrade) and expired manifests rejected |
+| `gc` | only current and previous slots remain |
+| `dcl` | a writable dex is refused on API 34+, read-only slots load everywhere |
+| `16k` | on a 16 KB page image, native libraries load |
+| apply policies, `split` | `restart` and `next_start` policies, and a host from `andysu split` boots and live-updates |
+| `no-dialog` | no permission, installer or crash dialog appeared during the run |
+
+```sh
+scripts/heavy.sh python3 android/tests/device_tests.py --api 24 29 31 34 36 36-16k --container
+```
+
+| Flag | Meaning |
+|---|---|
+| `--api` | API levels to run (default `24 29 31 34 36 36-16k`) |
+| `--container` | run emulators in the podman container (`android/tests/emulator/`) |
+| `--device SERIAL` | run on an already-running device instead of emulators |
+| `--keep` | keep the work directory |
+| `--slow N` | timeout multiplier for slow (TCG) devices |
+| `--split-loop N` | repeat only the split install and first launch N times |
+
+CI runs the same driver in `--device emulator-5554` mode on API 24, 29, 31, 34, 36 and 36 with 16 KB
+pages.
+
+### Why a container
+
+On the owner's machine every emulator build segfaults after a few seconds to two minutes (D20). The same
+binary runs fine inside an Ubuntu 24.04 container with `/dev/kvm` passed through and the SDK mounted
+read-only (`android/tests/emulator/run.sh`). `--container` uses it.
+
+### Shared devices
+
+With `--device` on a device that someone else uses (the BlissOS VM, say):
+
+- the tests do not turn the network off;
+- they restore logcat buffer sizes and animation scales;
+- they uninstall every package they installed.
+
+Never install anything on a device that belongs to another project.
+
+### Debug aids
+
+When a scenario fails, `android/tests/reports/` gets the full logcat, every event the harness saw,
+thread dumps, a listing of the app data with `state.json`, and the server log. CI uploads the whole
+directory. Environment hooks: `ANDYSU_TEST_FORCE_FAIL=<scenario>` fails right after a scenario to
+exercise the dumps, `ANDYSU_TEST_IGNORE_EVENT` drops a host log line to exercise the `state.json`
+fallback, and `ANDYSU_TEST_DROP_LOG` drops a payload log line.
+
+## sample_tests.py
+
+The three samples (Compose, native GLES, WebView), each built by `android/samples/build.sh`:
+
+1. the host starts its built-in payload 1.0;
+2. it finds 2.0 on the remote, applies it live and commits;
+3. what is on screen is checked through the accessibility tree (the Compose and WebView samples show
+   "Payload version 2.0"), and screenshots go to `docs/evidence/`.
+
+```sh
+scripts/heavy.sh python3 android/tests/sample_tests.py --only compose --api 36
+```
+
+Flags: `--only compose|native|webview`, `--api` (default 36), `--device`, `--keep`. Use `google_apis`
+images: ATD images (`aosp_atd`) capture normal windows as black frames.
+
+## testbed_tests.py
+
+Real apps (Xonotic Touch and SuperTuxKart Touch) from their published release APKs, with
+`andysu split --transparent`. For each bed: version A runs from the built-in payload, B downloads and
+applies on the next start and is committed, and a deliberately broken B is rolled back. For Xonotic the
+bed requires proof that the engine ran from the payload (the engine's own log lines), not just
+AndySU events. Details are on [Test beds](/contributing/testbeds).
+
+```sh
+scripts/heavy.sh python3 android/tests/testbed_tests.py --only stk --api 34
+```
+
+Modes: default (both beds), `--live`, `--live-failures`, `--low-storage`, `--live-swap-probe` and
+`--probe-vid-restart`. The live modes take locally built APKs (`--apk-a`, `--apk-b`, and variants).
+
+## demo_test.py
+
+Builds two demo releases exactly as CI does (`scripts/demo.sh`), installs the first release's APK and
+checks that it boots its built-in version, finds the second, swaps it in live and commits.
+
+## What is not covered
+
+- Physical phones. The device suite passed on emulators and on a BlissOS VM (Android 13).
+- The Xonotic beds on the BlissOS VM, because the owner's own Xonotic Touch there has the same
+  package name.
+- A Xonotic rollback whose data unpack fails (there is no way to provoke it).
+- Flutter's tests locally (CI only), and the Godot and Unity runtimes.

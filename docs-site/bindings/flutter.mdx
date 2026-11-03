@@ -1,0 +1,62 @@
+---
+title: "Flutter"
+description: "The andysu package: update status and control from Dart."
+---
+
+## Install
+
+```yaml
+dependencies:
+  andysu:
+    hosted: https://dixonsolutions.github.io/AndySU/pub
+    version: ^0.1.62
+```
+
+Or `flutter pub add 'andysu:{"hosted":"https://dixonsolutions.github.io/AndySU/pub"}'`. If a pub client
+ever rejects the static site, use a git dependency:
+
+```yaml
+dependencies:
+  andysu:
+    git: { url: https://github.com/dixonSolutions/AndySU, path: bindings/flutter, ref: v0.1.62 }
+```
+
+The Android side compiles against `io.github.dixonsolutions.andysu:api`, so the app's Gradle settings
+also need the [Maven repository](/android/gradle-plugin#repositories).
+
+## Package the app
+
+Build the release APK, then split it:
+
+```sh
+flutter build apk --release
+andysu split build/app/outputs/flutter-apk/app-release.apk --out out --transparent \
+  --host-template andysu-host-template-<version>.zip --config config.json --keystore release.jks
+```
+
+## Use it
+
+```dart
+import 'package:andysu/andysu.dart';
+
+AndySU.statusChanges.listen((s) {
+  if (s['state'] == 'staged') AndySU.applyNow();
+});
+await AndySU.checkNow();
+await AndySU.setApplyPolicy(ApplyPolicy.restart);   // live, restart, nextStart, or null
+```
+
+| Call | Returns |
+|---|---|
+| `AndySU.info()` | `{present, apiLevel, version, isFactory, slotDir}`, or `{present: false}` |
+| `AndySU.status()` | status map, `{state: idle}` without a host |
+| `AndySU.checkNow()`, `applyNow()`, `restartNow()`, `markHealthy()` | `Future<void>` |
+| `AndySU.setApplyPolicy(ApplyPolicy? p)` | `Future<void>` |
+| `AndySU.statusChanges` | `Stream<Map<String, dynamic>>` |
+
+Status states are listed in [Status and errors](/reference/status-and-errors).
+
+<Note>
+  The Flutter binding compiles on Android, but its Dart tests run only in CI (the SDK is not installed
+  on the development machine).
+</Note>

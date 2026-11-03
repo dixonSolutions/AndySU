@@ -1,0 +1,72 @@
+---
+title: "Status and errors"
+description: "UpdateClient status states, check outcomes and error codes."
+---
+
+`UpdateClient.status()` and the status listener return a JSON object with a `state` field.
+
+## States
+
+| `state` | Meaning | Extra fields |
+|---|---|---|
+| `idle` | nothing has happened yet | |
+| `checking` | a check is running | `trigger`: `open`, `user` (a `checkNow()` call), `job`, `payload` (a native payload's request) or `recovery` |
+| `deferred` | a check was skipped because of the `network` policy | `reason` |
+| `up_to_date` | the installed release is the best one | `sequence`, `not_modified` |
+| `available` | `mode = "check_only"` found an update | the update fields below |
+| `downloading` | blobs are being fetched | the update fields below |
+| `staged` | the release is verified and staged, waiting to apply | the update fields below |
+| `applying` | listed in the `UpdateClient` interface and the binding types; the updater in this version never sets it (applying is reported through events such as `live_swapped`) | |
+| `shell_update` | the best release needs a newer host, and a shell APK is offered | `release`, `version_code`, `sha256`, `size`, `urls` |
+| `error` | a check or download failed | `code`, `message` |
+
+The update fields: `release`, `sequence`, `mandatory`, `hot_only`, `native_live`, `download_bytes`,
+`notes_url`, `already_staged`, `not_modified`.
+
+## Error codes
+
+`error` states carry a `code`. The ones from the core are:
+
+| Code | Meaning |
+|---|---|
+| `sig_envelope` | the signature file is malformed |
+| `bad_signature` | the signature does not verify under any trusted key (also for tampered or unparseable manifests) |
+| `bad_cert` | the release key certificate is invalid or outside its validity window |
+| `manifest` | the manifest violates the schema |
+| `wrong_app` | the manifest is for another application id |
+| `wrong_channel` | the manifest is for another channel |
+| `expired` | the manifest expired |
+| `sequence_rollback` | the manifest sequence is lower than the last accepted one |
+| `sequence_reuse` | same sequence as before, different bytes |
+| `hash_mismatch` | a blob does not match its SHA-256 |
+| `size_mismatch` | a blob does not match its size |
+| `unsafe_path` | a component path or archive entry is unsafe |
+| `payload` | the payload descriptor is invalid |
+| `patch` | a delta could not be applied |
+| `archive` | an archive could not be extracted |
+| `key` | a key could not be parsed |
+| `state` | the state file is invalid |
+| `usage` | wrong use of the API |
+| `io` | a filesystem error |
+| `net` | a network error |
+| `no_space` | not enough free storage |
+
+On `no_space` the status also has `needed`, the bytes required.
+
+## Common situations
+
+<AccordionGroup>
+  <Accordion title="bad_signature on every check">
+    The manifest was signed with a key the host does not trust, or it was modified in transit. Check
+    that `roots` in the host's `config.json` matches the public key of the key you sign with. Run
+    `andysu verify <url> --pub andysu-public.pem`.
+  </Accordion>
+  <Accordion title="expired">
+    The channel manifest passed its `expires`. Re-sign it with `andysu sign`. See
+    [Rollouts and channels](/publishing/rollouts-and-channels).
+  </Accordion>
+  <Accordion title="sequence_rollback or sequence_reuse">
+    The remote serves an older manifest, or two different manifests with the same sequence. Always
+    publish with `andysu publish`, `sign` or `rollback`, which raise the sequence.
+  </Accordion>
+</AccordionGroup>

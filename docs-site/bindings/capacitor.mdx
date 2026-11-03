@@ -1,0 +1,40 @@
+---
+title: "Capacitor and Cordova"
+description: "@andysu/capacitor: the same API as a Capacitor plugin."
+---
+
+## Install
+
+`.npmrc`:
+
+```ini
+@andysu:registry=https://dixonsolutions.github.io/AndySU/npm/
+```
+
+```sh
+npm install @andysu/capacitor && npx cap sync android
+```
+
+The Android side needs the [Maven repository](/android/gradle-plugin#repositories) in the app's Gradle
+settings. Package the finished APK with `andysu split --transparent`; web assets update hot when you
+mark them with `--hot`.
+
+## Use it
+
+```ts
+import { AndySU } from '@andysu/capacitor';
+
+await AndySU.checkNow();
+await AndySU.setApplyPolicy({ policy: 'restart' });   // 'live' | 'restart' | 'next_start' | null
+const handle = await AndySU.addListener('status', s => console.log(s.state, s.release));
+```
+
+| Method | Returns |
+|---|---|
+| `info()` | `{present, apiLevel?, version?, isFactory?, slotDir?}` |
+| `status()` | `{state, release?, ...}` |
+| `checkNow()`, `applyNow()`, `restartNow()`, `markHealthy()` | `Promise<void>` |
+| `setApplyPolicy({ policy })`, `applyPolicy()` | override; read `{policy}` |
+| `addListener('status', cb)` | listener handle |
+
+On platforms without AndySU (web, iOS) every call resolves with neutral values.

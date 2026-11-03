@@ -1,0 +1,76 @@
+---
+title: "Package registries"
+description: "Install every AndySU package from the project's own GitHub remote."
+---
+
+Every package is published to this repository's own GitHub remote, not to the public registries:
+
+- **GitHub Pages** (`https://dixonsolutions.github.io/AndySU`) serves static registries: `maven/`,
+  `npm/`, `cargo/` and `pub/`. The release workflow keeps them on the `gh-pages` branch.
+- **GitHub Releases** (`v<version>`) carry the same packages as files, plus CLI binaries, the C and
+  Godot archives, the host template and `SHA256SUMS` with a detached signature.
+
+Versions are `<major.minor>.<commits on main>` (for example `0.1.62`), and every push to `main` makes a
+release. GitHub Packages is not used, because it needs a token even to install public packages.
+
+| Ecosystem | Package | How | Verified |
+|---|---|---|---|
+| Gradle | `io.github.dixonsolutions.andysu` | static Maven repo with plugin marker | local and CI |
+| Cargo | `andysu-core`, `andysu-cli` | sparse registry | local and CI |
+| npm | `@andysu/react-native`, `@andysu/capacitor`, `@andysu/cli` | static packuments, scoped registry | local and CI |
+| Unity | `com.andysu.unity` | the npm registry as a scoped registry | the HTTP exchange locally and in CI; Unity itself needs a licence |
+| pub | `andysu` | Hosted Pub Repository v2, static | CI only |
+| C and CMake | `andysu-c-<v>-linux-<arch>.tar.gz` | release asset | local and CI |
+| Godot | `andysu-godot-<v>.zip` | release asset | local and CI |
+| Homebrew | `andysu` CLI | tap = the repository (`Formula/`) | CI (Linux and macOS) |
+| GitHub Action | `dixonSolutions/AndySU/actions/publish` | subdirectory action | `actions/publish/test.sh` in CI |
+
+## Cargo
+
+`.cargo/config.toml`:
+
+```toml
+[registries.andysu]
+index = "sparse+https://dixonsolutions.github.io/AndySU/cargo/"
+```
+
+```sh
+cargo install andysu-cli --registry andysu
+```
+
+```toml
+[dependencies]
+andysu-core = { version = "0.1", registry = "andysu" }
+```
+
+## npm
+
+```ini
+@andysu:registry=https://dixonsolutions.github.io/AndySU/npm/
+```
+
+```sh
+npx @andysu/cli --version     # the CLI, bundled for Linux and macOS (x64, arm64)
+```
+
+Only the `@andysu` scope goes to this registry; everything else still comes from npmjs.com. Release
+tarballs also work: `npm install https://github.com/dixonSolutions/AndySU/releases/download/v0.1.62/andysu-react-native-0.1.62.tgz`.
+
+## Homebrew
+
+```sh
+brew tap dixonsolutions/andysu https://github.com/dixonSolutions/AndySU
+brew install dixonsolutions/andysu/andysu
+```
+
+The release workflow regenerates `Formula/andysu.rb` on `main` with a `[skip ci]` commit.
+
+## Maven, Unity, pub, C, Godot
+
+See the pages for [Gradle](/android/gradle-plugin#repositories), [Unity](/bindings/unity),
+[Flutter](/bindings/flutter), [C](/bindings/c) and [Godot](/bindings/godot).
+
+## Public registries are off
+
+The release workflow can also publish to crates.io and npmjs.com. Those jobs stay off until the owner
+adds `CARGO_REGISTRY_TOKEN` or `NPM_TOKEN`; our own registries remain the default.

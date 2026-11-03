@@ -1,0 +1,71 @@
+---
+title: "PR flow"
+description: "Branch, push, CI on the PR, review, merge. A merge to main is a release."
+---
+
+**A push to `main` publishes a release.** So nothing goes to `main` directly, with one exception for
+docs-only commits (below). The flow:
+
+<Steps>
+  <Step title="Get the step's tests passing locally">
+    Run what CI will run, see [Build and test locally](/contributing/build-and-test) and
+    [Test suites](/contributing/test-suites). Heavy jobs go through `scripts/heavy.sh`.
+  </Step>
+  <Step title="Branch and push">
+    Create a branch (`fix/...`, `feat/...`, `test/...`, `testbed/...`, `ci/...` are the names in the
+    history) and push it. No worktrees.
+  </Step>
+  <Step title="CI runs on the pull request">
+    `ci.yml` runs on every pull request: `rust`, `desktop-host`, `android-build`, `android-devices`
+    (API 24, 29, 31, 34, 36 and 36 with 16 KB pages), `bindings`, `packages` and `fuzz-smoke`.
+  </Step>
+  <Step title="Review">
+    Read the diff, run the acceptance test, and check the change against the brief and the spec.
+  </Step>
+  <Step title="Merge to main">
+    Merging is the release. `release.yml` runs the same tests, then publishes, see
+    [Release pipeline](/contributing/release-pipeline).
+  </Step>
+</Steps>
+
+## Staging commits
+
+Never use `git commit -a` or `git add -A`. Several workers can share one checkout, so stage files
+explicitly.
+
+## Lead and workers
+
+Much of the work is done by a lead agent that hands self-contained tasks to workers: one model class
+for implementation, a lighter one for mechanical work (renames, docs, fixtures, boilerplate, log
+digging). Each worker gets the exact files, the acceptance test and the rules. Workers share the
+checkout, so parallel workers get parts of the tree that do not overlap.
+
+The lead reviews every worker's result before it is committed: read the diff, run the acceptance test,
+check it against the brief and the spec, and fix or send it back if it falls short. `docs/PROGRESS.md`
+records which work came from a worker and how it was verified.
+
+## Docs-only changes
+
+A change that only touches documentation is not a release and does not need tests. The `paths-ignore`
+lists in `ci.yml` (pull requests) and `release.yml` (pushes to `main`) are:
+
+```yaml
+paths-ignore: ["docs/**", "docs-site/**", "**/*.md", "testbeds/patches/**/*.md"]
+```
+
+Also, a push whose **head commit** message contains `[skip ci]` skips the workflows for the whole push.
+That is how the Homebrew bot commits and docs-only pushes avoid a release. Two consequences:
+
+- Push code first, and push docs-only `[skip ci]` commits **separately**. A `[skip ci]` head commit on a
+  push that also carries code would skip CI for that code.
+- Pushes made with the workflow token never start workflows anyway, which the Homebrew bot relies on.
+
+The Mintlify integration deploys this site from `main` on its own, independent of GitHub Actions.
+
+## Other rules
+
+- Don't create any repository other than `dixonSolutions/AndySU` without asking the owner;
+  `andysu-remote-template` stays the owner's.
+- Never push to the repositories under `testbeds/` or touch `~/Projects/Xonotic-Touch`, see
+  [Test beds](/contributing/testbeds).
+- Never commit private keys, see [Keys policy](/contributing/keys-policy).

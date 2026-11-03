@@ -1,0 +1,45 @@
+---
+title: "Host configuration"
+description: "How the frozen host is configured, and where each key comes from."
+---
+
+The host reads its configuration from `assets/andysu/config.json`. It is generated from
+`andysu.toml` and **frozen with the host APK**: changing it needs a new host APK. The apply policy is the one setting an app can
+override at runtime ([how](/concepts/apply-policies#changing-the-policy-at-runtime)). A runtime
+override file for the crash signals mode (`<root>/crash_signals`) also exists, mainly for tests.
+
+## Generate it
+
+```sh
+andysu host-config --toml andysu.toml --config-out config.json --host-out andysu-host.json
+```
+
+- `config.json` goes into the host (the Gradle plugin's `config`, or `split --config`).
+- `andysu-host.json` is what the frozen host **declares**: permissions, stub counts, Host API level,
+  shell version, min SDK and features. Pass it to `andysu pack --host` so the build fails when a
+  payload needs more than the host has.
+
+`andysu remote --toml andysu.toml` prints the remote that the file describes as JSON (type, repo,
+base, channel, `manifest_url`).
+
+## Keys
+
+The full table, with defaults, is in the [configuration reference](/reference/config#host-configjson).
+Three points are worth knowing here:
+
+- `roots` holds the trusted root public keys (PEM or base64). More than one is allowed so a key can
+  be rotated.
+- `manifest_url` is derived from the `[remote]` section. See [Remotes](/publishing/remotes).
+- `host_api` is what the host declares. The host uses the smaller of that and the level its AAR
+  actually implements, and logs a warning if the declaration is higher.
+
+<Warning>
+  `check_on_open`, `max_boot_attempts` and `auto_healthy_ms` are read by the host but `andysu
+  host-config` does not write them. Their defaults apply unless you add them to `config.json`
+  yourself.
+</Warning>
+
+## What the host declares
+
+The host manifest contains everything a payload may ever need, declared up front. `andysu pack`
+checks the payload's `needs` against it. See [Permissions and components](/android/permissions).

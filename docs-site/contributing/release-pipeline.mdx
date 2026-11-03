@@ -1,0 +1,72 @@
+---
+title: "Release pipeline"
+description: "What release.yml does on every push to main."
+---
+
+Every push to `main` that is not docs-only runs `.github/workflows/release.yml`. It publishes everything
+to the project's own GitHub remote and then installs it back from the live URLs.
+
+```mermaid
+flowchart TD
+  T["test (ci.yml)"] --> P
+  V["version"] --> C["cli (4 targets)"]
+  V --> P["package"]
+  C --> P
+  P --> GR["github-release"]
+  P --> PG["pages (gh-pages)"]
+  GR --> HB["homebrew (Formula/)"]
+  GR --> VF
+  PG --> VF["verify: cargo npm upm maven pub c godot"]
+  HB --> VH["verify-homebrew (Linux, macOS)"]
+  GR --> VS["verify-signature"]
+  PG --> VS
+  VF --> CR["crates-io (optional)"]
+  VF --> NP["npmjs (optional)"]
+```
+
+## Jobs
+
+| Job | What it does |
+|---|---|
+| `test` | runs `ci.yml` as a reusable workflow: all the tests |
+| `version` | `scripts/version.sh` computes `<VERSION>.<commit count of main>`, for example `0.1.62` |
+| `cli` | builds static `andysu` binaries for `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` (both with `cargo-zigbuild`), `x86_64-apple-darwin` and `aarch64-apple-darwin` |
+| `package` | stamps the version (`scripts/set-version.sh`), restores earlier releases from `gh-pages`, builds every package (`scripts/package.sh`), builds the demo channel and demo APK (`scripts/demo.sh`), then writes `SHA256SUMS` and signs it with `andysu sign-file` |
+| `github-release` | creates release `v<version>` with the CLI binaries, AARs, crates, npm and pub tarballs, the C and Godot archives, the host template, the demo APK, `SHA256SUMS` and its signature |
+| `pages` | force-pushes `gh-pages` as one commit holding every version, then waits until Pages serves the new version |
+| `homebrew` | regenerates `Formula/andysu.rb` on `main` with a `[skip ci]` bot commit (up to 3 attempts; never replaces a newer formula with an older one) |
+| `verify` | consumer verification: a fresh project installs the package from the live Pages and Release URLs, one matrix entry each for `cargo`, `npm`, `upm`, `maven`, `pub`, `c` and `godot` |
+| `verify-homebrew` | `brew tap` and `brew install` on Linux and macOS, and checks `andysu --version` |
+| `verify-signature` | downloads the release, checks `sha256sum -c` and the `SHA256SUMS` signature against `keys/andysu-ci-test-public.pem`, and verifies the live demo channel with `andysu verify --blobs` |
+| `crates-io`, `npmjs` | publish to the public registries, only after `verify` has passed, and only when `CARGO_REGISTRY_TOKEN` or `NPM_TOKEN` exists. They skip themselves otherwise |
+
+## What gets published where
+
+- **GitHub Release `v<version>`:** CLI binaries (`andysu-<target>`), AARs, crates, npm and pub
+  tarballs, `andysu-c-<version>-linux-<arch>.tar.gz`, `andysu-godot-<version>.zip`,
+  `andysu-host-template-<version>.zip`, `andysu-demo-compose-<version>.apk`, `SHA256SUMS` and
+  `SHA256SUMS.sig`.
+- **GitHub Pages (`gh-pages`):** the static registries `maven/`, `npm/`, `cargo/` and `pub/`, the demo
+  channel at `demo/stable/update.json`, and an index page.
+- **`Formula/andysu.rb` on `main`:** the Homebrew tap.
+
+## The demo channel
+
+Each release publishes the Compose sample's payload to `<Pages>/demo/stable/update.json`, signed with
+`ANDYSU_SIGNING_KEY`, with deltas against earlier demo releases. The demo APK attached to each release is
+a host with that version built in, signed with the CI test keystore. An APK installed from any release
+therefore live-updates to every later one.
+
+## Public registries
+
+Our own registries are the default. The crates.io and npmjs.com jobs exist but stay off until their
+tokens are set. Before turning them on, check that the crate names `andysu-core` and `andysu-cli` are free
+or owned by the token's account, and that the `@andysu` npm scope is an organization the token can
+publish to. See `docs/KEYS.md`.
+
+## When a release fails
+
+Failures so far have been infrastructure (a corrupt emulator download, an emulator boot timeout), a
+Homebrew formula rebase conflict (fixed), and real bugs that the verification jobs found (a transport
+cut at the 8 MiB manifest limit). The history is in `docs/PROGRESS.md`, step 9. A failing release
+leaves the previous release in place.

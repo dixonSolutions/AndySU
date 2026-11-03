@@ -1,0 +1,58 @@
+---
+title: "Unity"
+description: "com.andysu.unity: a C# static API over the host."
+---
+
+<Warning>
+  The Unity package compiles against stub `UnityEngine` types in CI, but it has not been run inside
+  Unity, which needs a licence.
+</Warning>
+
+## Install (UPM)
+
+`Packages/manifest.json`:
+
+```json
+{
+  "scopedRegistries": [
+    {
+      "name": "AndySU",
+      "url": "https://dixonsolutions.github.io/AndySU/npm",
+      "scopes": ["com.andysu"]
+    }
+  ],
+  "dependencies": {
+    "com.andysu.unity": "0.1.62"
+  }
+}
+```
+
+UPM speaks the npm protocol: it requests `<url>/com.andysu.unity` and then downloads the tarball the
+document names. Packages from a registry are immutable, so the package ships its `.meta` files.
+
+Build the Android player, then split the APK:
+
+```sh
+andysu split game.apk --out out --transparent --host-template andysu-host-template-<version>.zip --config config.json
+```
+
+Unity's runtime (Mono) uses `SIGSEGV` in normal operation, so keep the default `crash_signals =
+"payload"`. See [Watchdog and crash detection](/concepts/watchdog-and-crashes#crash-signals-policy).
+
+## Use it
+
+```csharp
+AndySU.Updates.SetApplyPolicy(AndySU.ApplyPolicy.NextStart);
+if (AndySU.Updates.IsPresent) AndySU.Updates.CheckNow();
+```
+
+| Member | Meaning |
+|---|---|
+| `Updates.IsPresent` | true under an AndySU host |
+| `Updates.Version` | the payload version, or an empty string |
+| `Updates.StatusJson` | status as JSON, `{"state":"idle"}` without a host |
+| `Updates.CheckNow()`, `ApplyNow()`, `RestartNow()` | as in the [Host API](/android/host-api#updateclient) |
+| `Updates.MarkHealthy()` | commit this payload |
+| `Updates.SetApplyPolicy(ApplyPolicy?)` | `Live`, `Restart`, `NextStart`, or null |
+
+It talks to `com.andysu.api.Host` over JNI on Android; elsewhere every call returns neutral values.

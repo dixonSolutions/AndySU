@@ -3,7 +3,7 @@
 name: ci
 on:
   pull_request:
-    paths-ignore: ["docs/**", "**/*.md", "testbeds/patches/**/*.md"]
+    paths-ignore: ["docs/**", "docs-site/**", "**/*.md", "testbeds/patches/**/*.md"]
   workflow_call:
   workflow_dispatch:
 

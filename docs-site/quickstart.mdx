@@ -1,0 +1,154 @@
+---
+title: "Quickstart"
+description: "Install the CLI, create keys, integrate the host, publish a payload and ship the first update."
+---
+
+This page takes you from nothing to a live update. It uses a GitHub repository as the remote. For
+other remotes see [Remotes](/publishing/remotes).
+
+<Steps>
+  <Step title="Install the CLI">
+    Pick one.
+
+    <CodeGroup>
+    ```sh Homebrew
+    brew tap dixonsolutions/andysu https://github.com/dixonSolutions/AndySU
+    brew install dixonsolutions/andysu/andysu
+    ```
+
+    ```sh Cargo
+    # .cargo/config.toml needs the registry entry, see Package registries
+    cargo install andysu-cli --registry andysu
+    ```
+
+    ```sh npm
+    npx @andysu/cli --version
+    ```
+
+    ```sh Release binary
+    # Linux x86_64 (static musl). Other targets: aarch64-unknown-linux-musl,
+    # x86_64-apple-darwin, aarch64-apple-darwin
+    V=0.1.62   # use the newest release
+    curl -LO https://github.com/dixonSolutions/AndySU/releases/download/v$V/andysu-x86_64-unknown-linux-musl
+    chmod +x andysu-x86_64-unknown-linux-musl
+    ```
+    </CodeGroup>
+
+    Cargo and npm need a registry setting first, see [Package registries](/bindings/registries).
+    Release binaries are listed in `SHA256SUMS`, which has a detached signature you can check, see
+    [Keys and certificates](/publishing/keys-and-certificates#check-a-release).
+  </Step>
+
+  <Step title="Set up the project and keys">
+    In your project directory:
+
+    ```sh
+    andysu init --app com.example.app --repo you/app-updates
+    ```
+
+    `andysu init` detects the project type, generates a root key pair, writes `andysu.toml` and a
+    GitHub Actions workflow (`.github/workflows/andysu.yml`), and adds `.andysu/` and `*.key` to
+    `.gitignore`. It prints the next step for your project type.
+
+    Store the private key as a CI secret, then keep a copy offline and delete it from the project:
+
+    ```sh
+    gh secret set ANDYSU_SIGNING_KEY < .andysu/andysu-root.key
+    ```
+
+    <Warning>
+      Never commit a private key. `andysu-public.pem` is the public half and is committed. See
+      [Keys and certificates](/publishing/keys-and-certificates).
+    </Warning>
+  </Step>
+
+  <Step title="Integrate the host">
+    The host APK carries the bootloader and your **public** key. How you build it depends on your
+    app.
+
+    <Tabs>
+      <Tab title="Kotlin or Java app">
+        Use the Gradle plugin and implement `com.andysu.api.Payload`. See
+        [Gradle plugin](/android/gradle-plugin).
+      </Tab>
+      <Tab title="Any finished APK">
+        Flutter, Unity, Godot, React Native, Cordova and plain NDK apps need no code change:
+
+        ```sh
+        andysu host-config --config-out config.json --host-out andysu-host.json
+        andysu split app-release.apk --out out --transparent \
+          --host-template andysu-host-template-<version>.zip --config config.json \
+          --keystore release.jks --ks-pass pass:secret --key-alias release
+        ```
+
+        The host template zip is a release asset (`andysu-host-template-<version>.zip`). Install
+        `out/host.apk` once. `out/payload/` is what you pack
+        and publish for every update; pack it with `--no-rename`, as transparent mode keeps library
+        names. See [Transparent mode](/android/transparent-mode).
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Pack and publish a release">
+    <Tabs>
+      <Tab title="By hand">
+        ```sh
+        andysu pack out/payload --site site --host andysu-host.json   # add --no-rename in transparent mode
+        andysu publish --site site --release 1.1 --key .andysu/andysu-root.key
+        ```
+
+        `site/` is now a complete remote: `stable/update.json`, `stable/update.json.sig`,
+        `blobs/sha256/<hash>` and `deltas/`. Upload it to your static host. Check it exactly as a
+        client would:
+
+        ```sh
+        andysu verify site/stable/update.json --pub andysu-public.pem --blobs
+        ```
+      </Tab>
+      <Tab title="From CI (GitHub)">
+        The workflow `andysu init` wrote uses the publish action:
+
+        ```yaml
+        - uses: dixonSolutions/AndySU/actions/publish@main
+          with:
+            payload: build/andysu/payload
+            config: andysu.toml
+            signing-key: ${{ secrets.ANDYSU_SIGNING_KEY }}
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Ship the first update">
+    Install the host APK on a device. Change something in your app, build the payload again and
+    publish it as a new release (`1.2`). Open the app. The host checks on open, downloads a delta,
+    swaps the new payload in, and commits it once your app calls `markHealthy()`.
+
+    To watch it happen on a connected device:
+
+    ```sh
+    adb logcat -s AndySU-Event
+    ```
+
+    You should see `update_status` with `checking`, `downloading` and `staged`, then
+    `live_swapped` and `committed`. All event names are in the [events reference](/reference/events).
+  </Step>
+</Steps>
+
+## Try it locally without a remote
+
+`andysu serve` is a static server with Range and ETag support, good for local testing:
+
+```sh
+andysu serve site --addr 127.0.0.1:8787
+adb reverse tcp:8787 tcp:8787
+```
+
+Point `[remote]` at it with `type = "custom"` and `base = "http://127.0.0.1:8787"`, and build the
+host with `--cleartext` (split) so it accepts plain HTTP. Real remotes use HTTPS.
+
+## Next
+
+- [Host and payload](/concepts/host-and-payload) explains what ends up where.
+- [Apply policies](/concepts/apply-policies) chooses between live, restart and next start.
+- [CLI reference](/reference/cli) lists every command and flag.

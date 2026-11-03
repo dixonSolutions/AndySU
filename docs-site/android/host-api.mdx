@@ -1,0 +1,142 @@
+---
+title: "Host API"
+description: "The com.andysu.api interfaces: Payload, HostApi, UpdateClient, Host and LiveSwapHandler."
+---
+
+`com.andysu.api` is the contract between the frozen host and the payload. It is written in Java and
+uses only `java.*` and `android.*` types, with no default methods, so it stays binary-compatible with
+Kotlin payloads and with hosts built years earlier. **Exactly one copy exists at runtime: the host's.**
+Compile against it with `compileOnly`.
+
+Levels are additive. Level 2 added methods and removed none. Check `HostApi.apiLevel()` before using
+anything introduced in a later level.
+
+| Level | Adds |
+|---|---|
+| 1 | `Payload`, `HostApi`, `UpdateClient`, service and receiver handlers, `Host` |
+| 2 | `HostApi.setLiveSwapHandler`, `LiveSwapHandler`, `LiveSwapCallback` |
+
+## Payload
+
+Your entry class (`entry.dex_class` in the descriptor) implements `Payload` and has a public
+no-argument constructor. Extend `PayloadAdapter` to implement only what you need. One instance exists
+per payload generation.
+
+| Method | When |
+|---|---|
+| `start(HostApi host, byte[] state) throws Exception` | Once per generation, on the main thread. Throwing marks the generation failed and rolls back. `state` is what the previous generation's `suspend()` returned, or null on a cold start. |
+| `byte[] suspend()` | Before a live swap, on the main thread. Release threads, GL objects, audio and file handles and return state (may be null). |
+| `onActivityCreated(Activity, Bundle)` | A stub activity was created or re-attached after a live swap. Set its content here. |
+| `onActivityEvent(Activity, int event)` | Lifecycle. `event` is an `ActivityEvent` constant: `START` 1, `RESUME` 2, `PAUSE` 3, `STOP` 4, `DESTROY` 5, `WINDOW_FOCUS_GAINED` 6, `WINDOW_FOCUS_LOST` 7. |
+| `boolean onBackPressed(Activity)` | Return true if handled. |
+| `onConfigurationChanged(Activity, Configuration)` | Configuration change. |
+| `onContentUpdated(File slotDir)` | A hot (content-only) update was applied; re-read files under `slotDir`. |
+
+<Warning>
+  State passed between generations must be versioned and language-neutral (JSON or protobuf). Never
+  use Java serialization: the previous generation's classes are gone.
+</Warning>
+
+## HostApi
+
+Passed to `start()`.
+
+| Method | Meaning |
+|---|---|
+| `int apiLevel()` | Host API level of this host (1, or 2 for hosts offering live swap handlers). |
+| `Context context()` | The application context. |
+| `Activity activity()` | The resumed or most recently created stub activity, or null. |
+| `File slotDir()` | Absolute path of this generation's slot. Code files are read-only. |
+| `String version()` | Payload version from `andysu-payload.json`. |
+| `boolean isFactory()` | True when running the payload built into the APK (no update installed yet). |
+| `void markHealthy()` | Commit this generation. Call once it is known to work, for example when the first frame or screen is up. Until then it is on TRIAL. |
+| `void log(String)` | Log a message. |
+| `UpdateClient updates()` | Check, download and apply updates. |
+| `stubActivityCount()`, `stubActivity(int)` | The host's stub activities; index 0 is the launcher. |
+| `stubServiceCount()`, `stubService(int)`, `setServiceHandler(int, ServiceHandler)` | Route a stub service to payload code (null clears). |
+| `stubReceiverCount()`, `setReceiverHandler(int, ReceiverHandler)` | Route a stub receiver (declared without intent filters) to payload code. |
+| `runOnMain(Runnable)` | Run on the main thread, immediately if already on it. |
+| `String core(String method, String argsJson)` | Raw access to the AndySU core (JSON in, JSON out) for payloads that ship their own updater logic. |
+| `setLiveSwapHandler(LiveSwapHandler)` | Level 2. See below. |
+
+## UpdateClient
+
+`host.updates()` returns it. Status values are JSON objects, for example
+`{"state":"staged","release":"1.4.0","hot_only":false,"mandatory":false}`. The states and error codes
+are listed in [Status and errors](/reference/status-and-errors).
+
+| Method | Meaning |
+|---|---|
+| `checkNow()` | Check now, and download and apply according to the configured mode. |
+| `applyNow()` | Apply a staged update now: live if the payload supports it, otherwise by restarting. |
+| `restartNow()` | Restart into the newest staged or committed payload. |
+| `String status()` | Current status as JSON. |
+| `setListener(Listener)` | `Listener.onStatus(String statusJson)` is called on the main thread. Null removes it. |
+| `setApplyPolicy(String)` | `"live"`, `"restart"`, `"next_start"` or null for the configured policy. Persisted. |
+| `String applyPolicy()` | The policy in effect. |
+
+```kotlin
+host.updates().setListener { json ->
+    val s = JSONObject(json)
+    if (s.optString("state") == "staged") host.updates().applyNow()
+}
+```
+
+## Host.current()
+
+`com.andysu.api.Host.current()` returns the process-wide `HostApi`, or null when the app does not run
+under an AndySU host (a plain debug build). It is for code that is not handed a `HostApi`: framework
+bindings (Flutter, React Native, Unity, Godot, Capacitor) and apps in
+[transparent mode](/android/transparent-mode). Check for null so the app also runs without AndySU.
+
+## Live native swaps
+
+Host API level 2, for transparent mode. An app whose Java code cannot be replaced at runtime can still
+take **native-only** releases live by registering a handler.
+
+```java
+if (host.apiLevel() >= 2) {
+    host.setLiveSwapHandler((slotDir, version, cb) -> {
+        if (!canSwapNow()) return false;          // decline: the live_fallback policy applies
+        swapNativeCodeAndContent(slotDir, () -> cb.started(), reason -> cb.failed(reason));
+        return true;                              // accepted: report started() or failed()
+    });
+}
+```
+
+- `onLiveSwap(File slotDir, String version, LiveSwapCallback cb)` runs on the main thread. Returning
+  `false` or throwing declines: nothing changed, and `live_fallback` applies.
+- Returning `true` accepts. The host then starts a live trial and the app reports
+  `cb.started()` or `cb.failed(String reason)`. The callback is thread-safe and may be called from
+  any thread, once.
+- After `started()`, call `markHealthy()` to commit. If it does not arrive within `watchdog_ms`, the
+  host rolls back and relaunches, so the previous slot boots. From acceptance to `started()` the
+  deadline is at least 60 s.
+- `failed(reason)` means the app kept or restored its previous native code. The host marks the
+  release bad and makes the previous slot current again while the process keeps running.
+
+The host only offers releases that qualify as `native_live`: every differing component is `kind:
+native` or `kind: content` outside `dex/`, no dex file was removed, and the descriptor's `entry`,
+`dex` and `needs` are unchanged. It also requires `apply = "live"` and an activity in the resumed
+state. See [Apply policies](/concepts/apply-policies#live-native-swaps-in-transparent-mode).
+
+To accept payloads with `host_api_min = 2`, declare `host_api = 2` in `andysu.toml` and use a level-2
+host AAR.
+
+## Service and receiver handlers
+
+```java
+interface ServiceHandler {
+    void onCreate(Service service);
+    int onStartCommand(Service service, Intent intent, int flags, int startId);
+    IBinder onBind(Service service, Intent intent);
+    void onDestroy(Service service);
+}
+interface ReceiverHandler {
+    void onReceive(BroadcastReceiver receiver, Context context, Intent intent);
+}
+```
+
+## Native payloads (C)
+
+A native payload exports `andysu_payload_v1` instead. See [C and native payloads](/bindings/c).

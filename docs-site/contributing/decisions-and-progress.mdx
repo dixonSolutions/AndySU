@@ -1,0 +1,53 @@
+---
+title: "Decisions and progress logs"
+description: "docs/DECISIONS.md and docs/PROGRESS.md: what to record and when."
+---
+
+Two files in `docs/` are the project's memory. Keep them current as you work.
+
+## docs/DECISIONS.md
+
+A numbered log (D1, D2, ...) of every choice the brief left open, with the reason and the date. Newest
+last. Anything marked **owner** should be confirmed by the owner when convenient; the build continues
+with the default meanwhile.
+
+Write a decision when:
+
+- you pick between reasonable options (a library version, a file layout, a naming scheme);
+- you hit an Android platform limit that breaks part of the design. Do not fake it: record the evidence,
+  adjust the design and carry on (examples: D20, emulators in a container; D28, no action bar in stub
+  activities; D31, the foreground-time watchdog);
+- you change behaviour the docs describe.
+
+Cite the decision in code comments and docs where it matters. Several pages of this site mention D-numbers
+for that reason.
+
+## docs/PROGRESS.md
+
+The honest status of the build, step by step, newest first within each step. "Verified" means the named
+tests were run and passed on the owner's machine, unless CI is mentioned. For every step record the date,
+what landed, the test evidence, and the open issues. It also says:
+
+- which work came from a worker and how the lead verified it;
+- what is **not** covered (real phones, the Godot and Unity runtimes, Flutter tests outside CI, a
+  rollback whose unpack fails);
+- failures and their causes, even when fixed.
+
+If you cannot verify something, say so there and in the user docs. Do not write "works" for a thing that
+only compiles.
+
+## Docs-only commits
+
+Both files are Markdown under `docs/`, so a push that only changes them skips CI and release. Push them
+separately from code with `[skip ci]` in the head commit message, see
+[PR flow](/contributing/pr-flow#docs-only-changes).
+
+## Where else to look
+
+| File | What |
+|---|---|
+| `docs/BRIEF.md` | the agreed design, the build order, the environment and the rules |
+| `docs/KEYS.md` | keys and secrets |
+| `docs/REGISTRIES.md` | consumer snippets for every package manager |
+| `docs/THREAT_MODEL.md` | what is defended and what is not |
+| `spec/SPEC.md` | the protocol |

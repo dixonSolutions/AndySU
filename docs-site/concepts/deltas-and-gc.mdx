@@ -1,0 +1,49 @@
+---
+title: "Deltas and cleanup"
+description: "Small downloads, resumable transfers and garbage collection."
+---
+
+## Deltas
+
+`andysu pack` builds a binary delta from each of the last N releases of the channel to the new
+component (`--deltas`, default 3). Two formats exist: `zstd` (`zstd --patch-from`, the default) and
+`bsdiff` (`--delta-format bsdiff`).
+
+A client that already has the old blob downloads the patch, applies it, and verifies the result
+against the component's own SHA-256. If the patch is wrong or corrupt, it falls back to the full
+blob. The first update after install downloads deltas against the **built-in payload**: the host
+keeps it as a read-only base directory (with an `andysu-slot.json` index, written by
+`andysu pack --emit-slot`) and takes unchanged files and unpacked archives from it.
+
+Native libraries are named by the hash of their original bytes, so an unchanged library keeps its
+name across releases and a live swap reuses the loaded copy. See
+[Native libraries](/android/native-libraries).
+
+## Large asset trees
+
+`pack` bundles any directory with more than 400 loose files into a zip component. This keeps a
+release below GitHub's 1000-assets-per-release limit. You can also force it with
+`--archive <dir>`.
+
+## Resumable downloads
+
+Downloads resume with HTTP Range from `blobs/sha256/<hash>.part`. The transport retries each URL up
+to 3 times on network errors, resuming from the bytes on disk. A hash mismatch moves to the next URL
+instead. Checks use `ETag` and `If-None-Match`, so most are a `304`.
+
+## Garbage collection
+
+After a commit, GC keeps:
+
+- the current slot, the previous slot, and any pending one (only the current one on low-storage
+  devices, under 200 MB allocatable);
+- the slot a process booted from while it is still in use (`gc_skipped` is emitted when a run would
+  delete it).
+
+It also drops the cached blob of a plain (non-archive) component when a kept slot holds that file at
+the same size. The cached zip of an archive component stays, because a slot holds only the
+extracted tree and the zip is the delta base for the next release. Before a download, the host
+checks that twice the needed bytes are free; if not, it runs a low-storage GC and, if still short,
+reports `no_space`.
+
+Android denies hard links between app files, so a slot copies files it reuses.

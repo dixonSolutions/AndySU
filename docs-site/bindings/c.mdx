@@ -1,0 +1,74 @@
+---
+title: "C and native payloads"
+description: "The payload contract in andysu_payload.h and the CMake package."
+---
+
+A native payload is a shared library exporting `andysu_payload_v1`, usually through the
+`ANDYSU_PAYLOAD` macro. The same header serves Android native payloads and the Linux desktop host.
+
+```c
+#include <andysu_payload.h>
+
+static int start(const andysu_host *host, const char *state, size_t len) {
+    /* restore state, start rendering; once it works: */
+    host->mark_healthy();
+    return 0;                    /* non-zero: init failed, the host rolls back */
+}
+static char *suspend(size_t *len) {
+    *len = 0;
+    return NULL;                 /* or malloc'd JSON; the host frees it with free() */
+}
+ANDYSU_PAYLOAD(start, suspend)
+```
+
+## The contract
+
+The host calls `start()` once per generation, with the state the previous generation returned from
+`suspend()` (NULL and 0 on a cold start). `suspend()` must release threads, GL objects, audio and file
+handles and return versioned, language-neutral state (JSON recommended) allocated with `malloc()`.
+After a successful start the payload calls `host->mark_healthy()` once it is sure it works.
+
+`ANDYSU_PAYLOAD_FULL(start, suspend, frame)` also registers an optional per-frame tick that runs on the
+host's thread; a non-zero return asks the host to quit.
+
+`andysu_host` fields (Host API level 1):
+
+| Field | Meaning |
+|---|---|
+| `api_level`, `struct_size` | read `api_level` before touching fields added after level 1 |
+| `slot_dir`, `version` | this generation's slot (read-only code) and the payload version |
+| `log(msg)` | log a message |
+| `mark_healthy()` | commit this generation |
+| `emit(json)` | structured event, one JSON object without newline |
+| `request_update_check()` | ask the host to check soon (non-blocking) |
+| `host_data` | opaque |
+| `java_vm`, `activity`, `surface_width`, `surface_height` | Android only; `frame()` runs on the host's GL thread with its EGL context current |
+
+## Declare the entry
+
+Name the entry in the descriptor with `andysu split --entry-native LIB:SYMBOL`, for example
+`libgame:andysu_payload_v1`, or the Gradle plugin's `entryNative`.
+
+## CMake
+
+```sh
+curl -LO https://github.com/dixonSolutions/AndySU/releases/download/v0.1.62/andysu-c-0.1.62-linux-x86_64.tar.gz
+tar xzf andysu-c-0.1.62-linux-x86_64.tar.gz
+cmake -S . -B build -DCMAKE_PREFIX_PATH=$PWD/andysu-c-0.1.62
+```
+
+```cmake
+find_package(AndySU CONFIG REQUIRED)
+target_link_libraries(my_payload PRIVATE AndySU::payload)  # header-only payload contract
+target_link_libraries(my_host PRIVATE AndySU::core)        # the core's C ABI, static
+```
+
+On Android, native payloads need only `AndySU::payload`; the host AAR already carries the core.
+
+## Linux desktop host
+
+`desktop/` in the repository is a Linux host in C over the core's C ABI that live-swaps a `.so`
+payload. It doubles as a fast test loop without Android. It takes `--apply live|restart|next_start`.
+Its scenarios (`make -C desktop test`) cover live swap with carried state, rollback on `start()`
+failure, watchdog expiry, a native crash with one relaunch, next-start mode and three swaps in one
+process.

@@ -1,0 +1,88 @@
+---
+title: "Watchdog and crash detection"
+description: "How a broken release is detected and rolled back, and what the watchdog counts."
+---
+
+A release in TRIAL is guarded by four independent mechanisms.
+
+| Mechanism | Triggers on | Result |
+|---|---|---|
+| Init failure | `start()` throws, or a native `start` returns non-zero | live rollback in the same process |
+| Watchdog | no `markHealthy()` within `watchdog_ms` of foreground time | rollback (live, or relaunch) |
+| Crash detection | uncaught Java exception, or a native signal | crash marker, at most one relaunch, rollback |
+| Boot attempts | more than `max_boot_attempts` cold boots of a TRIAL slot | rollback before loading |
+
+## The watchdog counts foreground time
+
+The watchdog deadline is `watchdog_ms` (default 10000). It counts **only time while the app has a
+started activity** (decision D31):
+
+- When the last activity stops, the host pauses the watchdog and emits `watchdog_paused` with
+  `remaining_ms`.
+- When an activity starts again, the host re-posts the remaining time and emits `watchdog_resumed`.
+  The re-posted time is at least 2 s, or `auto_healthy_ms` plus 2 s in transparent mode so
+  auto-healthy can still fire first.
+- A watchdog armed before any activity has started (a cold start in the background) runs from the
+  moment it was armed.
+
+An app that is backgrounded right after an update, or covered by another app's screen, therefore does
+not lose a healthy release.
+
+<Note>
+  The trade-off is deliberate: a release that never comes to the foreground stays in TRIAL and is
+  not rolled back by the watchdog. Boot-attempt counting still bounds cold starts, and a crash still
+  rolls back at once.
+</Note>
+
+In transparent mode the deadline is longer until the app has started: `max(watchdog_ms,
+auto_healthy_ms + 60 s)`. A live native swap has `max(watchdog_ms, 60 s)` from acceptance until the
+app calls `started()`, and `started()` re-arms the configured watchdog.
+
+## Crash detection
+
+- **Java.** A default uncaught-exception handler emits `uncaught`. During TRIAL it reports a failure to the core (which rolls back) and relaunches; otherwise it passes the exception on to the platform's handler.
+- **Native.** The host installs signal handlers for `SIGSEGV`, `SIGABRT`, `SIGBUS`, `SIGILL` and
+  `SIGFPE`. A handler cannot safely call into the core, so it creates a `crash.marker` file using
+  only async-signal-safe calls, then re-raises. The next launch turns the marker into a failure
+  report, which rolls back if the slot was in TRIAL. Native crashes on non-main threads reach Java
+  through a pipe from the signal handler. The event is `native_crash`.
+- **Relaunch.** During TRIAL a crash relaunches the app **once** through a phoenix activity (a
+  separate process, `:andysu_phoenix`), so the user sees one relaunch, never a crash loop. At most
+  3 relaunches per minute; beyond that `relaunch_suppressed` is emitted. Outside TRIAL, crashes go to
+  the platform as usual and tombstones are kept.
+- **Recovery.** If every payload is broken, the host shows a recovery screen and the recovery updater
+  can still fetch a fix.
+
+## Crash signals policy
+
+An engine that installs its own `SIGSEGV` or `SIGABRT` handler replaces the host's, and a crash would
+not write a marker. The host therefore checks, after a payload starts and every 2 s during a trial,
+whether the handlers were replaced, and emits `crash_handler_replaced` with the signals and a
+`chained` flag. `crash_signals` chooses what happens next (decision D30):
+
+<Tabs>
+  <Tab title="payload (default)">
+    The host only reports. Nothing about the handlers changes. This is right for runtimes that use
+    signals in normal operation, such as Mono and Unity, where a managed null dereference is a
+    `SIGSEGV` that the runtime handles and continues from.
+
+    A payload that replaces the handlers must **chain to the previous handler** for faults it does
+    not handle. If it does not, a crash during a trial is caught only by the watchdog (if the main
+    thread still runs) or by the boot-attempt counter on later launches.
+  </Tab>
+  <Tab title="host">
+    The host re-installs its handlers and keeps the payload's as a chained one. On a crash it writes
+    the marker, wakes the relaunch pipe (so the process is relaunched even if the payload's handler
+    never returns), then calls the payload's handler. Use it for engines that show a crash dialog or
+    never chain. It is wrong for runtimes that use signals in normal operation.
+  </Tab>
+</Tabs>
+
+Set it in `andysu.toml` under `[policy]`. See [Configuration reference](/reference/config).
+
+## Boot attempts
+
+Every launch of a TRIAL slot increments `boot_attempts` before loading. A payload that kills the
+process inside `start()` is rolled back on the launch after the limit, before it loads. The default
+`max_boot_attempts` is 2. This key is read from the host's `config.json`; `andysu host-config` does
+not write it, see [Configuration reference](/reference/config#host-configjson).

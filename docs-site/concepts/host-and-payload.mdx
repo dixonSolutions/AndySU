@@ -1,0 +1,91 @@
+---
+title: "Host and payload"
+description: "The APK is a frozen bootloader. Everything else is a signed payload."
+---
+
+Android does not let an app replace its own APK without `REQUEST_INSTALL_PACKAGES`, an "install
+unknown apps" toggle and a confirmation dialog. AndySU avoids all three by never changing the APK.
+
+## The host
+
+The **host** is the APK you install once. It never changes through AndySU. It contains:
+
+- **Manifest.** Only normal permissions (`INTERNET`, `ACCESS_NETWORK_STATE`,
+  `RECEIVE_BOOT_COMPLETED`), all granted at install with no prompt. It also declares, up front,
+  every component the app might ever need: stub activities (different orientations and launch
+  modes), stub services, a job service, a file provider and stub receivers. See
+  [Permissions and components](/android/permissions).
+- **Bootloader.** Verifies signatures, picks a slot, loads the payload, guards against crashes and
+  rolls back.
+- **Recovery updater.** A minimal fetch, verify and rollback path that never changes. It is the way
+  back if every payload is broken (the host shows a recovery screen).
+- **Trusted root public keys.** The only trust anchor. See
+  [Manifests and signatures](/concepts/manifests-and-signatures).
+- **Host API.** What the payload can use: the Activity, lifecycle, the update client. It only grows:
+  level 2 added methods and removed none. Every payload declares `host_api_min`.
+
+## The payload
+
+The **payload** is everything else, stored per release in a **slot** under
+`noBackupFilesDir/andysu/slots/<version>/`:
+
+- dex files: the whole app, including its libraries and the full updater, which therefore updates
+  itself;
+- native `.so` files, each with a unique file name and SONAME (`lib<name>.<hash8>.so`);
+- assets and other data;
+- `andysu-payload.json`, the descriptor: app id, version, `host_api_min`, the entry point
+  (`entry.dex_class` for JVM payloads, `entry.native_lib` plus `entry.symbol` for native ones), the
+  native load order, and `needs` (permissions and stub counts).
+
+Loading uses public APIs only: `DexClassLoader` and `System.load(absolutePath)`. Payload classes
+load child-first, so the payload's own copies of Kotlin and AndroidX win over anything in the host.
+The exceptions are `com.andysu.api.*` and platform packages.
+
+## Update tiers
+
+| Tier | What | Permissions | Applies | Rollback |
+|---|---|---|---|---|
+| A, content | assets, configs, interpreted code (JS, Lua, WASM, QuakeC, pk3) | none | hot, in-process | instant, in-process |
+| B, code | dex and `.so` payload | none | live generation swap, or next start | live, or on next launch |
+| C, shell | the host APK itself | `REQUEST_INSTALL_PACKAGES` and user approval | reinstall | none |
+
+Tiers A and B are the product. Tier C is an optional "host too old" path: when the best release
+needs a newer `host_api_min` or `shell_min` and has a `shell` entry, the client reports
+`shell_update` instead of applying it. Building around A and B is what makes C rare.
+
+## Two host modes
+
+<CardGroup cols={2}>
+  <Card title="Stub mode" icon="puzzle-piece">
+    Your app's code implements `com.andysu.api.Payload` and runs inside the host's stub
+    components. Works on all API levels from 21 and supports full live swaps with `suspend()` and
+    `start(state)`. Built with the [Gradle plugin](/android/gradle-plugin).
+  </Card>
+  <Card title="Transparent mode" icon="wand-magic-sparkles">
+    For apps that cannot be changed (SDL games, Flutter, Unity, Godot, Cordova). `andysu split
+    --transparent` keeps every component of the original manifest. Android 9+. See
+    [Transparent mode](/android/transparent-mode).
+  </Card>
+</CardGroup>
+
+## On-disk layout
+
+```
+noBackupFilesDir/andysu/
+  state.json                 current slot and state machine (atomic write-rename)
+  state.lock                 exclusive lock for every read-modify-write of the state
+  blobs/sha256/<hash>        verified download cache, content-addressed
+  blobs/sha256/<hash>.part   resumable partial download (HTTP Range)
+  slots/<release-id>/        installed slots (code files read-only)
+  slots/<release-id>.staging/  being built, never loaded
+  factory/<id>/              the payload built into the host APK, unpacked once
+```
+
+`noBackupFilesDir` is used on purpose. `cacheDir` can be purged by the system, and the auto-backed-up
+`filesDir` would restore stale code to another device.
+
+## The built-in payload
+
+A host made by `andysu split` or the Gradle plugin carries a payload inside the APK, so the app
+works before the first update. That payload is also a **delta base**: the first update downloads
+only what changed since the built-in version. See [Deltas and cleanup](/concepts/deltas-and-gc).

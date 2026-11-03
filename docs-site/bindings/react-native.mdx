@@ -1,0 +1,47 @@
+---
+title: "React Native and Expo"
+description: "@andysu/react-native: status and control from TypeScript, plus an Expo config plugin."
+---
+
+## Install
+
+`.npmrc`:
+
+```ini
+@andysu:registry=https://dixonsolutions.github.io/AndySU/npm/
+```
+
+```sh
+npm install @andysu/react-native
+```
+
+For Expo, add `"@andysu/react-native"` to `plugins` in `app.json`. The plugin needs nothing in your
+app's manifest: the host comes from `andysu split --transparent`. It records the location of
+`andysu.toml` in the Android project's `gradle.properties` under the key `andysu.toml` (default
+`../andysu.toml`, or the plugin option `toml`).
+
+The Android library compiles against the AndySU API, so the app's Gradle settings also need the
+[Maven repository](/android/gradle-plugin#repositories).
+
+## Use it
+
+```ts
+import * as AndySU from '@andysu/react-native';
+
+const off = AndySU.onStatus(s => { if (s.state === 'staged') AndySU.applyNow(); });
+AndySU.checkNow();
+AndySU.setApplyPolicy('restart');   // 'live' | 'restart' | 'next_start' | null
+```
+
+| Function | Meaning |
+|---|---|
+| `info()` | `{present, apiLevel?, version?, isFactory?, slotDir?}`; `present: false` without a host |
+| `status()` | current status; `{state: 'idle'}` without a host |
+| `checkNow()`, `applyNow()`, `restartNow()` | as in the [Host API](/android/host-api#updateclient) |
+| `setApplyPolicy(policy)`, `applyPolicy()` | override the policy; read the effective one |
+| `markHealthy()` | commit this payload generation |
+| `onStatus(cb)` | listener; returns an unsubscribe function |
+
+The `Status` type has `state` (`idle`, `checking`, `up_to_date`, `deferred`, `available`,
+`downloading`, `staged`, `applying`, `shell_update`, `error`) and optional `release`, `hot_only`,
+`mandatory`, `download_bytes`, `code` and `message`. See [Status and errors](/reference/status-and-errors).

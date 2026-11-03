@@ -1,0 +1,44 @@
+---
+title: "Godot"
+description: "The andysu addon: an autoload with update status and control."
+---
+
+<Warning>
+  The addon's Android library compiles against Godot 4.7.2, but the GDScript has not been run (no Godot
+  on the development machine).
+</Warning>
+
+## Install
+
+Download `andysu-godot-<version>.zip` from the
+[release](https://github.com/dixonSolutions/AndySU/releases) and unzip it into the project root (it
+contains `addons/andysu/`). Enable *AndySU* under Project Settings, Plugins. The addon registers the
+`AndySU` autoload and adds its Android plugin AAR to Android exports.
+
+Export the Android build, then split the APK with `andysu split --transparent`.
+
+## Use it
+
+```gdscript
+AndySU.set_apply_policy("restart")
+AndySU.check_now()
+
+func _ready():
+    AndySU.status_changed.connect(_on_status)
+
+func _on_status(s: Dictionary):
+    if s.get("state") == "staged":
+        AndySU.apply_now()
+```
+
+| Member | Meaning |
+|---|---|
+| `is_present()` | true under an AndySU host |
+| `version()` | payload version, or an empty string |
+| `status()` | status dictionary, `{"state": "idle"}` without a host |
+| `check_now()`, `apply_now()`, `restart_now()` | as in the [Host API](/android/host-api#updateclient) |
+| `mark_healthy()` | commit this payload (otherwise the host does it after a while) |
+| `set_apply_policy(policy)` | `"live"`, `"restart"`, `"next_start"`, or `""` for the configured policy |
+| signal `status_changed(status: Dictionary)` | status changes |
+
+On platforms without AndySU every call is a no-op.

@@ -1,0 +1,99 @@
+---
+title: "Build and test locally"
+description: "Toolchains, the heavy-job lock, and the commands that CI runs."
+---
+
+## Environment
+
+`scripts/env.sh` puts the user-local toolchains on `PATH`: rustup's `cargo`, Temurin JDK 21
+(`JAVA_HOME`), the Android SDK (`ANDROID_HOME`, NDK 27.2.12479018), platform-tools, emulator and
+cmdline-tools, cmake from the SDK, and Node from `~/.local/bin`.
+
+```sh
+source scripts/env.sh
+```
+
+Requirements on a fresh machine:
+
+- Rust stable with the `aarch64`, `armv7`, `x86_64` and `i686` `linux-android` targets, and
+  `cargo-ndk`. The fuzz job also needs nightly and `cargo-fuzz`.
+- JDK 21 (Capacitor 8 ships Java 21 class files, and AGP supports it; bytecode targets stay at 17 for
+  the host and 8 for the API).
+- Android SDK with NDK 27.2, build-tools and the platforms the project uses.
+- Node 22 for the bindings, Python 3, and podman if you use the emulator container.
+
+## Memory rule: the heavy-job lock
+
+The development machine has 62 GB, but other projects' agents and VMs use most of it. A builder was
+killed by the out-of-memory killer on 2026-11-02, so heavy jobs follow one rule:
+
+```sh
+scripts/heavy.sh <command> [args...]
+```
+
+It is `flock /tmp/andysu-heavy.lock systemd-run --user --scope --quiet -p MemoryMax=10G -p
+MemorySwapMax=0 -- <command>`. Only one heavy job runs at a time, and a job over its limit is killed
+instead of your session or the desktop.
+
+- **Heavy** means Gradle, emulators, cargo release builds and test-bed runs.
+- Check `free -g` before heavy work.
+- Gradle uses `-Xmx2g` (set in `android/gradle.properties`); run `./gradlew --stop` when you are done.
+- Run **one emulator at a time** and shut it down after each test.
+- Do not use git worktrees: ten worktrees once filled the disk.
+
+## Rust
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --features andysu-core/jni,andysu-core/transport -- -D warnings
+cargo test --workspace
+```
+
+Plus the other checks CI makes in the `rust` job:
+
+```sh
+cargo build -p andysu-cli && bash actions/publish/test.sh   # the publish action, against local stand-ins
+bash templates/remote/test.sh                               # the remote template
+scripts/gen-header.sh && git diff --exit-code core/include/andysu.h   # the C header is up to date
+```
+
+Fuzzing runs in CI for 60 seconds per target, seeded with the spec fixtures:
+`cargo fuzz run verify_and_parse` and `parse_manifest` in `core/`.
+
+## Desktop host
+
+```sh
+make -C desktop test
+```
+
+Runs the Linux host's scenarios against real binaries over HTTP.
+
+## Android build
+
+```sh
+cd android
+../scripts/heavy.sh ./gradlew :api:assembleRelease :host:assembleRelease :payload-kit:assembleRelease
+```
+
+The host build compiles the core for all four ABIs through `cargo-ndk`; `-Pandysu.abis=x86_64` limits it.
+Bindings and samples are behind Gradle properties: `-Pandysu.bindings=true`, `-Pandysu.samples=true`.
+
+## Bindings
+
+```sh
+for b in react-native capacitor; do (cd bindings/$b && npm ci && npm run build && npm test); done
+(cd bindings/flutter && flutter pub get && flutter test)    # CI only on the dev machine
+dotnet build bindings/unity/Tests/Compile/Compile.csproj
+sh bindings/c/test.sh
+```
+
+## Device tests and emulators
+
+See [Test suites](/contributing/test-suites).
+
+## Packaging
+
+`scripts/package.sh <site-dir> <base-url>` builds every release package into `dist/` and merges them
+into the static registry site; `scripts/verify-consumers.sh` installs each one from that site in a
+fresh project. CI's `packages` job runs both against a throwaway local site. See
+[Release pipeline](/contributing/release-pipeline).
