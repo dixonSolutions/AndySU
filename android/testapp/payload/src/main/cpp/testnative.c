@@ -27,6 +27,13 @@ JNIEXPORT void JNICALL Java_com_andysu_testpayload_Native_installOwnHandler(JNIE
     sigaction(SIGSEGV, &sa, NULL);
 }
 
+/* 1 while our hanging handler is still the installed SIGSEGV handler (a takeover host replaces it). */
+JNIEXPORT jint JNICALL Java_com_andysu_testpayload_Native_ownHandlerActive(JNIEnv *e, jclass c) {
+    struct sigaction cur;
+    if (sigaction(SIGSEGV, NULL, &cur) != 0) return 0;
+    return !(cur.sa_flags & SA_SIGINFO) && cur.sa_handler == hang_handler;
+}
+
 /* Like Mono: SIGSEGV is part of normal operation. A handler that turns an armed fault into a return
  * (siglongjmp) and chains to the previous handler for any other fault. */
 static struct sigaction g_prev_segv;

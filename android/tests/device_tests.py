@@ -37,6 +37,9 @@ When a scenario fails, android/tests/reports/ also gets, per API level (stamp = 
   device-<stamp>-api<API>-server.log    `andysu serve` request log / stderr
 The job log names these files. CI uploads the whole reports/ directory.
 
+ANDYSU_TEST_IGNORE_EVENT=<event>[:<state>[:<release>]] (e.g. update_status:staged:7.0) drops the
+first such host log line in the harness, to exercise the state.json fallback for lost host lines (liblog drops
+writes while logd is busy).
 ANDYSU_TEST_FORCE_FAIL=<scenario> (e.g. hot, gc, crash-loop) makes the run fail right after that
 scenario's check passes, to exercise the failure dumps above.
 
@@ -110,6 +113,21 @@ class Fail(Exception):
 
 SLOW = 1.0  # --slow: multiplies every timeout (software-emulated devices)
 CONTAINER = False  # --container: run emulators inside the andysu-emulator podman image
+IGNORE_EVENT = os.environ.get("ANDYSU_TEST_IGNORE_EVENT", "")  # "event[:state[:release]]": drop the first such line once
+
+
+def _matches_ignore(ev):
+    """ANDYSU_TEST_IGNORE_EVENT simulates a host log line lost by logd (tests the state.json fallback)."""
+    global IGNORE_EVENT
+    name, _, rest = IGNORE_EVENT.partition(":")
+    state, _, release = rest.partition(":")
+    st = ev.get("status") or {}
+    if ev.get("event") != name or (state and st.get("state") != state) or (release and st.get("release") != release):
+        return False
+    IGNORE_EVENT = ""
+    return True
+
+
 FORCE_FAIL = os.environ.get("ANDYSU_TEST_FORCE_FAIL", "")  # scenario name: fail after it (tests the dumps)
 DROP_LOG = os.environ.get("ANDYSU_TEST_DROP_LOG", "")  # payload event name whose log line is dropped once
 STAMP = time.strftime("%Y%m%d-%H%M%S")
@@ -484,6 +502,9 @@ class Device:
                         ev = json.loads(line)
                     except json.JSONDecodeError:
                         continue
+                    if IGNORE_EVENT and _matches_ignore(ev):
+                        log(f"[{self.api}] ANDYSU_TEST_IGNORE_EVENT: dropping {json.dumps(ev)[:120]}")
+                        continue
                     self.events.append(ev)
                     self.q.put(ev)
 
@@ -530,8 +551,25 @@ class Device:
                          f"event {name} {match}", timeout)
 
     def status(self, state, timeout=120):
-        return self.wait(lambda e: e.get("event") == "update_status" and e["status"].get("state") == state,
-                         f"update status {state}", timeout)
+        try:
+            return self.wait(lambda e: e.get("event") == "update_status" and e["status"].get("state") == state,
+                             f"update status {state}", timeout)
+        except Fail:
+            if state != "staged":
+                raise
+            # The host's own log line can be dropped too (liblog drops writes while logd is busy; seen
+            # on CI: release 6.0 staged per state.json, its "staged" line missing from the full logcat).
+            # Accept state.json only for the release the last observed update_status was fetching.
+            want = next((e["status"].get("release") for e in reversed(self.events)
+                         if e.get("event") == "update_status" and e["status"].get("release")), None)
+            st = self.state()
+            pend = (st.get("pending") or {}).get("id")
+            if want and pend == want and "staged" in (st.get("last_event") or ""):
+                log(f"[{self.api}] WARNING: update status staged: log line missing, {want} is pending in state.json")
+                ev = {"event": "update_status", "status": {"state": "staged", "release": want}, "_from_state": True}
+                self.events.append(ev)
+                return ev
+            raise
 
 
 # ----------------------------------------------------------------------------- scenarios
