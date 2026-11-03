@@ -15,6 +15,8 @@ per API level, boots a headless emulator and checks:
   crash-handler payload replaces the SIGSEGV handler: reported only by default (a handling one commits, a hanging one
                 is rolled back by the watchdog); crash_signals = host re-installs, chains it, marker + relaunch -> rollback
   watchdog      markHealthy never called -> live rollback
+  background-trial  app sent HOME during a trial, away longer than watchdog_ms: the watchdog pauses (watchdog_paused),
+                resumes on return (watchdog_resumed), the release commits, no rollback (D31)
   resume-kill   process killed mid-download -> download resumes from the partial file
   resume-net    connection dropped mid-download -> resumed with Range
   next-start    staged in the background, applied on the next launch, committed
@@ -52,6 +54,7 @@ import argparse
 import json
 import os
 import queue
+import re
 import shutil
 import socket
 import subprocess
@@ -111,6 +114,8 @@ class Fail(Exception):
     pass
 
 
+ANIM_SCALES = ["window_animation_scale", "transition_animation_scale", "animator_duration_scale"]
+WATCHDOG_MS = 6000  # the test host's watchdog_ms
 SLOW = 1.0  # --slow: multiplies every timeout (software-emulated devices)
 CONTAINER = False  # --container: run emulators inside the andysu-emulator podman image
 IGNORE_EVENT = os.environ.get("ANDYSU_TEST_IGNORE_EVENT", "")  # "event[:state[:release]]": drop the first such line once
@@ -185,7 +190,7 @@ class Build:
         cfg = {
             "app": PKG, "channel": "stable", "roots": [open(self.pub).read()], "manifest_url": manifest_url,
             "mode": "auto", "apply": "live", "network": "any", "check_on_open": True,
-            "check_interval_minutes": 360, "watchdog_ms": 6000, "max_boot_attempts": 2, "host_api": 1,
+            "check_interval_minutes": 360, "watchdog_ms": WATCHDOG_MS, "max_boot_attempts": 2, "host_api": 1,
         }
         cp = os.path.join(self.work, "config.json")
         json.dump(cfg, open(cp, "w"), indent=2)
@@ -271,6 +276,7 @@ class Device:
         self.events = []
         self.logcat = None
         self.focus_log = []
+        self.packages = {PKG}
         self._stop_focus = threading.Event()
 
     def adb(self, *args, check=True, timeout=120):
@@ -283,6 +289,8 @@ class Device:
         if self.existing:
             self.adb("wait-for-device", timeout=60)
             self.restore_focus = self.sh("dumpsys window | grep mCurrentFocus", check=False).strip()
+            self.restore_logcat = self._logcat_sizes()
+            self.restore_anim = {k: self.sh(f"settings get global {k}", check=False).strip() for k in ANIM_SCALES}
             self._booted()
             return
         img = IMAGES[self.api]
@@ -310,9 +318,8 @@ class Device:
         self._booted()
 
     def _booted(self):
-        self.sh("settings put global window_animation_scale 0", check=False)
-        self.sh("settings put global transition_animation_scale 0", check=False)
-        self.sh("settings put global animator_duration_scale 0", check=False)
+        for k in ANIM_SCALES:
+            self.sh(f"settings put global {k} 0", check=False)
         self.sh("input keyevent KEYCODE_WAKEUP", check=False)
         self.sh("wm dismiss-keyguard", check=False)
         self.sdk = int(self.sh("getprop ro.build.version.sdk").strip())
@@ -320,14 +327,29 @@ class Device:
         log(f"[{self.api}] booted: SDK {self.sdk}, page size {self.page_size}")
         threading.Thread(target=self._focus_watch, daemon=True).start()
 
+    def _logcat_sizes(self):
+        """Buffer sizes in KiB per logcat buffer (`logcat -g`), to put back after watch() raised them."""
+        sizes = {}
+        for m in re.finditer(r"(\w+): ring buffer is\s+([\d.]+)\s*([KMG])i?B", self.sh("logcat -g", check=False), re.I):
+            sizes[m.group(1)] = int(float(m.group(2)) * {"K": 1, "M": 1024, "G": 1024 * 1024}[m.group(3).upper()])
+        return sizes
+
     def stop(self, keep=False):
         self._stop_focus.set()
         if self.logcat:
             self.logcat.kill()
         if self.existing:
             # Leave a shared device as we found it.
-            self.adb("uninstall", PKG, check=False)
+            for pkg in sorted(self.packages):
+                self.adb("uninstall", pkg, check=False)
             self.adb("reverse", "--remove-all", check=False)
+            for buf, kib in self.restore_logcat.items():
+                self.adb("logcat", "-b", buf, "-G", f"{kib}K", check=False)
+            for k, v in self.restore_anim.items():
+                if v and v != "null":
+                    self.sh(f"settings put global {k} {v}", check=False)
+                else:
+                    self.sh(f"settings delete global {k}", check=False)
             comp = self.restore_focus.split()[-1].rstrip("}") if self.restore_focus else ""
             if "/" in comp and PKG not in comp:
                 self.sh(f"am start -n {comp}", check=False)
@@ -455,6 +477,11 @@ class Device:
         return files
 
     # -- app control
+
+    def fresh(self, pkg):
+        """Uninstall `pkg` (a clean start); on a shared device (--device) it is uninstalled again in stop()."""
+        self.adb("uninstall", pkg, check=False)
+        self.packages.add(pkg)
 
     def install(self, apk):
         self.adb("install", "-r", "-t", apk, timeout=300)
@@ -932,6 +959,29 @@ def scenarios(d, b, r, results):
     d.event("crash_signals", mode="payload")
     ok("crash-handler", "default: handled SIGSEGV resumes and commits 9.2 (no relaunch), hung payload-thread handler -> watchdog rollback, 9.1 bad; host: re-install + chain -> marker, relaunch -> 9.2, 9.0 bad")
 
+    # D31: the trial watchdog counts foreground time only. 9.3 becomes healthy only after the app was stopped
+    # and came back; the app goes HOME right after the swap and stays away longer than watchdog_ms.
+    r.publish("9.3")
+    d.broadcast("check")
+    d.payload("9.3")
+    d.home()
+    paused = d.event("watchdog_paused", timeout=30)
+    d.event("payload_stopped", timeout=30)
+    since = len(d.events)
+    time.sleep(WATCHDOG_MS / 1000 * 2 * SLOW)
+    if any(e.get("event") in ("watchdog", "live_rollback", "rolled_back", "committed") for e in d.events[since:]):
+        raise Fail(f"the trial ended while the app was in the background: {d.events[since:]}")
+    d.launch()
+    resumed = d.event("watchdog_resumed", timeout=30)
+    d.event("payload_resumed", timeout=30)
+    d.event("committed", version="9.3", timeout=30)
+    if any(e.get("event") in ("watchdog", "live_rollback") for e in d.events[since:]):
+        raise Fail("the watchdog fired although the app was away only in the background")
+    if (d.state().get("current") or {}).get("id") != "9.3" or "9.3" in d.state()["bad"]:
+        raise Fail(f"9.3 should be current and not bad: {d.state()}")
+    ok("background-trial", f"9.3 trial: HOME right after the swap, away {WATCHDOG_MS * 2 // 1000} s (watchdog_ms {WATCHDOG_MS}); "
+                           f"watchdog paused with {paused['remaining_ms']} ms left, resumed with {resumed['remaining_ms']} ms, committed, no rollback")
+
     # no dialogs
     bad_focus = [f for f in d.focus_log if any(x in f.lower() for x in
                  ["packageinstaller", "permissioncontroller", "grantpermissions", "application not responding",
@@ -1004,7 +1054,8 @@ def main():
     r = Remote(b, port)
     for v, beh in [("0.9", "ok"), ("1.0", "ok"), ("2.0", "throw_start"), ("3.0", "crash_native"),
                    ("4.0", "crash_java"), ("5.0", "never_healthy"), ("6.0", "exit_on_start"),
-                   ("9.0", "own_handler_crash"), ("9.1", "own_handler_thread"), ("9.2", "handled_segv")]:
+                   ("9.0", "own_handler_crash"), ("9.1", "own_handler_thread"), ("9.2", "handled_segv"),
+                   ("9.3", "healthy_after_resume")]:
         b.payload(v, beh)
     b.payload("7.0", "ok", blob_kb=20000)
     b.payload("7.5", "ok", blob_kb=6000)

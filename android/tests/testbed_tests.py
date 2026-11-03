@@ -30,6 +30,7 @@ import argparse
 import glob
 import json
 import os
+import queue
 import re
 import shutil
 import subprocess
@@ -167,6 +168,28 @@ def screenshot(d, name):
     log(f"screenshot {p}")
 
 
+def wait_committed(d, name, timeout=240):
+    """Wait for the trial to commit. A game's own self-updater may open Android's "install unknown apps"
+    screen over it (seen on a BlissOS VM, whose network stays on); the game then never resumes and the
+    host's auto-healthy cannot fire. Press BACK once per appearance of exactly that Settings activity."""
+    end = time.time() + timeout
+    front = False
+    while time.time() < end:
+        try:
+            ev = d.q.get(timeout=2)
+            if ev.get("event") == "committed":
+                return ev
+        except queue.Empty:
+            pass
+        focus = d.sh("dumpsys window | grep mCurrentFocus", check=False)
+        now = "com.android.settings" in focus and "ManageAppExternalSourcesActivity" in focus
+        if now and not front:
+            log(f"[{name}] the game's updater opened the unknown-sources Settings screen; pressing BACK ({focus.strip()})")
+            d.sh("input keyevent KEYCODE_BACK", check=False)
+        front = now
+    return d.event("committed", timeout=5)  # also accepts the payload events file; raises with the event tail
+
+
 def bed(d, name, spec, work, results):
     pkg = spec["pkg"]
     w = os.path.join(work, name)
@@ -213,11 +236,12 @@ def bed(d, name, spec, work, results):
     srv = subprocess.Popen([dt.ANDYSU, "serve", site, "--addr", f"127.0.0.1:{port}"], stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL)
     try:
-        d.adb("uninstall", pkg, check=False)
+        d.fresh(pkg)
         # No internet for the emulator: the games' own first-run downloads (Xonotic fetches
         # 1.16 GB of pk3s) are not part of this test. The remote is reached over adb reverse.
-        d.sh("svc wifi disable", check=False)
-        d.sh("svc data disable", check=False)
+        if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
+            d.sh("svc wifi disable", check=False)
+            d.sh("svc data disable", check=False)
         d.install(ra["host"]["apk"])
         if name == "xonotic":
             # Before the remote is reachable (no adb reverse yet): the seeding launch must not
@@ -259,7 +283,7 @@ def bed(d, name, spec, work, results):
             raise dt.Fail(f"{vb} should boot in trial: {ev}")
         if el:
             engine_ran(el, mark, f"/slots/{vb}/", f"{vb} updated", LOADER)
-        d.event("committed", timeout=240)
+        wait_committed(d, name)
         time.sleep(10)
         screenshot(d, f"{name}-2-updated-{vb}")
         host_ver = installed_version()
@@ -316,9 +340,10 @@ def probe_vid_restart(args):
     res = {"api": args.api}
     try:
         d.start()
-        d.adb("uninstall", pkg, check=False)
-        d.sh("svc wifi disable", check=False)
-        d.sh("svc data disable", check=False)
+        d.fresh(pkg)
+        if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
+            d.sh("svc wifi disable", check=False)
+            d.sh("svc data disable", check=False)
         d.install(os.path.join(TB, spec["a"]))
         base = seed_xonotic(d, pkg, "+exec probe.cfg")
         cfg = os.path.join(tempfile.mkdtemp(prefix="probe-"), "probe.cfg")
@@ -445,9 +470,10 @@ def live_swap_probe(args):
     el = None
     try:
         d.start()
-        d.adb("uninstall", pkg, check=False)
-        d.sh("svc wifi disable", check=False)
-        d.sh("svc data disable", check=False)
+        d.fresh(pkg)
+        if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
+            d.sh("svc wifi disable", check=False)
+            d.sh("svc data disable", check=False)
         d.install(os.path.abspath(args.apk_a))
         base = seed_xonotic(d, pkg, "+exec probe.cfg" if args.map else "")
         d.sh(f"touch {base}/andysu-swap-hook")  # the loader's TEST HOOK thread only starts with this flag file
@@ -659,9 +685,10 @@ def live_bed(args):
 
     try:
         d.start()
-        d.adb("uninstall", pkg, check=False)
-        d.sh("svc wifi disable", check=False)
-        d.sh("svc data disable", check=False)
+        d.fresh(pkg)
+        if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
+            d.sh("svc wifi disable", check=False)
+            d.sh("svc data disable", check=False)
         d.install(ra["host"]["apk"])
         seed_xonotic(d, pkg)
         d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
@@ -867,9 +894,10 @@ def live_failures_bed(args):
 
     try:
         d.start()
-        d.adb("uninstall", pkg, check=False)
-        d.sh("svc wifi disable", check=False)
-        d.sh("svc data disable", check=False)
+        d.fresh(pkg)
+        if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
+            d.sh("svc wifi disable", check=False)
+            d.sh("svc data disable", check=False)
         d.install(ra["host"]["apk"])
         seed_xonotic(d, pkg)
         d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
@@ -1102,9 +1130,10 @@ def low_storage_bed(args):
             raise dt.Fail(f"--low-storage needs `adb root` (a userdebug image, e.g. the API 34 aosp_atd one): {r.strip()}")
         d.adb("wait-for-device", timeout=60)
         time.sleep(3)
-        d.adb("uninstall", pkg, check=False)
-        d.sh("svc wifi disable", check=False)
-        d.sh("svc data disable", check=False)
+        d.fresh(pkg)
+        if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
+            d.sh("svc wifi disable", check=False)
+            d.sh("svc data disable", check=False)
         d.install(ra["host"]["apk"])
         seed_xonotic(d, pkg)
         d.adb("reverse", f"tcp:{port}", f"tcp:{port}")

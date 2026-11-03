@@ -7,6 +7,7 @@ import android.os.Looper
 import android.os.Process
 import android.util.Log
 import android.widget.TextView
+import com.andysu.api.ActivityEvent
 import com.andysu.api.HostApi
 import com.andysu.api.PayloadAdapter
 import dalvik.system.DexClassLoader
@@ -151,6 +152,20 @@ class TestPayload : PayloadAdapter() {
         activity.setContentView(view)
         emit("payload_attached", JSONObject().put("activity", activity.javaClass.name))
         if (behavior == "ok" || behavior == "hot") main.postDelayed({ host.markHealthy() }, 500)
+    }
+
+    /** "healthy_after_resume": healthy only once the app is back in front after having been stopped (D31). */
+    private var stopped = false
+
+    override fun onActivityEvent(activity: Activity, event: Int) {
+        if (behavior != "healthy_after_resume") return
+        when (event) {
+            ActivityEvent.STOP -> { stopped = true; emit("payload_stopped") }
+            ActivityEvent.RESUME -> if (stopped) {
+                emit("payload_resumed")
+                main.postDelayed({ host.markHealthy() }, 500)
+            }
+        }
     }
 
     override fun onContentUpdated(slotDir: File) {
