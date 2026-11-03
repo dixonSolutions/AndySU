@@ -3,7 +3,7 @@
 #
 #   scripts/heavy.sh testbeds/patches/xonotic-touch/build.sh --out testbeds/build/apks
 #   scripts/heavy.sh testbeds/patches/xonotic-touch/build.sh --out DIR --variants "1.2.9001 1.2.9002"
-#   ... --variants "1.2.9001 1.2.9002 1.2.9003:fail"   (":fail": an engine whose init always fails; ":dex": a Java change; ":nohealthy": never reports healthy; ":crash": SIGSEGV a few seconds in)
+#   ... --variants "1.2.9001 1.2.9002 1.2.9003:fail"   (":fail": an engine whose init always fails; ":dex": a Java change; ":nohealthy": never reports healthy; ":crash": SIGSEGV a few seconds in; ":demo": draws the README demo banner, patch 0008)
 #   ... --no-loader     only the *.patch files (no resident loader sources): the stock engine layout
 #
 # What it does, in order:
@@ -127,6 +127,7 @@ for SPEC in $VARIANTS; do
         fail) export ORG_GRADLE_PROJECT_andysu_fail_init=1 ;;                          # init always fails
         nohealthy) export ORG_GRADLE_PROJECT_andysu_test_defs=ANDYSU_NO_HEALTHY ;;      # swaps in, never healthy
         crash) export ORG_GRADLE_PROJECT_andysu_test_defs=ANDYSU_CRASH_AFTER_START ;;   # SIGSEGV 60 frames in
+        demo) export ORG_GRADLE_PROJECT_andysu_test_defs=ANDYSU_DEMO_OVERLAY ;;         # on-screen release/pid/uptime banner (0008)
     esac
     EJ=android/app/src/main/java/io/github/dixonsolutions/xonotictouch/EngineSwap.java
     if [ "$OPT" = dex ] && [ -f "$EJ" ]; then

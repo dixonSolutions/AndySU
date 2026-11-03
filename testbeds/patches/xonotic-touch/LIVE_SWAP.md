@@ -760,3 +760,68 @@ version, native lib dir, asset loader) in the same main-thread task, after the h
 unlikely). `beforeEngineStart` now waits for the main looper (a task queued while the host's task is
 running or pending runs after it) and requires the host version to be `toVersion` before unpacking; a
 mismatch is an `IOException` (`game_data_failed`), the loader treats it as a failed start and rolls back.
+
+---------------------------------------------------------------------------------------------------
+
+## 12. README demo video, 2026-11-03
+
+`docs/media/andysu-xonotic-live-update.mp4` (+ `.gif` preview, `-poster.png`): split screen, real AndySU logs on the
+left, Xonotic Touch on an API 36 emulator on the right, updating live from a GitHub Pages remote. Everything is made by
+`testbeds/patches/xonotic-touch/demo/record.py` (three stages: `site`, `record`, `render`; `--dry-run` uses a local
+`andysu serve` + `adb reverse` remote and its own host, and never writes to `docs/media`).
+
+What the video shows, in order: the host APK installed once with release 1.2.9101 built in (blue banner); the
+publisher's terminal (the captured `andysu split / pack / publish / verify --blobs` output, replayed with its own
+timestamps, long JSON blocks shortened with `[... n more lines]`); a check in the running app (`cmd jobscheduler run -f`
+on the host's job, as the test beds do) that finds the signed release on GitHub Pages, downloads about 5.9 MB in the
+background and stages it; `live_swap_requested -> engine_stopped -> engine_start(swapped=1) -> live_swapped ->
+engine_healthy -> committed`, all in one pid; the banner turning green (release 1.2.9102, `live swaps 1`) while pid
+and process uptime keep counting; then proof lines read over adb (same pid, same `versionName`, same `lastUpdateTime`,
+same `base.apk` sha256, no installer / permission / unknown-sources screen in the window focus log, `appops
+REQUEST_INSTALL_PACKAGES` untouched). The screen is black for a few seconds while the engines swap: that is real.
+Wording: "no install-unknown-apps flow, no install prompt, same APK". The host APK does declare
+`REQUEST_INSTALL_PACKAGES` (transparent mode keeps the app's own manifest), but nothing ever uses it.
+
+Reproduce (heavy jobs through `scripts/heavy.sh`, one emulator at a time):
+```
+source scripts/env.sh
+scripts/heavy.sh testbeds/patches/xonotic-touch/build.sh --out testbeds/build/apks-demo --variants "1.2.9101:demo 1.2.9102:demo"
+python3 testbeds/patches/xonotic-touch/demo/record.py site          # key in ~/.config/andysu/keys/xonotic-demo/, host APK,
+                                                                    # site in testbeds/build/xonotic-demo-site/ (publish demo/xonotic/)
+scripts/heavy.sh python3 testbeds/patches/xonotic-touch/demo/record.py record     # emulator, screenrecord, logcat, cue
+python3 testbeds/patches/xonotic-touch/demo/record.py render --raw testbeds/build/xonotic-demo/raw/real
+```
+- Patch `0008-andysu-demo-overlay.patch`, build variant `:demo` (`ANDYSU_DEMO_OVERLAY`): the banner top left, menu and
+  game: release (`ANDYSU_BUILD_ID`), `pid`, `process up N s` (`CLOCK_BOOTTIME` minus `/proc/self/stat` starttime;
+  `/proc/uptime` is not readable by apps on current Android), `live swaps K` (the `swap_count` in the state the loader
+  keeps), accent colour from the last digit of the build id (1 blue, 2 green). Other builds are unchanged.
+- The host config of the video: `apply live`, `mode auto`, `check_on_open false`, `watchdog_ms 45000`, `host_api 2`,
+  manifest `https://dixonsolutions.github.io/AndySU/demo/xonotic/stable/update.json`, signed with a dedicated demo key.
+- The emulator is put in airplane mode until the cue. Without that the host's own scheduled job (it fires right after
+  the first launch) finds the already published B and swaps it in before the recording starts.
+- Engine arguments skip Xonotic Touch's first-run dialogs (`touch_profile_done`, `touch_setup_done`,
+  `_termsofservice_accepted`), so both releases show the main menu.
+
+Found while making it, and fixed by patch `0009-andysu-ignore-stale-window-events.patch`: after every live swap
+(milestones 2a-2c, 11) the new engine never drew another frame. The beds counted `engine_frames`, which kept counting,
+and `live-swap-final.png` shows the screen stuck on the loading plaque. Cause (engine log of `vid_hidden`, `scr_loading`
+and every SDL window event, see the gap in the screen recording): the old engine's window is destroyed and hidden, SDL
+stays initialised, and the HIDDEN / FOCUS_LOST events of that window are still in SDL's queue; the new engine's window has
+the same id (1), so the new engine took the stale `SDL_WINDOWEVENT_HIDDEN` for its own, set `vid_hidden`, and
+`SCR_UpdateScreen` returned early forever (no SHOWN event follows). The fix ignores a HIDDEN event while the current
+window's SDL flags say SHOWN (SDL has already updated the flags when it posts a real hide). Any APK built before 0009
+shows a frozen screen after a live swap; rebuild the beds' APKs to get it.
+
+Result of the recording against the real remote (API 36 google_apis emulator, container mode, 2026-11-04):
+`docs/media/andysu-xonotic-live-update.mp4` is 3.10 MB, 69.0 s, 1920x1080, H.264 yuv420p, 15 fps, faststart (copy in
+`docs-site/media/` for the docs Introduction page); `.gif` 1.66 MB, 1000x563, 8 fps, 20 s (from just before the swap
+request to a few seconds after the commit); `-poster.png` a frame after the commit. Timeline in the video: cue at 17.5 s,
+`live_swap_requested` 28.7 s, `live_swapped` 30.1 s, `committed` 45.9 s (about 28 s from the cue to the commit, the
+download of 5,915,418 bytes from GitHub Pages included). Proof lines of that run: pid 3634 before and after,
+`versionName` 1.2.9101 and `lastUpdateTime` unchanged, `base.apk` sha256 `91ddef0273f9...` unchanged, no installer,
+permission or unknown-sources window in the focus log (launcher, then Xonotic's activity only), `appops
+REQUEST_INSTALL_PACKAGES` "No operations". Xonotic Touch's own self-updater did not open the unknown-sources screen.
+The emulator image has no `curl`; that the emulator reaches the remote is shown by the host's own `update_status`
+events for 1.2.9102 (`downloading`, `staged`) fetched from the Pages URL. Left panel notes: the long JSON of
+`update_status` and `committed` is shown without its constant fields, the publisher's terminal is the output captured
+when the site was built (its timestamps are those of that run), `lib` paths are shortened with `...`.
