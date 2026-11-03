@@ -51,6 +51,10 @@ does not try to defend against. Each defence names the test that exercises it.
 
 - **A compromised device** (root, a malicious system image, an attacker with `adb`). Such an
   attacker can change the app's private files or the host itself.
+  - One test hook depends on this: on a debuggable app or a `userdebug`/`eng` system image, the host
+    reads a fake free-storage figure from `<root>/test_allocatable_bytes` in its private files. It
+    only changes how much the GC keeps and when a download stops with `no_space`; signatures,
+    sequence checks and slot choice are unaffected.
 - **A malicious developer.** AndySU proves that code came from the key holder, not that the code
   is benign.
 - **Confidentiality of payloads.** Payloads are public files on the remote. Do not put secrets in

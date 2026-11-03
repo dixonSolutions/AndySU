@@ -648,7 +648,8 @@ for 12 s, and the next start boots D.
 Not covered by the bed: watchdog expiry on a live trial (relaunch into the previous slot) and a
 native crash during the trial (the engine installs its own signal handlers, so AndySU's marker may
 not be written; `max_boot_attempts` then decides), a second live swap after a cold start into a
-slot (the GC guard keeps the booted slot; reasoned, not run), a real device.
+slot (the GC guard keeps the booted slot; reasoned, not run), a real device. (Since covered: 2c in
+section 9, the low-storage guard in section 10.)
 After an in-process rollback the unpacked game data belongs to the failed release until the next
 start re-unpacks it (the data prepare only runs for the swap, not for the rollback).
 
@@ -679,3 +680,22 @@ watchdog (relaunch, previous slot), so the rollback happened but late and with a
 screen. With 0006 the host's handler runs (marker, pipe poke, relaunch from the crash-watch thread)
 and the rollback needs one relaunch. No host change was needed. In a plain (non-AndySU) APK the
 crash now goes to Android's default handler instead of the dialog.
+
+---------------------------------------------------------------------------------------------------
+
+## 10. Low-storage GC guard, 2026-11-03
+
+`AndySU.gc()` never deletes the slot a live-swapped process booted from. Its dex and its
+not-yet-loaded libraries are still read from there until the next cold start. If that slot is
+still `previous`, the GC keeps it even under low storage. If it is no longer kept at all, the GC
+is skipped. Low storage is faked with `<root>/test_allocatable_bytes` (an `Updater` hook honoured
+only on debuggable apps or userdebug/eng images), written over `adb root`.
+Test: `scripts/heavy.sh python3 android/tests/testbed_tests.py --low-storage --api 34 --apk-a ..9001
+--apk-b ..9002 --apk-c ..9005 --apk-d ..9008 --apk-e ..9007` (evidence: `docs/evidence/low-storage.json`):
+- A -> B live, cold restart: B runs from `slots/B`.
+- 190 MiB "free", C swaps in live: the GC runs with `low_storage=true` and removes nothing.
+  The state is `current=C previous=B`, and both slots are on disk.
+- D swaps in live in the same process: `gc_skipped` ("booted slot B is in use"). B, C and D are on disk.
+- 100 kB "free", E offered: the pre-download GC is skipped too, the status is `no_space`, and B stays.
+- Cold start into D: the same pre-download GC removes C's slot (the normal low-storage rule) and is
+  not skipped.
