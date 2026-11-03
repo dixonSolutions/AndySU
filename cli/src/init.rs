@@ -269,7 +269,7 @@ fn next_steps(kind: &str) -> &'static str {
         "gradle" => "Add the plugin: plugins { id(\"io.github.dixonsolutions.andysu\") } (see docs/REGISTRIES.md),\nimplement com.andysu.api.Payload, and set andysu { role = \"payload\"; entryClass = \"...\" }.",
         "flutter" => "Add the andysu Flutter package (bindings/flutter) and build with `andysu split build/app/outputs/flutter-apk/app-release.apk`.",
         "react-native" | "expo" => "Add @andysu/react-native (bindings/react-native); Expo: add the config plugin to app.json.",
-        "capacitor" | "cordova" => "Add @andysu/capacitor (bindings/capacitor); web assets update hot.",
+        "capacitor" | "cordova" => "Add @andysu/capacitor (bindings/capacitor), then `andysu split app.apk --transparent`;\nupdates apply on restart (live_fallback).",
         "unity" => "Add the com.andysu.unity package (bindings/unity) through the scoped registry.",
         "godot" => "Copy bindings/godot/addons/andysu into the project.",
         "cmake" => "Link AndySU::payload (bindings/c) and export ANDYSU_PAYLOAD(start, suspend).",

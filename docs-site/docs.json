@@ -24,7 +24,21 @@
         "groups": [
           {
             "group": "Get started",
-            "pages": ["index", "quickstart"]
+            "pages": [
+              "index",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "tutorials/first-live-update",
+              "tutorials/existing-apk",
+              "tutorials/live-engine-updates",
+              "tutorials/github-actions",
+              "tutorials/test-locally",
+              "tutorials/production-checklist"
+            ]
           },
           {
             "group": "Concepts",
@@ -72,7 +86,10 @@
           },
           {
             "group": "Security and help",
-            "pages": ["security", "troubleshooting"]
+            "pages": [
+              "security",
+              "troubleshooting"
+            ]
           }
         ]
       },

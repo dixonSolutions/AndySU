@@ -1,0 +1,109 @@
+---
+title: "Test updates locally"
+description: "Serve releases from your machine, watch every step on the device, and rehearse rollbacks before your users do."
+---
+
+You do not need a public remote to test the whole update path. `andysu serve` is a static HTTP
+server with `Range` and `ETag` support, and `adb reverse` lets the device reach it as `127.0.0.1`.
+
+## 1. A debug host that talks to your machine
+
+Build a **separate debug host** whose manifest URL points at the local server. Never ship a host
+built this way: the URL is frozen into it.
+
+<Tabs>
+  <Tab title="Gradle plugin">
+    In `andysu.toml` for the debug build:
+
+    ```toml
+    [remote]
+    type = "custom"
+    base = "http://127.0.0.1:8787"
+    channel = "stable"
+    ```
+
+    Android blocks plain HTTP by default. Allow it for `127.0.0.1` only, in the host's **debug**
+    source set (`app/src/debug/res/xml/network_security_config.xml`):
+
+    ```xml
+    <network-security-config>
+        <domain-config cleartextTrafficPermitted="true">
+            <domain includeSubdomains="false">127.0.0.1</domain>
+        </domain-config>
+    </network-security-config>
+    ```
+
+    and reference it with `android:networkSecurityConfig="@xml/network_security_config"` on the
+    `<application>` of the debug manifest. The repository's samples do exactly this.
+  </Tab>
+  <Tab title="andysu split">
+    Use the same `andysu.toml` remote, then split with `--cleartext`, which sets
+    `usesCleartextTraffic` on the host:
+
+    ```sh
+    andysu host-config --config-out config.json --host-out andysu-host.json
+    andysu split app-1.0.apk --out out --transparent --cleartext \
+      --host-template andysu-host-template-<version>.zip --config config.json --keystore debug.jks
+    ```
+  </Tab>
+</Tabs>
+
+## 2. Serve releases
+
+```sh
+andysu pack out-1.1/payload --site site --host andysu-host.json   # add --no-rename for transparent payloads
+andysu publish --site site --release 1.1 --key .andysu/andysu-root.key
+andysu serve site --addr 127.0.0.1:8787
+adb reverse tcp:8787 tcp:8787
+```
+
+## 3. Watch the device
+
+```sh
+adb logcat -s AndySU-Event AndySU
+```
+
+Every step is a JSON line under `AndySU-Event`: `booted`, `update_status` (`checking`,
+`downloading`, `staged`), `live_swapped` or `restart_to_apply`, `committed`, `live_rollback`,
+`rolled_back`, `gc`. They are listed in the [events reference](/reference/events).
+
+The host's state file shows what is installed. For a debuggable app:
+
+```sh
+adb shell run-as com.example.app cat no_backup/andysu/state.json
+```
+
+It has `current`, `previous`, `pending`, `trial` and the `bad` list.
+
+## 4. Trigger checks on cue
+
+The host checks on every app open. To check in a running app, call `updates().checkNow()` from a
+debug menu, or run the host's background job directly:
+
+```sh
+adb shell cmd jobscheduler run -f com.example.app 1095648345   # 0x414e4459, the host's job id
+```
+
+## 5. Rehearse failures
+
+Publish a deliberately broken release and confirm it rolls back:
+
+| Rehearsal | How | What you should see |
+|---|---|---|
+| Start-up failure | throw in `Payload.start()` | `live_rollback` in the same process, release in `bad` |
+| Crash in a trial | crash a few seconds after start | `native_crash` or a Java crash, one relaunch, previous release |
+| Hang | never call `markHealthy()` | `watchdog` after `watchdog_ms` of foreground time, rollback |
+| Crash loop | kill the process during start, every time | rollback before loading, after `max_boot_attempts` |
+| Interrupted download | `andysu serve site --drop-after 300000 --drop-prefix blobs/` | `download_interrupted`, then a resumed download (`Range`) |
+| Slow network | `andysu serve site --throttle-kbps 64` | downloads progress in the background while the app runs |
+| Tampered remote | edit a byte of `update.json` | `bad_signature`; the running release is untouched |
+| Replayed manifest | serve an older signed manifest | `sequence_rollback` |
+
+A release marked bad is never offered again on that install. Publish a fixed release with a new
+version to move on.
+
+<Tip>
+  AndySU's own device suite (`android/tests/device_tests.py`) runs every row of this table on
+  emulators for each pull request. Its scenarios are a good template for your own tests; see
+  [Test suites](/contributing/test-suites).
+</Tip>

@@ -1,0 +1,114 @@
+---
+title: "Publish from GitHub Actions"
+description: "Build, pack, sign and publish every release from CI, to GitHub Releases or GitHub Pages."
+---
+
+The `dixonSolutions/AndySU/actions/publish` action packs a payload directory, signs the channel
+manifest and uploads everything to your remote. `andysu init` writes a starting workflow to
+`.github/workflows/andysu.yml`.
+
+<Steps>
+  <Step title="Store the signing key as a secret">
+    ```sh
+    gh secret set ANDYSU_SIGNING_KEY < .andysu/andysu-root.key
+    ```
+
+    Then move the key file somewhere safe and offline. The public half, `andysu-public.pem`, is
+    committed; it is built into the host. For day-to-day signing you can use a short-lived release
+    key certified by the root instead, see [Keys and certificates](/publishing/keys-and-certificates).
+  </Step>
+
+  <Step title="Write the workflow">
+    ```yaml
+    name: andysu-publish
+    on:
+      push:
+        branches: [main]
+    permissions:
+      contents: write          # create releases or push the Pages branch
+    jobs:
+      publish:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          - uses: actions/setup-java@v4
+            with: { distribution: temurin, java-version: 21 }
+          # Build the payload. Gradle plugin:
+          - run: ./gradlew :payload:andysuPayloadRelease
+          # (or: build your APK, then `andysu split app.apk --out out --transparent`)
+          - id: andysu
+            uses: dixonSolutions/AndySU/actions/publish@main
+            with:
+              payload: payload/build/andysu/payload/release
+              config: andysu.toml
+              signing-key: ${{ secrets.ANDYSU_SIGNING_KEY }}
+          - run: echo "Published ${{ steps.andysu.outputs.release }} to ${{ steps.andysu.outputs.manifest-url }}"
+    ```
+
+    Pin the action to a release tag instead of `@main` for reproducible builds.
+  </Step>
+
+  <Step title="Pick the remote in andysu.toml">
+    The action reads `[remote]`:
+
+    - `type = "github"`: the manifest and blobs become release assets. The stable channel is the
+      **latest** release, so use a dedicated updates repository if your main repository has other
+      releases.
+    - `type = "pages"`: the whole site is committed to the `pages-branch` (default `gh-pages`). Turn
+      on GitHub Pages for that branch once, in the repository settings.
+
+    See [Remotes](/publishing/remotes) for details.
+  </Step>
+</Steps>
+
+## Inputs
+
+| Input | Default | Meaning |
+|---|---|---|
+| `payload` | (required) | payload directory from `andysu split`, the Gradle plugin or your build |
+| `config` | `andysu.toml` | remote type, repository and channel |
+| `signing-key` | (required) | signing key PEM, from a secret |
+| `signing-cert` | | root certificate (JSON) when `signing-key` is a certified release key |
+| `version` | the payload's version | release id |
+| `channel` | the one in `andysu.toml` | channel to publish to |
+| `pack-args` | | extra `andysu pack` arguments, for example `--no-rename` (transparent payloads), `--hot assets/`, `--archive assets/data` |
+| `rollout` | | staged rollout percentage, 1 to 100 |
+| `pages-branch` | `gh-pages` | branch GitHub Pages serves (`type = "pages"`) |
+| `andysu-version` | `latest` | CLI release to use, for example `0.1.62` |
+| `token` | `github.token` | token with `contents: write` |
+
+Outputs: `manifest-url` and `release`.
+
+<Warning>
+  For a transparent-mode app, always set `pack-args: --no-rename`. See
+  [Transparent mode](/android/transparent-mode).
+</Warning>
+
+## Staged rollouts and channels
+
+Publish to a `beta` channel first, then promote:
+
+```yaml
+- uses: dixonSolutions/AndySU/actions/publish@main
+  with:
+    payload: build/andysu/payload/release
+    signing-key: ${{ secrets.ANDYSU_SIGNING_KEY }}
+    channel: beta
+    rollout: 20          # 20% of installs on this channel
+```
+
+Each install decides with its random install id (hashed with a per-release salt) whether it is inside
+the rollout. Raising the percentage for the same release later only adds devices; `andysu sign` can
+change it without republishing. See [Rollouts and channels](/publishing/rollouts-and-channels).
+
+## Keep manifests fresh
+
+Signed manifests expire, so a frozen remote cannot be replayed forever. If you do not release often,
+re-sign on a schedule with `andysu sign`, which refreshes the expiry. See
+[Re-sign before expiry](/publishing/publish-flow#re-sign-before-expiry).
+
+## How AndySU itself does it
+
+AndySU's own release workflow publishes a demo channel on every merge to `main`: it builds the
+Compose sample, packs it against all earlier releases (deltas), signs with a CI test key and pushes
+the site to GitHub Pages. See [Release pipeline](/contributing/release-pipeline).

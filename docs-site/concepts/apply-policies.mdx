@@ -8,7 +8,7 @@ After a release is staged, the **apply policy** decides when it runs. Set it in 
 
 | `apply` | Behaviour |
 |---|---|
-| `live` (default) | Swap the payload in-process while the app runs. Content-only releases apply hot. |
+| `live` (default) | Swap the payload in-process while the app runs. In stub mode, content-only releases apply hot. Transparent apps need a `LiveSwapHandler`, otherwise `live_fallback` applies. |
 | `restart` | Relaunch once to apply (`restart_when = "now"`, the default), or end the process when the user leaves (`restart_when = "background"`). |
 | `next_start` | Stage only. The next cold start applies it. |
 

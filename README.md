@@ -68,7 +68,7 @@ Apply policy, in `andysu.toml` and changeable at runtime:
 
 | `apply` | Behaviour |
 |---|---|
-| `live` (default) | swap in-process while the app runs; content-only releases apply hot |
+| `live` (default) | swap in-process while the app runs; content-only releases apply hot (stub mode) |
 | `restart` | relaunch once to apply (`restart_when = "now"`), or end the process when the user leaves (`"background"`) |
 | `next_start` | stage only; the next cold start applies it |
 

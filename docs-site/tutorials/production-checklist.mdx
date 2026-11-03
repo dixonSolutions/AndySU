@@ -1,0 +1,65 @@
+---
+title: "Production checklist"
+description: "What to decide and verify before the first public release, because the host APK is frozen."
+---
+
+The host APK is installed once and never changes. Anything frozen into it, such as the manifest URL,
+the trusted keys, the permissions and the stub components, can only change with a reinstall.
+Get these right before users install it.
+
+## Frozen into the host
+
+- [ ] **Remote URL.** The `[remote]` in `andysu.toml` becomes the manifest URL inside the host. Use
+  a URL you will control for years: your own domain (`type = "custom"`), or a dedicated GitHub
+  repository for updates. Not a personal fork, and not a repository you may rename.
+- [ ] **Trusted root keys.** `roots` can list several public keys. Consider shipping a second,
+  offline backup root so a lost or compromised key can be replaced without a reinstall. See
+  [Rotating the root key](/publishing/keys-and-certificates#rotating-the-root-key).
+- [ ] **Permissions and components.** List in `[host]` every permission and every service, receiver
+  and provider the app may ever need. `andysu pack --host andysu-host.json` refuses payloads that
+  need more, so you find out at build time, not on devices.
+- [ ] **Host API level.** Build with the newest host AAR and set `host_api` to the level your
+  payloads need. Level 2 is required for [live native swaps](/tutorials/live-engine-updates).
+- [ ] **Signing key of the APK.** Sign the host with your existing release key, so it installs over
+  the version users already have and later reinstalls stay possible.
+
+## Keys and signing
+
+- [ ] The root private key is **offline**: not in the repository, not on a laptop that syncs.
+  `andysu init` adds `.andysu/` and `*.key` to `.gitignore`.
+- [ ] CI signs with a **short-lived release key** certified by the root
+  (`andysu keygen --release --days 90`), stored as `ANDYSU_SIGNING_KEY` and `ANDYSU_SIGNING_CERT`.
+- [ ] Someone owns renewing that certificate, and re-signing manifests before they expire
+  (`publish --expires-days`, default 30; refresh with `andysu sign`). Expired manifests are
+  rejected, which is a protection against replay, not a bug.
+
+## Release policy
+
+- [ ] **Apply policy.** `apply = "live"` for apps that keep state across swaps; `restart` with
+  `restart_when = "background"` is the least disruptive for everything else. Transparent apps also
+  need `live_fallback`. See [Apply policies](/concepts/apply-policies).
+- [ ] **Health signal.** Call `markHealthy()` when the app is *really* working, for example after the
+  first screen has rendered or the first network call has succeeded, not at the top of `start()`.
+  Transparent apps commit after `auto_healthy_ms` on screen.
+- [ ] **Watchdog.** `watchdog_ms` (default 10 s of foreground time) must be longer than your slowest
+  healthy start on a low-end device.
+- [ ] **Network.** `network = "unmetered"` if payloads are large; checks then wait for Wi-Fi.
+- [ ] **Rollouts.** Publish to a small percentage or a `beta` channel first; widen later with
+  `andysu sign`. See [Rollouts and channels](/publishing/rollouts-and-channels).
+
+## Before every release
+
+- [ ] `andysu verify <manifest URL> --pub andysu-public.pem --blobs` passes against the **live**
+  remote, exactly as a client checks it.
+- [ ] The release was installed over the previous one on a test device and committed
+  (`committed` in `adb logcat -s AndySU-Event`).
+- [ ] A rollback was rehearsed at least once for this app. See
+  [Test updates locally](/tutorials/test-locally#5-rehearse-failures).
+- [ ] State format changes are versioned: the new `start(state)` reads the old generation's state,
+  and a rollback can still read what the new one wrote.
+
+## Store policy
+
+AndySU is for apps distributed **outside** Google Play and F-Droid. Play forbids downloading
+executable code from outside Play, and F-Droid requires self-updaters to be off. Do not ship an
+AndySU host through those stores. See [Security](/security).
