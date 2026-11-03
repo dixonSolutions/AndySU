@@ -1,6 +1,7 @@
 package com.andysu.host
 
 import android.os.Build
+import android.util.Log
 import com.andysu.api.Payload
 import org.json.JSONObject
 import java.io.File
@@ -44,9 +45,24 @@ class Generation private constructor(
                 // Before API 26 DexClassLoader needs a writable optimized-dex directory; keep it in the
                 // slot so it goes away with the slot.
                 val odex = if (Build.VERSION.SDK_INT < 26) File(dir, ".oat").apply { mkdirs() }.path else null
-                val loader = PayloadClassLoader(dex.joinToString(File.pathSeparator), odex, libDir, Generation::class.java.classLoader!!, libs)
-                val payload = loader.loadClass(dexClass).getDeclaredConstructor().newInstance() as Payload
-                return Generation(dir, factory, version, payload, 0, loader)
+                val dexPath = dex.joinToString(File.pathSeparator)
+                var attempt = 1
+                while (true) {
+                    val loader = PayloadClassLoader(dexPath, odex, libDir, Generation::class.java.classLoader!!, libs)
+                    try {
+                        val payload = loader.loadClass(dexClass).getDeclaredConstructor().newInstance() as Payload
+                        return Generation(dir, factory, version, payload, 0, loader)
+                    } catch (e: VerifyError) {
+                        // ART verifies a custom loader's classes on its background "Verification thread" too, calling
+                        // back into loadClass concurrently with this thread. A class that fails there stays erroneous
+                        // in that loader for good, even when the failure was a transient resolution miss (seen once:
+                        // java.lang.Object "unresolved"). Class state is per loader, so a fresh loader gets a clean
+                        // verdict; a payload that really does not verify fails the same way again and rolls back.
+                        if (attempt >= 2) throw e
+                        Log.w("AndySU", "payload $version failed verification ($e); retrying with a fresh class loader")
+                        attempt++
+                    }
+                }
             }
             val entry = plan.str("entry_lib") ?: error("payload has neither dex_class nor native_lib")
             val symbol = plan.str("symbol") ?: error("native payload without symbol")

@@ -401,6 +401,27 @@ with the Actions secrets set by `scripts/setup-secrets.sh` (CI test keys) and Pa
   emulator boot timeout) and two unexplained ones (API 34: a payload log line not seen; API 31:
   a download stuck in `downloading`). Since PR #6, failures upload full logcat, thread dumps,
   app data and the server log, to explain the next one.
+- **What the dumps showed (2026-11-03):**
+  - **A real bug: a split host's built-in payload failed class verification** once on API 31
+    (`VerifyError: ... 'Unresolved Reference: java.lang.Object'`), and the app ran without its
+    payload until an update arrived. A worker (Sonnet) investigated it and the lead reviewed
+    the work. The leading hypothesis: ART's background verification thread resolves classes
+    through our child-first `PayloadClassLoader` (an "unsupported" loader, so resolution goes
+    through Java callbacks) concurrently with the main thread, and one resolution failed
+    transiently. **Not proven:** 0 of 170 local reproductions failed (split first launch on the
+    API 31 image, 70 before and 100 after, with and without CPU stress), and 1,600 in-process
+    stress rounds with a replica loader also passed.
+  - **Mitigation, not a fix:** when a payload fails verification, the host retries once with a
+    fresh class loader (class state is per loader, and a payload that really doesn't verify fails
+    again and rolls back as before). `loadClass` now logs any unexpected throw with the thread
+    name, so a recurrence will show the cause.
+  - **The "payload X started" timeouts** (API 34, then API 31 and 36): the host's events show
+    `start()` returned, but the payload's own log line is missing even from the full logcat.
+    liblog drops writes while logd is busy. The test payload now also records its latest event
+    of each kind in a file. On a timeout the harness accepts the event from that file only if
+    its pid matches the live app process, and logs a warning. Shown with a deliberately dropped
+    line on API 31; the suite passes on API 31 and 34.
+  - CI now retries an emulator job only when the emulator never reached the tests (PR #10).
 `actions/publish/test.sh` covers both remote types: three releases with deltas and a 50%
 rollout, against a bare git repo and a stand-in `gh`, then a simulated client updates from each.
 
