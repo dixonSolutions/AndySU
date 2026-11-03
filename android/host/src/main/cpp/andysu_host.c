@@ -8,6 +8,9 @@
  *    thread it also pokes a pipe watched from Java (which relaunches cleanly through the phoenix
  *    activity) and parks the crashing thread; on the main thread it chains to the previous
  *    handler (the process dies; the next launch rolls back).
+ *  - If a payload replaces these handlers (D30), check_handlers() reports it; with crash_signals =
+ *    "host" it also re-installs ours and keeps the payload's as a chained handler, called after
+ *    the marker is written.
  */
 #include <android/log.h>
 #include <dlfcn.h>
@@ -40,6 +43,7 @@ static JavaVM *g_vm;
 static jclass g_bridge;            /* com.andysu.host.NativeBridge (global ref) */
 static jmethodID g_on_healthy, g_on_log, g_on_emit, g_on_check;
 static char g_err[512];
+static void check_after_start(void); /* crash handling, below */
 
 /* A missing callback must not take the host down: log it and leave that callback unset. */
 static jmethodID static_method(JNIEnv *env, jclass c, const char *name, const char *sig) {
@@ -169,6 +173,7 @@ JNIEXPORT jint JNICALL Java_com_andysu_host_NativeBridge_start(JNIEnv *env, jcla
     }
     int rc = g->p->start(&g->host, (const char *)b, (size_t)len);
     if (b) (*env)->ReleaseByteArrayElements(env, state, b, JNI_ABORT);
+    check_after_start();
     return rc;
 }
 
@@ -201,23 +206,51 @@ static int g_notify_fd = -1;
 static pid_t g_main_tid;
 static volatile int g_relaunch; /* set by Java while a generation is on trial */
 static struct sigaction g_old[32];
+static struct sigaction g_host_sa;
 static const int g_sigs[] = {SIGSEGV, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGTRAP};
+/* A handler a payload installed over ours (D30), kept to call after the marker is written. Double
+ * buffered: the checker fills the idle slot, then flips g_chain_idx, so a handler never sees a torn entry. */
+static struct sigaction g_chain[32][2];
+static volatile int g_chain_idx[32];
+static volatile int g_chain_valid[32];
+static volatile int g_in_chain[32]; /* a payload handler that calls back into ours must not recurse */
+
+static const char *sig_name(int sig) {
+    return sig == SIGSEGV ? "SIGSEGV" : sig == SIGABRT ? "SIGABRT" : sig == SIGBUS ? "SIGBUS"
+         : sig == SIGFPE ? "SIGFPE" : sig == SIGILL ? "SIGILL" : "SIGTRAP";
+}
 
 static void on_crash(int sig, siginfo_t *info, void *uc) {
     int fd = open(g_marker, O_CREAT | O_WRONLY | O_TRUNC, 0600);
     if (fd >= 0) {
-        const char *n = sig == SIGSEGV ? "SIGSEGV" : sig == SIGABRT ? "SIGABRT" : sig == SIGBUS ? "SIGBUS"
-                      : sig == SIGFPE ? "SIGFPE" : sig == SIGILL ? "SIGILL" : "SIGTRAP";
+        const char *n = sig_name(sig);
         ssize_t w = write(fd, n, strlen(n));
         (void)w;
         fsync(fd);
         close(fd);
     }
     pid_t tid = (pid_t)syscall(__NR_gettid);
-    if (g_relaunch && tid != g_main_tid && g_notify_fd >= 0) {
+    const struct sigaction *chain = NULL;
+    if (sig > 0 && sig < 32 && g_chain_valid[sig] && !g_in_chain[sig]) chain = &g_chain[sig][g_chain_idx[sig]];
+    int poked = 0;
+    /* Poke Java first: a payload handler (an engine's crash dialog) may never return, and the
+     * process has to be relaunched from outside the crashing thread. */
+    if (g_relaunch && g_notify_fd >= 0 && (tid != g_main_tid || chain)) {
         char b = (char)sig;
         ssize_t w = write(g_notify_fd, &b, 1);
         (void)w;
+        poked = 1;
+    }
+    if (chain) {
+        g_in_chain[sig] = 1;
+        if (chain->sa_flags & SA_SIGINFO) {
+            if (chain->sa_sigaction) chain->sa_sigaction(sig, info, uc);
+        } else if (chain->sa_handler != SIG_DFL && chain->sa_handler != SIG_IGN) {
+            chain->sa_handler(sig);
+        }
+        g_in_chain[sig] = 0;
+    }
+    if (poked) {
         /* Park this thread; Java relaunches the process. If that never happens, die normally. */
         struct timespec ts = {5, 0};
         while (nanosleep(&ts, &ts) == -1 && errno == EINTR) {}
@@ -234,6 +267,72 @@ static void on_crash(int sig, siginfo_t *info, void *uc) {
     raise(sig);
 }
 
+/* A payload that replaced the host's handlers is always reported (crash_handler_replaced, once per
+ * handler). With takeover ("crash_signals": "host") the host also re-installs its own handler and
+ * keeps the payload's as the chained one; otherwise nothing changes: runtimes such as Mono use
+ * SIGSEGV for normal operation and must keep their handler first (D30). Returns how many signals
+ * were reported. */
+static int g_takeover;
+static void *g_reported[32];
+static int g_reported_set[32];
+
+static int check_handlers(int takeover) {
+    char list[160] = "";
+    int n = 0;
+    g_takeover = takeover;
+    for (size_t i = 0; i < sizeof g_sigs / sizeof *g_sigs; i++) {
+        int sig = g_sigs[i];
+        struct sigaction cur;
+        if (sigaction(sig, NULL, &cur) != 0) continue;
+        if ((cur.sa_flags & SA_SIGINFO) && cur.sa_sigaction == on_crash) {
+            g_reported_set[sig] = 0;
+            continue;
+        }
+        if (takeover) {
+            struct sigaction prev;
+            if (sigaction(sig, &g_host_sa, &prev) != 0) continue;
+            int real = (prev.sa_flags & SA_SIGINFO) ? prev.sa_sigaction != NULL
+                                                    : (prev.sa_handler != SIG_DFL && prev.sa_handler != SIG_IGN);
+            if (real) {
+                int idle = 1 - g_chain_idx[sig];
+                g_chain[sig][idle] = prev;
+                g_chain_idx[sig] = idle;
+                g_chain_valid[sig] = 1;
+            } else {
+                g_chain_valid[sig] = 0;
+            }
+        } else {
+            void *h = (cur.sa_flags & SA_SIGINFO) ? (void *)cur.sa_sigaction : (void *)cur.sa_handler;
+            if (g_reported_set[sig] && g_reported[sig] == h) continue;
+            g_reported[sig] = h;
+            g_reported_set[sig] = 1;
+        }
+        if (n++) strncat(list, ",", sizeof list - strlen(list) - 1);
+        strncat(list, "\"", sizeof list - strlen(list) - 1);
+        strncat(list, sig_name(sig), sizeof list - strlen(list) - 1);
+        strncat(list, "\"", sizeof list - strlen(list) - 1);
+    }
+    if (n) {
+        char json[256];
+        snprintf(json, sizeof json, "{\"event\":\"crash_handler_replaced\",\"signals\":[%s],\"chained\":%s}", list,
+                 takeover ? "true" : "false");
+        LOGE("payload replaced the crash handlers (%s); %s", list,
+             takeover ? "host handlers re-installed, payload's chained" : "reported only (crash_signals = payload)");
+        cb_emit(json);
+    }
+    return n;
+}
+
+static void check_after_start(void) {
+    if (g_marker[0]) check_handlers(g_takeover);
+}
+
+JNIEXPORT jint JNICALL Java_com_andysu_host_NativeBridge_checkCrashHandlers(JNIEnv *env, jclass c, jboolean takeover) {
+    (void)env;
+    (void)c;
+    return g_marker[0] ? check_handlers(takeover ? 1 : 0) : 0;
+}
+
 JNIEXPORT void JNICALL Java_com_andysu_host_NativeBridge_installCrashHandler(JNIEnv *env, jclass c, jstring marker,
                                                                             jint notify_fd) {
     (void)c;
@@ -242,12 +341,12 @@ JNIEXPORT void JNICALL Java_com_andysu_host_NativeBridge_installCrashHandler(JNI
     (*env)->ReleaseStringUTFChars(env, marker, m);
     g_notify_fd = notify_fd;
     g_main_tid = getpid(); /* called on the main thread, whose tid equals the pid */
-    struct sigaction sa;
-    memset(&sa, 0, sizeof sa);
-    sa.sa_sigaction = on_crash;
-    sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
-    sigemptyset(&sa.sa_mask);
-    for (size_t i = 0; i < sizeof g_sigs / sizeof *g_sigs; i++) sigaction(g_sigs[i], &sa, &g_old[g_sigs[i]]);
+    struct sigaction *sa = &g_host_sa;
+    memset(sa, 0, sizeof *sa);
+    sa->sa_sigaction = on_crash;
+    sa->sa_flags = SA_SIGINFO | SA_ONSTACK;
+    sigemptyset(&sa->sa_mask);
+    for (size_t i = 0; i < sizeof g_sigs / sizeof *g_sigs; i++) sigaction(g_sigs[i], sa, &g_old[g_sigs[i]]);
     LOGI("crash handler installed (marker %s)", g_marker);
 }
 

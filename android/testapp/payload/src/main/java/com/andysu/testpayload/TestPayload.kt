@@ -20,6 +20,10 @@ object Native {
     @JvmStatic external fun depInstances(): Int
     @JvmStatic external fun pageSize(): Int
     @JvmStatic external fun crash()
+    @JvmStatic external fun installOwnHandler()
+    @JvmStatic external fun ownHandlerActive(): Int
+    @JvmStatic external fun installHandlingHandler()
+    @JvmStatic external fun faultHandled(): Int
 }
 
 /** Test payload: emits JSON events on logcat tag AndySU-Event; behaviour from BuildConfig. */
@@ -98,6 +102,31 @@ class TestPayload : PayloadAdapter() {
         when (behavior) {
             "crash_java" -> main.postDelayed({ throw RuntimeException("test payload crash on the main thread") }, 1000)
             "crash_native" -> thread(name = "payload-native") { Thread.sleep(1000); Native.crash() }
+            "own_handler_crash" -> {
+                // D30: install our own SIGSEGV handler (which hangs) a moment after start, then crash on the main thread
+                // once the host has taken the signal back (its check polls every 2 s), or after 4 s at the latest:
+                // a fixed delay from start raced the watchdog, which counts from the swap, on slow emulators.
+                thread(name = "payload-handler") {
+                    Thread.sleep(300); Native.installOwnHandler(); emit("own_handler_installed")
+                    val until = System.currentTimeMillis() + 4000
+                    while (Native.ownHandlerActive() == 1 && System.currentTimeMillis() < until) Thread.sleep(50)
+                    main.postDelayed({ Native.crash() }, 200)
+                }
+            }
+            "own_handler_thread" -> {
+                // Same, but the crash is on a payload thread (an engine's worker): the main thread stays free for the watchdog.
+                thread(name = "payload-handler") { Thread.sleep(300); Native.installOwnHandler(); emit("own_handler_installed") }
+                thread(name = "payload-native") { Thread.sleep(5000); Native.crash() }
+            }
+            "handled_segv" -> {
+                // D30 regression: a Mono-like runtime handles a SIGSEGV itself and resumes, then stays healthy.
+                thread(name = "payload-handler") { Thread.sleep(300); Native.installHandlingHandler() }
+                main.postDelayed({
+                    val handled = Native.faultHandled()
+                    emit("segv_handled", JSONObject().put("handled", handled))
+                    main.postDelayed({ host.markHealthy() }, 500)
+                }, 4000)
+            }
         }
     }
 

@@ -150,7 +150,7 @@ IDLE --download+verify--> STAGED --launch/live apply--> TRIAL --markHealthy--> C
 
 - Every launch while a slot is in TRIAL increments `boot_attempts` *before* loading it. When
   `boot_attempts` exceeds `max_boot_attempts` (default 2), the client rolls back before loading.
-- A crash or an init failure during TRIAL rolls back immediately.
+- A crash or an init failure during TRIAL rolls back immediately. On Android the host detects native crashes with its own signal handlers (SIGSEGV, SIGABRT, SIGBUS, SIGILL, SIGFPE) and re-checks them while in TRIAL; a payload that replaces them must chain to the previous handler for faults it does not handle (as Mono does), otherwise a crash is only caught by the watchdog or the boot-attempt counter. The host reports a replaced handler as `crash_handler_replaced`; with `crash_signals = "host"` it instead re-installs its handlers and chains the payload's after writing the crash marker.
 - `state.json` is written as: write a uniquely named temporary file next to it, fsync it, rename
   it over `state.json`, fsync the directory. A reader therefore always sees the old or the new
   state, never a torn one. Every read-modify-write (staging, launch decisions, commit, rollback)
@@ -204,6 +204,7 @@ by `andysu host-config` (or by the Gradle plugin). It is frozen with the host. K
 | `apply` | `live` | `live`: swap in-process; `restart`: relaunch to apply; `next_start`: stage only |
 | `restart_when` | `now` | with `apply = restart`: `now`, or `background` (end the process once the user has left) |
 | `live_fallback` | `next_start` | what `live` does where a live swap is impossible (`next_start` or `restart`) |
+| `crash_signals` | `payload` | Android: `payload` leaves the native crash signals to the payload and only reports a replaced handler; `host` re-installs the host's handlers and chains the payload's (for engines that show a crash dialog or never chain; wrong for runtimes that use signals in normal operation, such as Mono/Unity) |
 | `network`, `charging`, `battery_not_low` | `any`, false, true | constraints for background checks |
 | `check_on_open`, `check_interval_minutes` | true, 360 | when to check |
 | `watchdog_ms` | 10000 | TRIAL deadline for `markHealthy()` |

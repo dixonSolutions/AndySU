@@ -12,6 +12,8 @@ per API level, boots a headless emulator and checks:
   init-throw    start() throws -> live rollback in the same process
   native-crash  SIGSEGV on a payload thread during trial -> one relaunch -> previous slot
   java-crash    uncaught exception during trial -> one relaunch -> previous slot
+  crash-handler payload replaces the SIGSEGV handler: reported only by default (a handling one commits, a hanging one
+                is rolled back by the watchdog); crash_signals = host re-installs, chains it, marker + relaunch -> rollback
   watchdog      markHealthy never called -> live rollback
   resume-kill   process killed mid-download -> download resumes from the partial file
   resume-net    connection dropped mid-download -> resumed with Range
@@ -35,6 +37,9 @@ When a scenario fails, android/tests/reports/ also gets, per API level (stamp = 
   device-<stamp>-api<API>-server.log    `andysu serve` request log / stderr
 The job log names these files. CI uploads the whole reports/ directory.
 
+ANDYSU_TEST_IGNORE_EVENT=<event>[:<state>[:<release>]] (e.g. update_status:staged:7.0) drops the
+first such host log line in the harness, to exercise the state.json fallback for lost host lines (liblog drops
+writes while logd is busy).
 ANDYSU_TEST_FORCE_FAIL=<scenario> (e.g. hot, gc, crash-loop) makes the run fail right after that
 scenario's check passes, to exercise the failure dumps above.
 
@@ -108,6 +113,21 @@ class Fail(Exception):
 
 SLOW = 1.0  # --slow: multiplies every timeout (software-emulated devices)
 CONTAINER = False  # --container: run emulators inside the andysu-emulator podman image
+IGNORE_EVENT = os.environ.get("ANDYSU_TEST_IGNORE_EVENT", "")  # "event[:state[:release]]": drop the first such line once
+
+
+def _matches_ignore(ev):
+    """ANDYSU_TEST_IGNORE_EVENT simulates a host log line lost by logd (tests the state.json fallback)."""
+    global IGNORE_EVENT
+    name, _, rest = IGNORE_EVENT.partition(":")
+    state, _, release = rest.partition(":")
+    st = ev.get("status") or {}
+    if ev.get("event") != name or (state and st.get("state") != state) or (release and st.get("release") != release):
+        return False
+    IGNORE_EVENT = ""
+    return True
+
+
 FORCE_FAIL = os.environ.get("ANDYSU_TEST_FORCE_FAIL", "")  # scenario name: fail after it (tests the dumps)
 DROP_LOG = os.environ.get("ANDYSU_TEST_DROP_LOG", "")  # payload event name whose log line is dropped once
 STAMP = time.strftime("%Y%m%d-%H%M%S")
@@ -482,6 +502,9 @@ class Device:
                         ev = json.loads(line)
                     except json.JSONDecodeError:
                         continue
+                    if IGNORE_EVENT and _matches_ignore(ev):
+                        log(f"[{self.api}] ANDYSU_TEST_IGNORE_EVENT: dropping {json.dumps(ev)[:120]}")
+                        continue
                     self.events.append(ev)
                     self.q.put(ev)
 
@@ -528,8 +551,25 @@ class Device:
                          f"event {name} {match}", timeout)
 
     def status(self, state, timeout=120):
-        return self.wait(lambda e: e.get("event") == "update_status" and e["status"].get("state") == state,
-                         f"update status {state}", timeout)
+        try:
+            return self.wait(lambda e: e.get("event") == "update_status" and e["status"].get("state") == state,
+                             f"update status {state}", timeout)
+        except Fail:
+            if state != "staged":
+                raise
+            # The host's own log line can be dropped too (liblog drops writes while logd is busy; seen
+            # on CI: release 6.0 staged per state.json, its "staged" line missing from the full logcat).
+            # Accept state.json only for the release the last observed update_status was fetching.
+            want = next((e["status"].get("release") for e in reversed(self.events)
+                         if e.get("event") == "update_status" and e["status"].get("release")), None)
+            st = self.state()
+            pend = (st.get("pending") or {}).get("id")
+            if want and pend == want and "staged" in (st.get("last_event") or ""):
+                log(f"[{self.api}] WARNING: update status staged: log line missing, {want} is pending in state.json")
+                ev = {"event": "update_status", "status": {"state": "staged", "release": want}, "_from_state": True}
+                self.events.append(ev)
+                return ev
+            raise
 
 
 # ----------------------------------------------------------------------------- scenarios
@@ -813,6 +853,7 @@ def scenarios(d, b, r, results):
     d.event("apply_policy", policy="live")
     ok("apply-next-start", "policy next_start: 8.5 staged while the app was in front, applied on the next start; reset to live")
 
+
     # andysu split: the host built from a finished APK boots its built-in payload and updates
     d.adb("uninstall", PKG, check=False)
     d.install(b.split_apk)
@@ -824,6 +865,72 @@ def scenarios(d, b, r, results):
     d.payload("8.5")
     d.event("committed")
     ok("split", f"host APK made by `andysu split` from the payload's own APK: built-in {b.split_version} ran, live update to 8.5 committed")
+
+    # D30: a payload replaces the host's SIGSEGV handler. Default (crash_signals = payload): the host only
+    # reports it. Opt-in (crash_signals = host): it re-installs its handler and chains the payload's.
+    # (runs on the test host again, updated to 8.5 first; each rollback below returns to 9.2)
+    d.adb("uninstall", PKG, check=False)
+    d.install(b.apk)
+    d.launch()
+    d.event("live_swapped", to="8.5", timeout=120)
+    d.payload("8.5")
+    d.event("committed", version="8.5")
+    # (a) default, handler that HANDLES a SIGSEGV and resumes (Mono): reported, never relaunched, commits
+    inits = count("init")
+    relaunches = count("relaunch")
+    crashes = count("native_crash")
+    r.publish("9.2")
+    d.broadcast("check")
+    d.payload("9.2")
+    rep = d.event("crash_handler_replaced", timeout=30)
+    if "SIGSEGV" not in rep.get("signals", []) or rep.get("chained") is not False:
+        raise Fail(f"default mode must only report: {rep}")
+    seg = d.event("segv_handled", timeout=30)
+    if seg.get("handled") != 1:
+        raise Fail(f"payload did not resume from its handled fault: {seg}")
+    d.event("committed", version="9.2")
+    if count("init") != inits or count("relaunch") != relaunches or count("native_crash") != crashes:
+        raise Fail("a handled SIGSEGV relaunched or crashed the app in default mode")
+    # (b) default, handler that hangs on a payload thread: not recorded by the host; the watchdog rolls back
+    r.publish("9.1")
+    d.broadcast("check")
+    d.payload("9.1")
+    rep = d.event("crash_handler_replaced", timeout=30)
+    if rep.get("chained") is not False:
+        raise Fail(f"default mode must not chain: {rep}")
+    d.event("watchdog", timeout=60)
+    rb = d.event("live_rollback", timeout=30)
+    if "watchdog" not in rb.get("reason", ""):
+        raise Fail(f"expected a watchdog rollback in default mode: {rb}")
+    d.payload("9.2")
+    if "9.1" not in d.state()["bad"]:
+        raise Fail("9.1 not marked bad")
+    if count("native_crash") != crashes:
+        raise Fail("default mode must not record the crash itself")
+    # (c) takeover: the host re-installs, writes the marker, relaunches immediately even though the
+    # payload's handler (on the main thread) never returns
+    d.broadcast("crashsignals", mode="host")
+    d.event("crash_signals", mode="host")
+    inits = count("init")
+    r.publish("9.0")
+    d.broadcast("check")
+    d.payload("9.0")
+    rep = d.event("crash_handler_replaced", timeout=30)
+    if "SIGSEGV" not in rep.get("signals", []) or rep.get("chained") is not True:
+        raise Fail(f"takeover mode did not re-install and chain: {rep}")
+    d.event("native_crash", timeout=30)
+    d.event("relaunch")
+    launch = d.event("launch", timeout=60)
+    if not any(e.get("event") == "rolled_back" and "native crash" in e.get("reason", "") for e in launch.get("events", [])):
+        raise Fail(f"launch after the hung handler did not roll back: {launch}")
+    d.payload("9.2")
+    if count("init") - inits != 1:
+        raise Fail("expected exactly one relaunch after the hung payload handler")
+    if "9.0" not in d.state()["bad"]:
+        raise Fail("9.0 not marked bad")
+    d.broadcast("crashsignals")  # back to the configured default
+    d.event("crash_signals", mode="payload")
+    ok("crash-handler", "default: handled SIGSEGV resumes and commits 9.2 (no relaunch), hung payload-thread handler -> watchdog rollback, 9.1 bad; host: re-install + chain -> marker, relaunch -> 9.2, 9.0 bad")
 
     # no dialogs
     bad_focus = [f for f in d.focus_log if any(x in f.lower() for x in
@@ -896,7 +1003,8 @@ def main():
     port = free_port()
     r = Remote(b, port)
     for v, beh in [("0.9", "ok"), ("1.0", "ok"), ("2.0", "throw_start"), ("3.0", "crash_native"),
-                   ("4.0", "crash_java"), ("5.0", "never_healthy"), ("6.0", "exit_on_start")]:
+                   ("4.0", "crash_java"), ("5.0", "never_healthy"), ("6.0", "exit_on_start"),
+                   ("9.0", "own_handler_crash"), ("9.1", "own_handler_thread"), ("9.2", "handled_segv")]:
         b.payload(v, beh)
     b.payload("7.0", "ok", blob_kb=20000)
     b.payload("7.5", "ok", blob_kb=6000)

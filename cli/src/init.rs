@@ -47,6 +47,10 @@ pub struct Policy {
     /// apply = live when a live swap is impossible: restart | next_start
     #[serde(default = "next_start")]
     pub live_fallback: String,
+    /// Android: who owns the native crash signals while a payload is on trial (D30):
+    /// payload (default: only report a replaced handler) | host (re-install, chain the payload's)
+    #[serde(default = "payload")]
+    pub crash_signals: String,
     #[serde(default)]
     pub charging: bool,
     #[serde(default = "yes")]
@@ -68,6 +72,9 @@ fn live() -> String {
 }
 fn now() -> String {
     "now".into()
+}
+fn payload() -> String {
+    "payload".into()
 }
 fn next_start() -> String {
     "next_start".into()
@@ -152,6 +159,7 @@ impl AndySUToml {
         check("apply", &t.policy.apply, &["live", "restart", "next_start"])?;
         check("restart_when", &t.policy.restart_when, &["now", "background"])?;
         check("live_fallback", &t.policy.live_fallback, &["restart", "next_start"])?;
+        check("crash_signals", &t.policy.crash_signals, &["payload", "host"])?;
         check("network", &t.policy.network, &["any", "unmetered"])?;
         Ok(t)
     }
@@ -191,7 +199,7 @@ impl AndySUToml {
         Ok(serde_json::json!({
             "app": self.app, "channel": self.remote.channel, "roots": [pem], "manifest_url": self.manifest_url()?,
             "mode": self.policy.mode, "apply": self.policy.apply, "restart_when": self.policy.restart_when,
-            "live_fallback": self.policy.live_fallback, "network": self.policy.network,
+            "live_fallback": self.policy.live_fallback, "crash_signals": self.policy.crash_signals, "network": self.policy.network,
             "charging": self.policy.charging, "battery_not_low": self.policy.battery_not_low,
             "check_interval_minutes": self.policy.check_interval_minutes, "watchdog_ms": self.policy.watchdog_ms,
             "host_api": self.host_api, "shell_version": self.host.shell_version,
