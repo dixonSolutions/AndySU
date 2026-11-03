@@ -86,7 +86,13 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: cargo install cargo-ndk --locked
-      - uses: reactivecircus/android-emulator-runner@v2
+      # The runner sometimes fails before our tests start (a corrupt emulator download, a boot
+      # timeout). The script's first act is a marker file, so "failed without the marker" means
+      # infrastructure, and only then is the emulator set up once more. A failure of the tests
+      # themselves is never retried.
+      - id: devices
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
           target: ${{ matrix.target }}
@@ -94,7 +100,24 @@ jobs:
           ram-size: 3072M
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: python3 android/tests/device_tests.py --device emulator-5554
+          script: mkdir -p android/tests/reports && touch android/tests/reports/started && python3 android/tests/device_tests.py --device emulator-5554
+      - name: Infrastructure retry (the emulator never got as far as the tests)
+        id: retry
+        if: steps.devices.outcome == 'failure' && hashFiles('android/tests/reports/started') == ''
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          ram-size: 3072M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: mkdir -p android/tests/reports && touch android/tests/reports/started && python3 android/tests/device_tests.py --device emulator-5554
+      - name: Device tests failed
+        if: steps.devices.outcome == 'failure' && steps.retry.outcome != 'success'
+        run: |
+          echo "::error::device tests failed (see the device-report artifact)"
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
