@@ -16,7 +16,7 @@ local.
 | 2 Rust core | done |
 | 3 CLI | done |
 | 4 Linux desktop host | done (10 scenarios incl. `--apply restart`) |
-| 5 Android host | `device_tests` (live, crashes, watchdog, resume, apply policies, split, crash handlers) green in CI on API 24, 29, 31, 34, 36 and 36 with 16 KB pages, and locally on 24/31/34 (2026-11-03). Not run on a real device |
+| 5 Android host | `device_tests` (live, crashes, watchdog, resume, apply policies, split, crash handlers, background trial) green in CI on API 24, 29, 31, 34, 36 and 36 with 16 KB pages, locally on 24/31/34, and 21/21 on the owner's BlissOS VM (Android 13 on x86_64; see its section). Not run on a phone |
 | 5 samples | Compose, native GLES, WebView: built-in 1.0 → 2.0 live → committed on API 36, with the version label checked on screen (2026-11-03) |
 | 6 Gradle plugin + split | done |
 | 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back, with the game engine verified running at each step. Live `.so` swap in Xonotic built (`testbeds/patches/xonotic-touch/`): in-process swap committed, rollback, watchdog expiry, native crash, second swap after a cold start, game data re-unpacked on an in-process rollback, low-storage GC guard |
@@ -238,6 +238,38 @@ Screenshots: `docs/evidence/sample-*.png`. Found along the way:
 exposed in every binding).
 Verified: desktop scenario I (`--apply restart`: staged, one self-restart, trial, commit), and
 device scenarios `apply-restart` and `apply-next-start` (see the step 5 table).
+
+## BlissOS VM: a full Android 13 system (2026-11-03)
+The owner's BlissOS VM (`xtbliss`, `127.0.0.1:5555`) runs Android 13 (SDK 33). It is a `user`
+build for x86_64 with ARM translation, a virtio-gpu GPU and 4 KB pages. It is closer to a real
+device than the emulators. Everything was run by the lead with `--device 127.0.0.1:5555`, and the
+VM was left as found: same packages and settings, logcat buffers back to 256 KB, and the owner's
+Xonotic Touch still in focus. Results:
+- **`device_tests`: 21/21.** Every scenario passes: live swap, init throw, native and Java crash,
+  watchdog, resume after kill and after network loss, next start, crash loop, hot, reject, GC, DCL,
+  apply policies, split, crash handlers, background trial, and no dialogs.
+- **Samples:** Compose, native GLES and WebView all go built-in 1.0 → live 2.0 → committed, with
+  real frames on screen (`docs/evidence/bliss-sample-*.png`).
+- **Live demo channel over the internet:** the demo APK attached to v0.1.58 was installed. It
+  found 0.1.62 on GitHub Pages, fetched a 1,158-byte delta, swapped live, committed, and showed
+  "Payload version 0.1.62" (`bliss-demo-live-0.1.62.png`).
+- **SuperTuxKart bed: failed first, which exposed a real bug (D31).**
+  - On the VM the network stays on, so the game's own updater opened Android's "install unknown
+    apps" screen right after the trial boot.
+  - The game was stopped, auto-healthy never fired, and the wall-clock watchdog rolled back a
+    good release. On the emulators the bed turns the network off, so this never showed.
+  - The fix, built by a worker (Sonnet) and reviewed by the lead: the trial watchdog now counts
+    foreground time only. A new device scenario, `background-trial`, sends the app HOME for
+    2× `watchdog_ms`. It passes on API 34 and 24 (worker), fails without the fix (worker), and
+    passes on the VM (lead).
+  - With the fix, the STK bed passes on the VM: built-in → update on next start, committed →
+    broken release rolled back. The bed presses BACK on that Settings screen.
+- **Not run on the VM:** the Xonotic beds, because the owner's own Xonotic Touch there has the
+  same package name, and the beds' `adb root` steps, because this is a `user` build.
+- **Harness changes from this round:**
+  - On a shared device (`--device`), the tests no longer turn the network off.
+  - They restore the logcat buffer sizes and animation scales.
+  - They uninstall every package they installed.
 
 ## Step 7 — test beds (2026-11-02)
 `android/tests/testbed_tests.py` takes the projects' *published* x86_64 release APKs (no rebuild,

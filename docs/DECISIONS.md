@@ -285,3 +285,25 @@ once per replaced handler. Config `crash_signals` (andysu.toml `[policy]`, runti
   that show a crash dialog or never chain; wrong for runtimes that use signals in normal operation.
 Device scenario `crash-handler` covers both modes and a Mono-style payload that handles a SIGSEGV
 and resumes (default mode: no relaunch, commits).
+
+## D31. The trial watchdog counts foreground time only (2026-11-03)
+The trial watchdog (`watchdog_ms`; in transparent mode `max(watchdog_ms, auto_healthy_ms + 60 s)`) was
+wall-clock. On a BlissOS VM the SuperTuxKart test bed's game opened Android's "install unknown
+apps" Settings screen with its own self-updater right after the trial boot. The game's activity was
+stopped at once and never resumed, so auto-healthy (an activity resumed for `auto_healthy_ms`)
+never fired and the watchdog rolled back a perfectly good release. In payload mode a user who
+leaves the app right after an update lost the release the same way.
+
+Now the host pauses the watchdog when the last activity stops (`AndySU.onBackgrounded`) and
+re-posts the remaining time when an activity starts again (`AndySU.onStarted`), with a floor of
+2 s, or `auto_healthy_ms` + 2 s in transparent mode so auto-healthy can fire first. Events
+`watchdog_paused` / `watchdog_resumed` carry the remaining ms. All arming sites (cold-boot trial,
+live swap, hot apply, transparent live swap and its `started()` re-arm) go through the same
+`postWatchdog` / `cancelWatchdog`. A watchdog armed before any activity has started (a cold start
+in the background) still runs from the moment it was armed. Crash detection (native and Java
+crashes, `max_boot_attempts`) is unchanged. Device scenario `background-trial` covers it.
+
+Trade-off: a release that never comes to the foreground stays in TRIAL, not rolled back by the
+watchdog. Boot-attempt counting still bounds cold starts (each launch of a TRIAL slot counts), and
+a crash still rolls back at once. The test bed also presses BACK when that Settings screen is in
+front, to return to the game.

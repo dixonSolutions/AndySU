@@ -76,7 +76,7 @@ def sample(d, name, pkg, results):
     srv = subprocess.Popen([dt.ANDYSU, "serve", os.path.join(out, "site"), "--addr", f"127.0.0.1:{port}"],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        d.adb("uninstall", pkg, check=False)
+        d.fresh(pkg)  # on a shared device (--device) stop() uninstalls it again
         d.install(os.path.join(out, "host.apk"))
         perms = d.sh(f"dumpsys package {pkg} | grep -E 'android.permission' | sort -u", check=False)
         dangerous = [p for p in ("CAMERA", "LOCATION", "STORAGE", "INSTALL_PACKAGES", "CONTACTS") if p in perms]

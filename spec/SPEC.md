@@ -151,6 +151,7 @@ IDLE --download+verify--> STAGED --launch/live apply--> TRIAL --markHealthy--> C
 - Every launch while a slot is in TRIAL increments `boot_attempts` *before* loading it. When
   `boot_attempts` exceeds `max_boot_attempts` (default 2), the client rolls back before loading.
 - A crash or an init failure during TRIAL rolls back immediately. On Android the host detects native crashes with its own signal handlers (SIGSEGV, SIGABRT, SIGBUS, SIGILL, SIGFPE) and re-checks them while in TRIAL; a payload that replaces them must chain to the previous handler for faults it does not handle (as Mono does), otherwise a crash is only caught by the watchdog or the boot-attempt counter. The host reports a replaced handler as `crash_handler_replaced`; with `crash_signals = "host"` it instead re-installs its handlers and chains the payload's after writing the crash marker.
+- The TRIAL watchdog (`watchdog_ms`; transparent mode and live swaps use longer deadlines until the app has started) counts only time while the app has a started activity. When the last activity stops, the host pauses it (`watchdog_paused {remaining_ms}`); when an activity starts again, it re-posts the remaining time (`watchdog_resumed {remaining_ms}`), at least 2 s, or `auto_healthy_ms` + 2 s in transparent mode so auto-healthy can still fire first. An app that is backgrounded right after an update, or covered by another app's screen, therefore does not lose a healthy release. A release that never comes to the foreground stays in TRIAL; crashes and `max_boot_attempts` are unaffected. (D31)
 - `state.json` is written as: write a uniquely named temporary file next to it, fsync it, rename
   it over `state.json`, fsync the directory. A reader therefore always sees the old or the new
   state, never a torn one. Every read-modify-write (staging, launch decisions, commit, rollback)
@@ -207,7 +208,7 @@ by `andysu host-config` (or by the Gradle plugin). It is frozen with the host. K
 | `crash_signals` | `payload` | Android: `payload` leaves the native crash signals to the payload and only reports a replaced handler; `host` re-installs the host's handlers and chains the payload's (for engines that show a crash dialog or never chain; wrong for runtimes that use signals in normal operation, such as Mono/Unity) |
 | `network`, `charging`, `battery_not_low` | `any`, false, true | constraints for background checks |
 | `check_on_open`, `check_interval_minutes` | true, 360 | when to check |
-| `watchdog_ms` | 10000 | TRIAL deadline for `markHealthy()` |
+| `watchdog_ms` | 10000 | TRIAL deadline for `markHealthy()`, counted in foreground time only (see below) |
 | `auto_healthy_ms` | 8000 | transparent mode: commit after an activity stayed resumed this long |
 | `max_boot_attempts` | 2 | cold boots of a TRIAL slot before rolling back without loading it |
 | `host_api`, `shell_version` | 1, 0 | what the frozen host offers (release requirements); the host uses `min(host_api, level its AAR implements)` |

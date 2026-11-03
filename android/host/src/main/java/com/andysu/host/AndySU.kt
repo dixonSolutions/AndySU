@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.util.Log
 import com.andysu.api.ActivityEvent
 import com.andysu.api.LiveSwapCallback
@@ -63,6 +64,11 @@ object AndySU {
     @Volatile var resumed: Activity? = null
         internal set
     private val watchdog = Runnable { onWatchdog() }
+    /** SystemClock time the posted watchdog fires (0: none posted), and, while the app is in the
+     *  background, the time it still had left (-1: not paused). D31. */
+    private var watchdogDueAt = 0L
+    private var watchdogLeft = -1L
+    private var autoHealthyMs = 8_000L
     private var transparentCallbacks: TransparentCallbacks? = null
     /** Host API level 2: the app's handler for live native swaps in transparent mode (D29). */
     @Volatile internal var liveSwapHandler: LiveSwapHandler? = null
@@ -118,12 +124,13 @@ object AndySU {
             .put("trial", inTrial).put("transparent", true))
         com.andysu.api.Host.install(HostApiImpl(null))
         val autoHealthy = config.json.optLong("auto_healthy_ms", 8_000)
+        autoHealthyMs = autoHealthy
         transparentCallbacks = TransparentCallbacks(autoHealthy).also { it.installOn(app) }
         if (inTrial) {
             // Generous: the app gets until well after its first activity has had time to settle.
             NativeBridge.setRelaunchOnCrash(true)
             watchCrashHandlers()
-            main.postDelayed(watchdog, maxOf(config.watchdogMs, autoHealthy + 60_000))
+            postWatchdog(maxOf(config.watchdogMs, autoHealthy + 60_000))
         }
         if (config.checkOnOpen && config.mode != "off") updater.checkAsync("open")
     }
@@ -215,7 +222,7 @@ object AndySU {
             if (!inTrial) return@post
             inTrial = false
             trialLive = false
-            main.removeCallbacks(watchdog)
+            cancelWatchdog()
             NativeBridge.setRelaunchOnCrash(false)
             swapState = null
             val r = Core.ok(Core.markHealthy(root.path))
@@ -260,11 +267,42 @@ object AndySU {
         trialLive = live
         watchCrashHandlers()
         NativeBridge.setRelaunchOnCrash(true)
+        postWatchdog(config.watchdogMs)
+    }
+
+    private fun postWatchdog(ms: Long) {
         main.removeCallbacks(watchdog)
-        main.postDelayed(watchdog, config.watchdogMs)
+        watchdogLeft = -1
+        watchdogDueAt = SystemClock.uptimeMillis() + ms
+        main.postDelayed(watchdog, ms)
+    }
+
+    private fun cancelWatchdog() {
+        main.removeCallbacks(watchdog)
+        watchdogDueAt = 0
+        watchdogLeft = -1
+    }
+
+    /** D31: the trial deadline counts foreground time only. The app went to the background. */
+    private fun pauseWatchdog() {
+        if (watchdogDueAt == 0L || watchdogLeft >= 0) return
+        val left = maxOf(0L, watchdogDueAt - SystemClock.uptimeMillis())
+        main.removeCallbacks(watchdog)
+        watchdogLeft = left
+        emit("watchdog_paused", JSONObject().put("remaining_ms", left))
+    }
+
+    /** An activity started again: re-post the paused deadline. The floor leaves auto-healthy (transparent
+     *  mode) or the payload time to act after the activity resumes. */
+    private fun resumeWatchdog() {
+        if (watchdogLeft < 0) return
+        val ms = maxOf(watchdogLeft, if (transparent) autoHealthyMs + 2_000 else 2_000L)
+        emit("watchdog_resumed", JSONObject().put("remaining_ms", ms))
+        postWatchdog(ms)
     }
 
     private fun onWatchdog() {
+        watchdogDueAt = 0
         if (!inTrial) return
         emit("watchdog", JSONObject().put("version", generation?.version))
         if (trialLive && previous != null) {
@@ -346,8 +384,14 @@ object AndySU {
         }
     }
 
+    /** The first activity started (from none): the trial clock runs again. */
+    internal fun onStarted() {
+        if (startedActivities++ == 0 && inTrial) resumeWatchdog()
+    }
+
     /** All activities stopped: finish a deferred restart-to-apply. */
     internal fun onBackgrounded() {
+        if (inTrial) pauseWatchdog()
         if (restartWhenBackgrounded && !inTrial) {
             emit("restart_to_apply", JSONObject().put("when", "background"))
             android.os.Process.killProcess(android.os.Process.myPid())
@@ -466,8 +510,7 @@ object AndySU {
         trialLive = true
         NativeBridge.setRelaunchOnCrash(true)
         watchCrashHandlers()
-        main.removeCallbacks(watchdog)
-        main.postDelayed(watchdog, maxOf(config.watchdogMs, 60_000L))
+        postWatchdog(maxOf(config.watchdogMs, 60_000L))
         return true
     }
 
@@ -481,7 +524,7 @@ object AndySU {
     private fun onLiveFailed(s: LiveSwap, reason: String) {
         if (liveSwap !== s || s.done || !inTrial) return
         s.done = true
-        main.removeCallbacks(watchdog)
+        cancelWatchdog()
         emit("live_rollback", JSONObject().put("reason", reason).put("from", s.toVersion).put("to", s.fromVersion))
         val r = Core.obj(Core.reportFailure(root.path, reason))
         emit("rolled_back", JSONObject().put("reason", reason).put("result", r).put("state", Core.obj(Core.state(root.path))))
@@ -552,7 +595,7 @@ object AndySU {
     }
 
     private fun liveRollback(reason: String, suspendCurrent: Boolean = true) {
-        main.removeCallbacks(watchdog)
+        cancelWatchdog()
         val bad = generation
         val back = previous
         emit("live_rollback", JSONObject().put("reason", reason).put("from", bad?.version).put("to", back?.version))
@@ -602,7 +645,7 @@ object AndySU {
 
     internal fun activityEvent(activity: Activity, event: Int) {
         when (event) {
-            ActivityEvent.START -> startedActivities++
+            ActivityEvent.START -> onStarted()
             ActivityEvent.STOP -> if (--startedActivities <= 0) {
                 startedActivities = 0
                 onBackgrounded()
