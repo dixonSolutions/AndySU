@@ -19,7 +19,7 @@ local.
 | 5 Android host | `device_tests` (live, crashes, watchdog, resume, apply policies, split, crash handlers) green in CI on API 24, 29, 31, 34, 36 and 36 with 16 KB pages, and locally on 24/31/34 (2026-11-03). Not run on a real device |
 | 5 samples | Compose, native GLES, WebView: built-in 1.0 → 2.0 live → committed on API 36, with the version label checked on screen (2026-11-03) |
 | 6 Gradle plugin + split | done |
-| 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back, with the game engine verified running at each step. Live `.so` swap in Xonotic built (`testbeds/patches/xonotic-touch/`): in-process swap committed, rollback, watchdog expiry, native crash, second swap after a cold start. Java-side data is not re-unpacked after an in-process rollback |
+| 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back, with the game engine verified running at each step. Live `.so` swap in Xonotic built (`testbeds/patches/xonotic-touch/`): in-process swap committed, rollback, watchdog expiry, native crash, second swap after a cold start, game data re-unpacked on an in-process rollback, low-storage GC guard |
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
 | 9 Publishing | live: every merge to `main` is a release. v0.1.33 and v0.1.41 fully green (all tests, registries installed from the live URLs, `brew install` on Linux and macOS, signed checksums, demo channel verified blob by blob). v0.1.46: only the Homebrew formula push failed (rebase conflict); after the fix (PR #13), v0.1.49 is fully green including `brew install` |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
@@ -356,8 +356,18 @@ with three rollback layers. Two feasibility probes ran:
       slot stays on disk.
     - After a cold start, the low-storage GC drops `previous` as usual.
     - Breaking the guard on purpose makes step a fail (worker's check).
-  - **Still not covered:** real devices, and re-unpacking Java-side game data after an in-process
-    rollback.
+  - **Game data after an in-process rollback** (patch 0007). A worker (Sonnet) built this; the lead
+    sent it back once and re-ran `--live` on API 34 (6/6).
+    - Before the previous engine starts again, the app now unpacks the previous release's data.
+      Until now, that engine ran on the failed release's data until the next cold start.
+    - Before unpacking, the SDL thread waits for the host's slot switch on the main looper, then
+      checks the host's version. This covers the swap as well as the rollback.
+    - If unpacking fails during a rollback, the bundle stamp is cleared and the host is asked to
+      relaunch. The previous engine does not run on mixed data.
+    - The bed checks GameData's `.bundle-version` stamp on disk. Without the fix it fails ("the
+      unpacked game data belongs to 1.2.9003 ..."); with it, 9013 → 9012 in about 700 ms.
+      `--live-failures` still passes (worker).
+  - **Still not covered:** real devices, and a rollback whose unpack fails (no way to provoke it).
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |

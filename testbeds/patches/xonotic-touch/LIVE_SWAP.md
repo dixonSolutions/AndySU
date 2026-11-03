@@ -650,8 +650,8 @@ native crash during the trial (the engine installs its own signal handlers, so A
 not be written; `max_boot_attempts` then decides), a second live swap after a cold start into a
 slot (the GC guard keeps the booted slot; reasoned, not run), a real device. (Since covered: 2c in
 section 9, the low-storage guard in section 10.)
-After an in-process rollback the unpacked game data belongs to the failed release until the next
-start re-unpacks it (the data prepare only runs for the swap, not for the rollback).
+(The gap that was here, game data left from the failed release after an in-process rollback, is
+closed: section 11.)
 
 ---------------------------------------------------------------------------------------------------
 
@@ -699,3 +699,64 @@ Test: `scripts/heavy.sh python3 android/tests/testbed_tests.py --low-storage --a
 - 100 kB "free", E offered: the pre-download GC is skipped too, the status is `no_space`, and B stays.
 - Cold start into D: the same pre-download GC removes C's slot (the normal low-storage rule) and is
   not skipped.
+
+---------------------------------------------------------------------------------------------------
+
+## 11. Game data after an in-process rollback, 2026-11-03
+
+The gap: when the new engine fails (`ANDYSU_RUN_FAILED`) the loader reloads the previous engine and
+runs it with `swapped = 2`, but `java_before_start` (the app unpacking the release's game data,
+`EngineSwap.beforeEngineStart`) only ran for `swapped == 1`. The previous engine therefore ran on the
+failed release's unpacked data until the next cold start.
+
+Fix: loader `java_before_start(swapped)` now runs for 1 and 2 (`loader/andysu_loader.c`), and patch
+`0007-andysu-rollback-prepares-data.patch` (`EngineSwap.java`, `GameData.java`) does the work:
+- `onLiveSwap` records `fromVersion` (the release running before the swap; the host has not switched
+  yet at that point) and `toVersion` before the loader may start the swap.
+- Ordering. The loader calls `notify_java(EV_FAILED)` and then `beforeEngineStart(2)` on the SDL thread.
+  The host handles `failed(reason)` by posting to the main looper (`onLiveFailed`: report the failure,
+  roll the state back, `switchTransparentSlot` = version, native lib dir, asset loader). So the SDL
+  thread posts a latch to the same looper and waits: the looper is FIFO, so when it runs the host's
+  rollback has finished and `GameData` reads the previous release's assets. Then it checks that the host
+  version is `fromVersion` (else it fails, see below). No sleeps; a 10 s limit only turns a stuck main
+  thread into the failure path.
+- `GameData.prepareAfterRollback(progress, failedVersion)`: if the failed release's unpack finished
+  (the `.bundle-version` stamp equals `toVersion`) the manifest it left is exact, so only differing files
+  are rewritten; otherwise (its unpack never started or stopped halfway, files of two releases may be mixed)
+  the stamp and manifest are deleted and the whole bundle is unpacked again.
+- Observable: `AndySU-Event` `game_data_prepared` {swapped, release, data_version, ms}; `data_version`
+  is read back from the stamp on disk after the unpack. `game_data_failed` on an error.
+- If preparing fails during a rollback: the stamp and manifest are deleted (so the next start unpacks
+  everything), the host is asked to relaunch (`HostApi.updates().restartNow()`, a Phoenix relaunch; the
+  cold start boots the rolled-back state and re-unpacks) and `beforeEngineStart` returns 1. The loader
+  then does not start the previous engine (`engine_start_failed`, `loader_engine_returned`), because it
+  must not run on a mix of two releases' data. If the host cannot relaunch, the SDL main just returns
+  and the next start fixes the data. Not exercised by the bed (no way to make the unpack fail).
+- Without an AndySU host (the 2a probe) `fromVersion` stays null and the rollback just calls `prepare()`.
+
+Marker: all variants bundle the same slim data zip (built from one clone commit; "0 of 469 files
+changed" in every unpack), so file contents cannot tell the releases apart. The marker is GameData's
+`.bundle-version` stamp, which holds the version of the release whose bundle was last unpacked (written
+after a complete unpack). The bed reads `<external files>/.bundle-version` over adb.
+
+Test: `--live` bed, step 3 (the forced init failure of `:fail` in-process rollback):
+`scripts/heavy.sh python3 android/tests/testbed_tests.py --live --api 34 --apk-a ..9011 --apk-b ..9012
+--apk-fail ..9013 --apk-dex ..9014` (APKs from `build.sh --variants "1.2.9011 1.2.9012 1.2.9013:fail
+1.2.9014:dex"`). After B is live the stamp must be B; after F's rollback the stamp must be B, with
+`game_data_prepared` swapped=1 data_version=F (F's start) and swapped=2 data_version=B before B's
+engine restarts. Result: passes; log order `engine_rolled_back`, `live_rollback`, "Unpacking ... for B",
+`game_data_prepared swapped=2` (687 ms). Against the unfixed APKs (9001-9004) the same bed fails at the
+new assertion: "after the in-process rollback the unpacked game data belongs to '1.2.9003' (the failed
+release is 1.2.9003), expected 1.2.9002". `--live-failures` (watchdog, second swap, native crash) still
+passes with the fixed APKs. Not covered: a failing unpack during a rollback (the relaunch path), and a
+host that does not switch to the expected version (the IOException path, which for `swapped == 1` makes the
+loader roll back).
+
+The same ordering for `swapped == 1`: the host calls `onLiveSwap` on the main thread (`onStaged` is
+posted to main; `applyLive` checks the main looper) and switches its slot (`switchTransparentSlot`:
+version, native lib dir, asset loader) in the same main-thread task, after the handler returns and after
+`beginLive`. The loader's swap flag is set inside `onLiveSwap`, so the SDL thread could reach
+`beforeEngineStart(1)` before that switch (only the old engine's teardown, 86-290 ms, used to make that
+unlikely). `beforeEngineStart` now waits for the main looper (a task queued while the host's task is
+running or pending runs after it) and requires the host version to be `toVersion` before unpacking; a
+mismatch is an `IOException` (`game_data_failed`), the loader treats it as a failed start and rolls back.

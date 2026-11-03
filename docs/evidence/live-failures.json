@@ -1,28 +1,28 @@
 {
   "api": "34",
   "versions": {
-    "A": "1.2.9001",
-    "B": "1.2.9002",
-    "C": "1.2.9005",
-    "W": "1.2.9006",
-    "G": "1.2.9007"
+    "A": "1.2.9011",
+    "B": "1.2.9012",
+    "C": "1.2.9015",
+    "W": "1.2.9016",
+    "G": "1.2.9017"
   },
   "steps": [
     {
       "step": "setup",
-      "detail": "1.2.9001 -> 1.2.9002 live in pid 2115, committed"
+      "detail": "1.2.9011 -> 1.2.9012 live in pid 2217, committed"
     },
     {
       "step": "watchdog",
-      "detail": "1.2.9006 swapped in (pid 2115) but never healthy: watchdog after 30s (watchdog_ms 30000), reason 'watchdog', relaunch -> pid 3355, 1.2.9002 boots committed from slots/1.2.9002, engine runs; 1.2.9006 is not offered again (up_to_date => marked bad)"
+      "detail": "1.2.9016 swapped in (pid 2217) but never healthy: watchdog after 30s (watchdog_ms 30000), reason 'watchdog', relaunch -> pid 3444, 1.2.9012 boots committed from slots/1.2.9012, engine runs; 1.2.9016 is not offered again (up_to_date => marked bad)"
     },
     {
       "step": "second live swap",
-      "detail": "1.2.9002 (booted cold) -> 1.2.9005 live in pid 3355; state current=1.2.9005 previous=1.2.9002; GC after commit: {\"result\": {\"freed_bytes\": 47496615, \"removed_blobs\": 6, \"removed_blobs_held_by_slots\": 3, \"removed_slots\": [\"1.2.9006\"]}, \"event\": \"gc\"} (booted slot kept)"
+      "detail": "1.2.9012 (booted cold) -> 1.2.9015 live in pid 3444; state current=1.2.9015 previous=1.2.9012; GC after commit: {\"result\": {\"freed_bytes\": 47499147, \"removed_blobs\": 6, \"removed_blobs_held_by_slots\": 3, \"removed_slots\": [\"1.2.9016\"]}, \"low_storage\": false, \"event\": \"gc\"} (booted slot kept)"
     },
     {
       "step": "native crash",
-      "detail": "1.2.9007 swapped in (pid 3355), SIGSEGV 60 frames later: native_crash signal 11, relaunch -> pid 4678, 1.2.9005 boots committed from its slot and the engine runs; 1.2.9007 not offered again"
+      "detail": "1.2.9017 swapped in (pid 3444), SIGSEGV 60 frames later: native_crash signal 11, relaunch -> pid 4792, 1.2.9015 boots committed from its slot and the engine runs; 1.2.9017 not offered again"
     }
   ],
   "verdict": "live failure paths pass"
