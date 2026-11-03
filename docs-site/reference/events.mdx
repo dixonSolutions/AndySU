@@ -74,6 +74,7 @@ always in `state.json`.
 | `uncaught` | `thread`, `error`, `trial`, `stack` | an uncaught Java exception |
 | `native_crash` | `signal` | a native signal during a trial reached the watcher thread |
 | `crash_handler_replaced` | `signals`, `chained` | a payload replaced the host's crash handlers |
+| `verify_retry` | `version`, `error`, `thread` | a payload's classes failed verification once; the host retried with a fresh class loader (rare; the device tests print a warning) |
 | `relaunch` | `reason` | the host relaunches the app through the phoenix activity |
 | `relaunch_suppressed` | `reason` | more than 3 relaunches within a minute |
 
