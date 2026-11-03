@@ -724,6 +724,201 @@ def live_bed(args):
             d.stop()
 
 
+# ----------------------------------------------------------------------------- live failure paths (D29, milestone 2c)
+
+
+def wait_status(el, since, state, timeout=120):
+    """An `update_status` event whose status.state is `state`. -> (index, status)"""
+    end = time.time() + timeout * dt.SLOW
+    while time.time() < end:
+        for i, e in events_since(el, since):
+            if e.get("event") == "update_status" and e.get("status", {}).get("state") == state:
+                return i, e["status"]
+        time.sleep(0.5)
+    raise dt.Fail(f"timed out waiting for update status {state}\n" + "\n".join(json.dumps(e)[:200] for _, e in events_since(el, 0)[-12:]))
+
+
+def live_failures_bed(args):
+    """The failure paths of an AndySU-driven live swap, one host install, apply=live:
+       A -> B live; W (swaps in, never healthy): watchdog -> rollback -> relaunch -> B boots cold;
+       C live from that cold B (GC keeps the booted slot); G (SIGSEGV after the swap): crash -> rollback
+       -> relaunch -> C boots cold."""
+    need = {"--apk-a": args.apk_a, "--apk-b": args.apk_b, "--apk-c": args.apk_c, "--apk-nohealthy": args.apk_nohealthy,
+            "--apk-crash": args.apk_crash}
+    missing = [k for k, v in need.items() if not v]
+    if missing:
+        raise SystemExit("--live-failures needs " + ", ".join(sorted(need)) + f" (missing {', '.join(missing)}); build them with "
+                         "testbeds/patches/xonotic-touch/build.sh --variants \"1.2.9001 1.2.9002 1.2.9005 1.2.9006:nohealthy 1.2.9007:crash\"")
+    pkg = BEDS["xonotic"]["pkg"]
+    apk = {k: os.path.abspath(v) for k, v in {"A": args.apk_a, "B": args.apk_b, "C": args.apk_c, "W": args.apk_nohealthy,
+                                               "G": args.apk_crash}.items()}
+    work = tempfile.mkdtemp(prefix="livefail-")
+    keys = os.path.join(work, "keys")
+    os.makedirs(keys)
+    dt.run([dt.ANDYSU, "keygen", "--dir", keys])
+    key = os.path.join(keys, "andysu-root.key")
+    site = os.path.join(work, "site")
+    os.makedirs(os.path.join(site, "stable"))
+    port = dt.free_port()
+    wd_ms = 30000  # a healthy swapped-in engine reports within ~20 s on the emulator
+    cfg = {"app": pkg, "channel": "stable", "roots": [open(os.path.join(keys, "andysu-public.pem")).read()],
+           "manifest_url": f"http://127.0.0.1:{port}/stable/update.json", "mode": "auto", "apply": "live",
+           "check_on_open": True, "watchdog_ms": wd_ms, "auto_healthy_ms": 600000, "max_boot_attempts": 2, "host_api": 1}
+    cp = os.path.join(work, "config.json")
+    json.dump(cfg, open(cp, "w"))
+    tpl = os.path.join(dt.ANDROID, "host-template/build/andysu/andysu-host-template.zip")
+    ks = ["--keystore", dt.debug_keystore(), "--ks-pass", "pass:android", "--key-alias", "androiddebugkey"]
+    ra = json.loads(dt.run([dt.ANDYSU, "split", apk["A"], "--out", os.path.join(work, "A"), "--transparent", "--host-template", tpl,
+                            "--config", cp, "--cleartext", *ks], timeout=3600))
+    rel = {"A": ra["version"]}
+    payload = {}
+    for k in "BCWG":
+        r = json.loads(dt.run([dt.ANDYSU, "split", apk[k], "--out", os.path.join(work, k), "--transparent"], timeout=3600))
+        rel[k] = r["version"]
+        payload[k] = os.path.join(work, k, "payload")
+
+    def publish(k):
+        dt.run([dt.ANDYSU, "pack", payload[k], "--site", site, "--no-rename"], timeout=3600)
+        dt.run([dt.ANDYSU, "publish", "--site", site, "--release", rel[k], "--key", key])
+        log(f"[fail] published {k} = {rel[k]}")
+
+    d = dt.Device(args.api, 3, existing=args.device)
+    srv = subprocess.Popen([dt.ANDYSU, "serve", site, "--addr", f"127.0.0.1:{port}"], stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL)
+    el = None
+    res = {"api": args.api, "versions": rel, "steps": []}
+
+    def step(name, detail):
+        res["steps"].append({"step": name, "detail": detail})
+        log(f"[fail] OK {name}: {detail}")
+
+    def launch():
+        d.sh(f"monkey -p {pkg} -c android.intent.category.LAUNCHER 1", check=False)
+
+    def run_check():
+        d.sh(f"cmd jobscheduler run -f {pkg} {JOB_ID}", check=False)
+
+    def engine_up(mark, build_id, what, swapped=None, timeout=300):
+        kw = {"build_id": build_id}
+        if swapped is not None:
+            kw["swapped"] = swapped
+        _, st = wait_event(el, mark, "engine_start", what, timeout=timeout, **kw)
+        el.wait(r"========Initialized=========", f"{what}: init banner", mark, timeout=timeout)
+        el.wait(r"GL_RENDERER: ", f"{what}: GL renderer", mark)
+        wait_event(el, mark, "engine_frames", f"{what}: frames", build_id=build_id, timeout=timeout)
+        return st
+
+    def live_to(k, mark_label):
+        """publish k, check, and wait until it is swapped in (live_swapped); returns (mark, engine_start event)."""
+        publish(k)
+        mark = el.mark()
+        run_check()
+        wait_event(el, mark, "live_swap_requested", f"host calls the handler for {k}", timeout=120, to=rel[k])
+        _, st = wait_event(el, mark, "engine_start", f"{k} started", swapped=1, build_id=rel[k], timeout=180)
+        wait_event(el, mark, "live_swapped", f"host sees started() for {k}", timeout=120)
+        return mark, st
+
+    try:
+        d.start()
+        d.adb("uninstall", pkg, check=False)
+        d.sh("svc wifi disable", check=False)
+        d.sh("svc data disable", check=False)
+        d.install(ra["host"]["apk"])
+        seed_xonotic(d, pkg)
+        d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
+        el = EngineLog(d)
+        d.watch()
+
+        # ---- 0. A boots built-in; B swaps in live and commits (the precondition of every case below)
+        mark = el.mark()
+        launch()
+        wait_event(el, mark, "booted", "A booted", version=rel["A"])
+        st = engine_up(mark, rel["A"], "A", swapped=0)
+        pid0 = st["pid"]
+        time.sleep(5)
+        mark, _ = live_to("B", "B")
+        wait_event(el, mark, "committed", "B commits", timeout=180, version=rel["B"])
+        step("setup", f"{rel['A']} -> {rel['B']} live in pid {pid0}, committed")
+
+        # ---- 1. watchdog: W swaps in but never reports healthy
+        mark, stw = live_to("W", "W")
+        if stw["pid"] != pid0:
+            raise dt.Fail("W did not swap in the same process")
+        t_swapped = time.time()
+        _, wd = wait_event(el, mark, "watchdog", "watchdog on the unhealthy live trial", timeout=wd_ms // 1000 + 60)
+        waited = time.time() - t_swapped
+        _, rl = wait_event(el, mark, "relaunch", "Phoenix relaunch", timeout=60)
+        _, ev = wait_event(el, mark, "booted", "relaunched process boots", timeout=120, version=rel["B"])
+        if ev.get("trial") or ev.get("factory"):
+            raise dt.Fail(f"B should boot committed from its slot after the watchdog rollback: {ev}")
+        stb = engine_up(mark, rel["B"], "B (after watchdog)", swapped=0)
+        if stb["pid"] == pid0:
+            raise dt.Fail("the process was not relaunched")
+        pid1 = stb["pid"]
+        if "/slots/" + rel["B"] + "/" not in stb["lib"]:
+            raise dt.Fail(f"B should run from its slot: {stb['lib']}")
+        _, ls = wait_event(el, mark, "launch", "launch decision", timeout=60)
+        _, utd = wait_status(el, mark, "up_to_date")
+        step("watchdog", f"{rel['W']} swapped in (pid {pid0}) but never healthy: watchdog after {waited:.0f}s (watchdog_ms {wd_ms}), "
+             f"reason '{rl['reason']}', relaunch -> pid {pid1}, {rel['B']} boots committed from slots/{rel['B']}, engine runs; "
+             f"{rel['W']} is not offered again (up_to_date => marked bad)")
+
+        # ---- 2. a live swap from a cold-started slot: the booted slot must stay on disk
+        time.sleep(5)
+        mark, _ = live_to("C", "C")
+        _, com = wait_event(el, mark, "committed", "C commits", timeout=180, version=rel["C"])
+        if com["state"]["current"]["id"] != rel["C"] or (com["state"].get("previous") or {}).get("id") != rel["B"]:
+            raise dt.Fail(f"state after C: {com['state']}")
+        # the GC after the commit must keep B (the slot this process booted from)
+        end = time.time() + 60
+        gc_ev = None
+        while time.time() < end and gc_ev is None:
+            for _, e in events_since(el, mark):
+                if e.get("event") in ("gc", "gc_skipped"):
+                    gc_ev = e
+            time.sleep(1)
+        if gc_ev is None:
+            raise dt.Fail("no gc event after the commit")
+        removed = (gc_ev.get("result") or {}).get("removed_slots", [])
+        if rel["B"] in removed:
+            raise dt.Fail(f"GC removed the booted slot {rel['B']}: {gc_ev}")
+        step("second live swap", f"{rel['B']} (booted cold) -> {rel['C']} live in pid {pid1}; state current={rel['C']} previous="
+             f"{rel['B']}; GC after commit: {json.dumps(gc_ev)[:160]} (booted slot kept)")
+
+        # ---- 3. native crash after the swap
+        time.sleep(5)
+        mark, stg = live_to("G", "G")
+        try:
+            _, nc = wait_event(el, mark, "native_crash", "native crash reported to the host", timeout=90)
+        except dt.Fail:
+            tail = d.sh(f"ps -A | grep {pkg}", check=False)
+            res["crash_gap"] = {"pid_alive": bool(d.sh(f"pidof {pkg}", check=False).strip()), "ps": tail[:200],
+                                "events": [e.get("event") for _, e in events_since(el, mark)][-20:]}
+            raise
+        _, rl2 = wait_event(el, mark, "relaunch", "Phoenix relaunch after the crash", timeout=60)
+        _, ev = wait_event(el, mark, "booted", "relaunched process boots", timeout=120, version=rel["C"])
+        if ev.get("trial") or ev.get("factory"):
+            raise dt.Fail(f"C should boot committed after the crash rollback: {ev}")
+        stc = engine_up(mark, rel["C"], "C (after crash)", swapped=0)
+        if stc["pid"] in (pid0, pid1):
+            raise dt.Fail("the process was not relaunched after the crash")
+        _, utd = wait_status(el, mark, "up_to_date")
+        step("native crash", f"{rel['G']} swapped in (pid {pid1}), SIGSEGV 60 frames later: native_crash signal {nc['signal']}, relaunch "
+             f"-> pid {stc['pid']}, {rel['C']} boots committed from its slot and the engine runs; {rel['G']} not offered again")
+        res["verdict"] = "live failure paths pass"
+        log("live failures result: " + json.dumps(res, indent=1))
+        os.makedirs(EVIDENCE, exist_ok=True)
+        with open(os.path.join(EVIDENCE, "live-failures.json"), "w") as f:
+            json.dump(res, f, indent=2)
+    finally:
+        srv.kill()
+        if el:
+            el.stop()
+            el.save("live-failures-engine-log.txt")
+        if not args.keep:
+            d.stop()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", choices=list(BEDS))
@@ -737,6 +932,12 @@ def main():
                     help="milestone 2b: AndySU drives the engine swap (needs --apk-a/--apk-b/--apk-fail/--apk-dex)")
     ap.add_argument("--apk-fail", help="with --live: engine whose init always fails (build.sh variant :fail)")
     ap.add_argument("--apk-dex", help="with --live: a release that changes the dex (build.sh variant :dex)")
+    ap.add_argument("--live-failures", action="store_true",
+                    help="milestone 2c: watchdog, native crash and second-swap cases of the live swap (needs --apk-a/b/c, "
+                         "--apk-nohealthy, --apk-crash)")
+    ap.add_argument("--apk-c", help="with --live-failures: a second native-only release after B")
+    ap.add_argument("--apk-nohealthy", help="with --live-failures: engine that swaps in but never reports healthy (:nohealthy)")
+    ap.add_argument("--apk-crash", help="with --live-failures: engine that SIGSEGVs after the swap (:crash)")
     ap.add_argument("--live-swap-probe", action="store_true",
                     help="milestone 2a: in-process engine swaps A->B->A->B plus a forced-failure rollback (needs --apk-a/--apk-b)")
     ap.add_argument("--map", help="with --live-swap-probe: start this local map first and require it to be carried over every swap")
@@ -746,6 +947,12 @@ def main():
     if args.probe_vid_restart:
         args.api = args.api or "36"
         probe_vid_restart(args)
+        return
+    if args.live_failures:
+        args.api = args.api or "34"
+        dt.run(["cargo", "build", "-q", "-p", "andysu-cli"], cwd=dt.REPO)
+        dt.gradle(":host-template:andysuHostTemplate")
+        live_failures_bed(args)
         return
     if args.live:
         args.api = args.api or "34"

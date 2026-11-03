@@ -3,7 +3,7 @@
 #
 #   scripts/heavy.sh testbeds/patches/xonotic-touch/build.sh --out testbeds/build/apks
 #   scripts/heavy.sh testbeds/patches/xonotic-touch/build.sh --out DIR --variants "1.2.9001 1.2.9002"
-#   ... --variants "1.2.9001 1.2.9002 1.2.9003:fail"   (":fail": an engine whose init always fails; ":dex": a Java change)
+#   ... --variants "1.2.9001 1.2.9002 1.2.9003:fail"   (":fail": an engine whose init always fails; ":dex": a Java change; ":nohealthy": never reports healthy; ":crash": SIGSEGV a few seconds in)
 #   ... --no-loader     only the *.patch files (no resident loader sources): the stock engine layout
 #
 # What it does, in order:
@@ -122,11 +122,12 @@ fi
 CODE=$CODE_BASE
 for SPEC in $VARIANTS; do
     V="${SPEC%%:*}"; OPT="${SPEC#*:}"; [ "$OPT" = "$SPEC" ] && OPT=""
-    if [ "$OPT" = fail ]; then
-        export ORG_GRADLE_PROJECT_andysu_fail_init=1   # engine whose init always fails (rollback tests)
-    else
-        unset ORG_GRADLE_PROJECT_andysu_fail_init
-    fi
+    unset ORG_GRADLE_PROJECT_andysu_fail_init ORG_GRADLE_PROJECT_andysu_test_defs
+    case "$OPT" in
+        fail) export ORG_GRADLE_PROJECT_andysu_fail_init=1 ;;                          # init always fails
+        nohealthy) export ORG_GRADLE_PROJECT_andysu_test_defs=ANDYSU_NO_HEALTHY ;;      # swaps in, never healthy
+        crash) export ORG_GRADLE_PROJECT_andysu_test_defs=ANDYSU_CRASH_AFTER_START ;;   # SIGSEGV 60 frames in
+    esac
     EJ=android/app/src/main/java/io/github/dixonsolutions/xonotictouch/EngineSwap.java
     if [ "$OPT" = dex ] && [ -f "$EJ" ]; then
         sed -i 's/TAG = "XonoticTouch"/TAG = "XonoticTouchDex"/' "$EJ"   # a Java change: the dex differs

@@ -9,15 +9,15 @@
   "steps": [
     {
       "step": "A built-in",
-      "detail": "1.2.9001 engine ran via the loader (SDL_main -> AndySU_SDL_main -> libmain), pid 2116"
+      "detail": "1.2.9001 engine ran via the loader (SDL_main -> AndySU_SDL_main -> libmain), pid 2172"
     },
     {
       "step": "live swap",
-      "detail": "1.2.9001 -> 1.2.9002 in pid 2116: live_swap_requested, engine_stopped, engine_start(swapped=1), live_swapped, committed; state current=1.2.9002 (A was the built-in payload, so no previous slot)"
+      "detail": "1.2.9001 -> 1.2.9002 in pid 2172: live_swap_requested, engine_stopped, engine_start(swapped=1), live_swapped, committed; state current=1.2.9002 (A was the built-in payload, so no previous slot)"
     },
     {
       "step": "in-process rollback",
-      "detail": "1.2.9003 failed its engine init (ANDYSU_FAIL_INIT: this engine build is deliberately broken  ); live_rollback; state current=1.2.9002, bad=['1.2.9003']; engine 1.2.9002 runs again in pid 2116"
+      "detail": "1.2.9003 failed its engine init (ANDYSU_FAIL_INIT: this engine build is deliberately broken  ); live_rollback; state current=1.2.9002, bad=['1.2.9003']; engine 1.2.9002 runs again in pid 2172"
     },
     {
       "step": "cold start",
