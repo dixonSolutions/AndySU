@@ -23,7 +23,7 @@ local.
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
 | 9 Publishing | live: every merge to `main` is a release. v0.1.33 and v0.1.41 fully green (all tests, registries installed from the live URLs, `brew install` on Linux and macOS, signed checksums, demo channel verified blob by blob). v0.1.46: only the Homebrew formula push failed (rebase conflict); after the fix (PR #13), v0.1.49 is fully green including `brew install` |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
-| 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated. Developer docs site in `docs-site/` (Mintlify, 41 pages: guides, reference, how we work), written by a worker (Sonnet), passing `mint validate` and `mint broken-links`; spot-checked by the lead against the CLI and registries. The Mintlify deploy from `main` is being connected |
+| 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated. Developer docs site in `docs-site/` (Mintlify, 41 pages: guides, reference, how we work), written by a worker (Sonnet), passing `mint validate` and `mint broken-links`; spot-checked by the lead against the CLI and registries. Deployed by Mintlify from `main` (`docs-site/`) at https://andysu.mintlify.site, which is also the repo's website link. Mintlify's GitHub App can reach only `lindroids` and `AndySU`; its OAuth grant was revoked after linking, as the owner asked |
 
 ## Environment (2026-11-02)
 - rustup stable 1.99.1 in `~/.cargo` with aarch64/armv7/x86_64/i686 Android targets, cargo-ndk 4.1.2,
@@ -399,7 +399,25 @@ with three rollback layers. Two feasibility probes ran:
     - The bed checks GameData's `.bundle-version` stamp on disk. Without the fix it fails ("the
       unpacked game data belongs to 1.2.9003 ..."); with it, 9013 → 9012 in about 700 ms.
       `--live-failures` still passes (worker).
-  - **Still not covered:** real devices, and a rollback whose unpack fails (no way to provoke it).
+  - **README demo video** (`docs/media/andysu-xonotic-live-update.mp4`, plus a GIF; also on the docs
+    site). A worker (Sonnet) built it, and the lead reviewed the frames and published the channel.
+    - Xonotic Touch on an API 36 emulator, installed once, updates live from a signed channel on
+      GitHub Pages (`demo/xonotic/`, dedicated demo key).
+    - Proofs in the video: the same pid, the same APK (`versionName`, `lastUpdateTime` and
+      `base.apk` sha256 unchanged), no installer or permission window, and the real AndySU log
+      lines.
+    - Made by `demo/record.py`; LIVE_SWAP.md section 12 has the details.
+    - Patch 0008 adds the on-screen banner, only in `:demo` builds.
+  - **Bug found while making it (patch 0009):** after every live swap, the new engine never drew a
+    frame.
+    - Cause: a stale `SDL_WINDOWEVENT_HIDDEN` from the old engine's window, which had the same
+      window id, set `vid_hidden`.
+    - The beds missed it because they only counted `engine_frames`, and
+      `docs/evidence/live-swap-final.png` actually shows the stuck screen.
+    - Fixed for every swap build. The APKs used by earlier `--live*` runs predate the fix, and the
+      beds do not yet assert that frames reach the screen.
+  - **Still not covered:** real devices, a rollback whose unpack fails (no way to provoke it), and
+    an on-screen check in the live beds.
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |

@@ -1,0 +1,121 @@
+diff --git a/engine/darkplaces/cl_screen.c b/engine/darkplaces/cl_screen.c
+--- a/engine/darkplaces/cl_screen.c
++++ b/engine/darkplaces/cl_screen.c
+@@ -188,6 +188,107 @@
+ 	DrawQ_String(x, y, scr_toast_text, 0, h, h, 1, 1, 1, fade, 0, NULL, true, FONT_DEFAULT);
+ }
+ 
++#ifdef ANDYSU_DEMO_OVERLAY
++/*
++==============
++SCR_DrawAndysuDemoOverlay
++
++README demo builds only (build.sh variant ":demo"). A banner, top left, that proves a live
++swap happened inside one process: the release this engine was built as, the pid and the age of
++the process (both read from the OS, so they keep counting across a swap), and how many live
++swaps led here (the previous engine's saved state, kept by the resident loader). The accent
++colour is taken from the last digit of the build id, so two releases look different at a glance.
++==============
++*/
++#include <unistd.h>
++#include <stdio.h>
++#include <inttypes.h>
++#include <time.h>
++#include "andysu_engine.h"
++
++static int Andysu_DemoSwapCount(void)
++{
++	static int swaps = -1;
++	size_t len = 0;
++	const char *state, *p;
++
++	if (swaps >= 0)
++		return swaps;
++	swaps = 0;
++	if (andysu_loader && andysu_loader->get_state && (state = andysu_loader->get_state(&len)) != NULL && len
++	    && (p = strstr(state, "\"swap_count\":")) != NULL)
++		swaps = atoi(p + strlen("\"swap_count\":"));
++	return swaps;
++}
++
++// Seconds since this process started (field 22 of /proc/self/stat is in clock ticks since boot).
++static long Andysu_DemoProcessAge(void)
++{
++	FILE *f;
++	char buf[1024], *p;
++	double up = 0;
++	unsigned long long start = 0;
++	int i;
++	struct timespec ts;
++
++	// /proc/uptime is not readable by apps on current Android; CLOCK_BOOTTIME is the same clock
++	if (clock_gettime(CLOCK_BOOTTIME, &ts) == 0)
++		up = (double)ts.tv_sec + (double)ts.tv_nsec / 1e9;
++	if ((f = fopen("/proc/self/stat", "r")) == NULL)
++		return -1;
++	buf[fread(buf, 1, sizeof buf - 1, f)] = 0;
++	fclose(f);
++	if ((p = strrchr(buf, ')')) == NULL)
++		return -1;
++	// after "(comm)" the fields start with the state (3rd); starttime is the 22nd
++	for (i = 3, p += 2; i < 22 && *p; i++)
++	{
++		while (*p && *p != ' ')
++			p++;
++		while (*p == ' ')
++			p++;
++	}
++	start = strtoull(p, NULL, 10);
++	return (long)(up - (double)start / (double)sysconf(_SC_CLK_TCK));
++}
++
++static void SCR_DrawAndysuDemoOverlay(void)
++{
++	static const float accents[5][3] = {
++		{0.25f, 0.60f, 1.00f}, // ...0 blue
++		{0.25f, 0.60f, 1.00f}, // ...1 blue: the release built into the APK
++		{0.20f, 0.90f, 0.40f}, // ...2 green: the release that arrives from the remote
++		{1.00f, 0.62f, 0.10f}, // ...3 orange
++		{0.90f, 0.30f, 0.80f}, // ...4 magenta
++	};
++	static double next_age;
++	static long age = -1;
++	const char *id = ANDYSU_BUILD_ID;
++	int digit = id[0] ? id[strlen(id) - 1] - '0' : 0;
++	const float *c = accents[(digit < 0 || digit > 4) ? 0 : digit];
++	char l1[96], l2[96];
++	float h, w1, w2, w, x = 8, y = 8, pad;
++
++	if (host.realtime >= next_age)
++	{
++		age = Andysu_DemoProcessAge();
++		next_age = host.realtime + 0.5;
++	}
++	dpsnprintf(l1, sizeof l1, "AndySU release %s", id);
++	dpsnprintf(l2, sizeof l2, "pid %d | process up %ld s | live swaps %d", (int)getpid(), age, Andysu_DemoSwapCount());
++	h = bound(6, min(vid_conheight.value / 26, vid_conwidth.value * 0.5f / 46), 40);
++	w1 = DrawQ_TextWidth(l1, 0, h * 1.25f, h * 1.25f, true, FONT_DEFAULT);
++	w2 = DrawQ_TextWidth(l2, 0, h, h, true, FONT_DEFAULT);
++	w = max(w1, w2);
++	pad = h * 0.4f;
++	DrawQ_Fill(x, y, w + pad * 2 + h * 0.5f, h * 2.25f + pad * 2, 0, 0, 0, 0.72f, 0);
++	DrawQ_Fill(x, y, h * 0.5f, h * 2.25f + pad * 2, c[0], c[1], c[2], 1, 0);
++	DrawQ_Fill(x, y + h * 2.25f + pad * 2 - 3, w + pad * 2 + h * 0.5f, 3, c[0], c[1], c[2], 1, 0);
++	DrawQ_String(x + h * 0.5f + pad, y + pad, l1, 0, h * 1.25f, h * 1.25f, c[0], c[1], c[2], 1, 0, NULL, true, FONT_DEFAULT);
++	DrawQ_String(x + h * 0.5f + pad, y + pad + h * 1.25f, l2, 0, h, h, 1, 1, 1, 1, 0, NULL, true, FONT_DEFAULT);
++}
++#endif
++
+ void SCR_CenterPrint(const char *str)
+ {
+ 	scr_centertime_off = scr_centertime.value;
+@@ -1860,6 +1961,9 @@
+ 	SCR_DrawConsole();
+ 	SCR_DrawInfobar();
+ 	SCR_DrawToast();
++#ifdef ANDYSU_DEMO_OVERLAY
++	SCR_DrawAndysuDemoOverlay();
++#endif
+ 
+ 	if (!scr_loading)
+ 	{

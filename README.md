@@ -8,6 +8,17 @@ AndySU's own updater. The remote can be a GitHub repository, GitHub Pages or any
 Updates apply **live** while the app runs, on a **restart**, or on the **next start**. A broken
 update **rolls back** by itself.
 
+[![Xonotic Touch updating live from GitHub Pages: real AndySU logs on the left, the running game on the right](docs/media/andysu-xonotic-live-update.gif)](docs/media/andysu-xonotic-live-update.mp4)
+
+*Recorded on an Android emulator: Xonotic Touch, installed once as a frozen host APK, finds release
+1.2.9102 on GitHub Pages, downloads it in the background and swaps its game engine in **live**:
+same process, same APK, no install prompt and no "install unknown apps" screen. The left panel
+shows the real AndySU log lines. [Full video (MP4, 69 s)](docs/media/andysu-xonotic-live-update.mp4)
+· how it was made: [LIVE_SWAP.md §12](testbeds/patches/xonotic-touch/LIVE_SWAP.md).*
+
+**Documentation: [andysu.mintlify.site](https://andysu.mintlify.site)**: quickstart, concepts,
+Android integration, publishing, bindings, reference, and how we work.
+
 - No runtime permissions, no install prompt, no "unknown sources" toggle (only `INTERNET`,
   `ACCESS_NETWORK_STATE` and `RECEIVE_BOOT_COMPLETED`, all granted at install).
 - Ed25519-signed manifests (root key → short-lived release keys), SHA-256 on every blob, rollback
