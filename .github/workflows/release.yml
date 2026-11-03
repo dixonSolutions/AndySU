@@ -219,14 +219,28 @@ jobs:
           name: release
           path: dist
       - name: Update Formula/andysu.rb on main ([skip ci]; pushes with the workflow token start no runs)
+        env:
+          V: ${{ needs.version.outputs.version }}
         run: |
-          mkdir -p Formula
-          scripts/homebrew-formula.sh "${{ needs.version.outputs.version }}" dist > Formula/andysu.rb
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/andysu.rb
-          git commit -q -m "Homebrew: andysu ${{ needs.version.outputs.version }} [skip ci]" || exit 0
-          for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && exit 0; sleep 5; done
+          cp -r dist "$RUNNER_TEMP/dist"
+          # Regenerate on a fresh main each attempt (no rebase of a stale formula), and never
+          # replace a newer release's formula with an older one.
+          for i in 1 2 3; do
+            git fetch -q origin main && git checkout -q -B formula origin/main
+            cur=$(sed -n 's/^  version "\(.*\)"/\1/p' Formula/andysu.rb 2>/dev/null || true)
+            if [ -n "$cur" ] && [ "$(printf '%s\n%s\n' "$cur" "$V" | sort -V | tail -1)" != "$V" ]; then
+              echo "Formula already at $cur (newer than $V)"; exit 0
+            fi
+            mkdir -p Formula
+            scripts/homebrew-formula.sh "$V" "$RUNNER_TEMP/dist" > Formula/andysu.rb
+            git add Formula/andysu.rb
+            git diff --cached --quiet && { echo "Formula unchanged"; exit 0; }
+            git commit -q -m "Homebrew: andysu $V [skip ci]"
+            git push -q origin HEAD:main && exit 0
+            sleep 5
+          done
           exit 1
 
   verify:
