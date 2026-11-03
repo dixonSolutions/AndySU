@@ -1,0 +1,142 @@
+---
+title: "Ship an existing APK (any framework)"
+description: "Flutter, React Native, Unity, Godot, Cordova or a native game: make the finished APK self-updating without code changes."
+---
+
+If you already build an APK, you do not have to restructure anything. `andysu split --transparent`
+turns the finished APK into a frozen host plus a payload, and every later version of the same APK
+becomes an update. Your code, `Application` class, activities and native libraries stay exactly as
+they are.
+
+<Info>
+  Transparent mode needs **Android 9 (API 28)**, or **Android 11 (API 30)** when the payload has
+  assets, which is the case for Flutter, React Native, Unity and Godot apps. On older devices the
+  host keeps running the built-in version.
+</Info>
+
+<Steps>
+  <Step title="Set up keys and the remote">
+    ```sh
+    andysu init --app com.example.game --repo you/game-updates
+    ```
+
+    Set the remote in `andysu.toml` (GitHub Pages here, see [Remotes](/publishing/remotes) for
+    the others) and choose how updates apply:
+
+    ```toml
+    [remote]
+    type = "pages"
+    repo = "you/game-updates"
+    channel = "stable"
+
+    [policy]
+    apply = "live"              # transparent apps without a live-swap handler fall back to:
+    live_fallback = "restart"   # relaunch to apply ("next_start" waits for the next cold start)
+    restart_when = "background" # relaunch only once the user has left the app
+    ```
+
+    ```sh
+    andysu host-config --config-out config.json --host-out andysu-host.json
+    ```
+  </Step>
+
+  <Step title="Split version 1.0 into host and built-in payload">
+    Download the host template (`andysu-host-template-<version>.zip`) from the
+    [AndySU release](https://github.com/dixonSolutions/AndySU/releases) that matches your CLI, then:
+
+    ```sh
+    andysu split game-1.0.apk --out out-1.0 --transparent \
+      --host-template andysu-host-template-<version>.zip --config config.json \
+      --keystore release.jks --ks-pass env:KS_PASS --key-alias release
+    ```
+
+    `out-1.0/host.apk` is what users install, once. Sign it with your **existing release key** so it
+    installs over the version users already have. Its manifest keeps every component of the original
+    APK; the code and native libraries load from the built-in payload.
+  </Step>
+
+  <Step title="Publish 1.1">
+    Build the next version of your app the normal way, then:
+
+    ```sh
+    andysu split game-1.1.apk --out out-1.1 --transparent       # no --host-template: payload only
+    andysu pack out-1.1/payload --site site --host andysu-host.json --no-rename
+    andysu publish --site site --release 1.1 --key .andysu/andysu-root.key
+    andysu verify site/stable/update.json --pub andysu-public.pem --blobs
+    ```
+
+    <Warning>
+      Always pass `--no-rename` for transparent payloads: engines load their libraries by name
+      (`dlopen("libmain.so")`), so names must stay as they are.
+    </Warning>
+
+    Upload `site/` to the Pages branch, by hand or with the
+    [GitHub Action](/tutorials/github-actions). Only what changed is downloaded: unchanged files are
+    shared by hash, and changed ones get deltas against the installed version.
+  </Step>
+
+  <Step title="Check it on a device">
+    ```sh
+    adb install out-1.0/host.apk
+    adb logcat -s AndySU-Event
+    ```
+
+    Open the app. You see `booted` with `"factory": true`, then a check that finds 1.1
+    (`update_status`: `checking`, `downloading`, `staged`). With the policy above, the app relaunches
+    when you leave it and comes back on 1.1 (`booted`, `"trial": true`). After it has stayed on screen
+    for `auto_healthy_ms` (8 s by default) you see `committed`.
+  </Step>
+</Steps>
+
+## When does an update apply?
+
+A transparent app's Java/Kotlin code cannot be swapped inside a running process, so by default an
+update applies on a restart:
+
+| What changed | Default (`live_fallback = "next_start"`) | With `live_fallback = "restart"` | With a `LiveSwapHandler` |
+|---|---|---|---|
+| Dex (Java, Kotlin, Flutter embedding, Unity/Godot Java side) | next cold start | relaunch (now, or when the user leaves) | next start or relaunch |
+| Native libraries and content only | next cold start | relaunch | **live, in the same process** |
+
+The live column needs Host API level 2 and an app that can swap its own native part, which is what
+the [native engine tutorial](/tutorials/live-engine-updates) and the demo video show.
+
+## Framework notes
+
+<AccordionGroup>
+  <Accordion title="Flutter">
+    Split `build/app/outputs/flutter-apk/app-release.apk` (or each ABI APK). Dart code is compiled into
+    `libapp.so`, so a pure Dart change is a native-only release. Add the [Flutter
+    binding](/bindings/flutter) to show update status or offer a "restart to update" button.
+  </Accordion>
+  <Accordion title="React Native and Expo">
+    The JavaScript bundle is an asset, so a JS-only release is a content change. In transparent mode
+    it applies on restart like any other release. Use the [React Native binding](/bindings/react-native)
+    for status and control; with Expo, add its config plugin.
+  </Accordion>
+  <Accordion title="Capacitor and Cordova">
+    Web assets are content. Without a live-swap handler they apply on restart, not hot: hot updates
+    (`andysu pack --hot`) are a stub-mode feature. See the [Capacitor binding](/bindings/capacitor).
+  </Accordion>
+  <Accordion title="Unity and Godot">
+    Split the exported APK as is. IL2CPP builds are native libraries plus data; Godot's `.pck` is
+    content. Mono and Unity use `SIGSEGV` internally, so keep the default `crash_signals = "payload"`.
+    See [Unity](/bindings/unity) and [Godot](/bindings/godot).
+  </Accordion>
+  <Accordion title="Native games (SDL, NDK)">
+    Works as is. If the engine installs its own crash handlers, read
+    [crash signals](/concepts/watchdog-and-crashes#crash-signals-policy). To update the engine
+    **live**, see [Live updates for native engines](/tutorials/live-engine-updates).
+  </Accordion>
+</AccordionGroup>
+
+## Limits
+
+- The host declares permissions and components once. A release that needs a new permission or a
+  new manifest component cannot be delivered as a payload: `andysu pack --host` refuses it, and it
+  needs a new host APK (a normal reinstall). Declare what you expect to need up front in `[host]`.
+- Asset **listing** (`AssetManager.list`) is not supported for payload assets; opening by name is.
+- The app id and signing key of the host never change.
+
+Tested end to end on the Xonotic Touch and SuperTuxKart Touch release APKs, without rebuilding them.
+See [Test beds](/contributing/testbeds).

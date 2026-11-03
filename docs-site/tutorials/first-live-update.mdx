@@ -1,0 +1,225 @@
+---
+title: "Your first live update (Kotlin and Compose)"
+description: "From an empty Compose app to a release that swaps in while the app is on screen."
+---
+
+This tutorial builds the smallest useful AndySU app: a Jetpack Compose screen that keeps a tap
+counter across live updates. It is the same app as the repository's Compose sample
+(`android/samples/compose`), so every snippet here is code that runs in CI.
+
+You will end with two Gradle modules:
+
+| Module | Role | Changes after release? |
+|---|---|---|
+| `payload` | your app: Compose UI, Kotlin, AndroidX | yes, every update |
+| `app` | the frozen **host** APK users install | never |
+
+<Info>
+  Prerequisites: the `andysu` CLI ([Quickstart](/quickstart)), Android Studio or the Android SDK, and
+  a device or emulator with USB debugging. Replace `0.1.62` with the newest version from the
+  [releases page](https://github.com/dixonSolutions/AndySU/releases).
+</Info>
+
+<Steps>
+  <Step title="Create keys and andysu.toml">
+    In the project root:
+
+    ```sh
+    andysu init --app com.example.hello --repo you/hello-updates
+    ```
+
+    This writes `andysu.toml`, a root key pair (`.andysu/andysu-root.key` private,
+    `andysu-public.pem` public) and a publish workflow. Edit `[remote]` to serve from GitHub Pages:
+
+    ```toml
+    [remote]
+    type = "pages"
+    repo = "you/hello-updates"
+    channel = "stable"
+    ```
+
+    Then generate what the host is built from:
+
+    ```sh
+    mkdir -p build/andysu
+    andysu host-config --toml andysu.toml --config-out build/andysu/config.json \
+      --host-out build/andysu/andysu-host.json
+    ```
+
+    `config.json` carries your **public** key and the manifest URL
+    (`https://you.github.io/hello-updates/stable/update.json`). `andysu-host.json` is the list of what
+    the frozen host declares. `andysu pack` refuses payloads that need more.
+  </Step>
+
+  <Step title="Add the Maven repository and the plugin">
+    `settings.gradle.kts`, in both `pluginManagement` and `dependencyResolutionManagement`:
+
+    ```kotlin
+    maven("https://dixonsolutions.github.io/AndySU/maven")
+    ```
+
+    See [Gradle plugin](/android/gradle-plugin#repositories) for the full block.
+  </Step>
+
+  <Step title="Write the payload">
+    `payload/build.gradle.kts` is a normal application module plus the plugin:
+
+    ```kotlin
+    plugins {
+        id("com.android.application")
+        id("org.jetbrains.kotlin.plugin.compose")
+        id("io.github.dixonsolutions.andysu") version "0.1.62"
+    }
+
+    android {
+        namespace = "com.example.hello"
+        defaultConfig { applicationId = "com.example.hello"; minSdk = 23; versionName = "1.0" }
+        buildFeatures { compose = true }
+    }
+
+    andysu {
+        role.set("payload")
+        entryClass.set("com.example.hello.HelloPayload")
+    }
+
+    dependencies {
+        compileOnly("io.github.dixonsolutions.andysu:api:0.1.62")         // the host has the runtime copy
+        implementation("io.github.dixonsolutions.andysu:payload-kit:0.1.62") // lifecycle owners for Compose
+        implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+        implementation("androidx.compose.ui:ui")
+        implementation("androidx.compose.material3:material3")
+    }
+    ```
+
+    The entry class extends `PayloadAdapter`. Three things matter:
+
+    - `start(host, state)` receives the previous generation's state after a live swap (`null` on a
+      cold start);
+    - `suspend()` returns that state as versioned JSON and releases everything;
+    - `markHealthy()` commits the release once the UI has drawn.
+
+    ```kotlin
+    class HelloPayload : PayloadAdapter() {
+        private lateinit var host: HostApi
+        private var owners: ActivityOwners? = null
+        private var taps by mutableIntStateOf(0)
+
+        override fun start(host: HostApi, state: ByteArray?) {
+            this.host = host
+            if (state != null) taps = JSONObject(String(state)).optInt("taps")
+        }
+
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+            owners?.destroy()
+            val o = ActivityOwners(activity, savedInstanceState).also { owners = it }
+            val view = ComposeView(activity)
+            o.install(view)                       // lifecycle, saved state, view model store
+            view.setContent { Screen() }
+            activity.setContentView(view)
+        }
+
+        override fun onActivityEvent(activity: Activity, event: Int) { owners?.onEvent(event) }
+
+        override fun suspend(): ByteArray {
+            owners?.destroy(); owners = null
+            return JSONObject().put("v", 1).put("taps", taps).toString().toByteArray()
+        }
+
+        @Composable
+        private fun Screen() {
+            LaunchedEffect(Unit) { host.markHealthy() }   // the first composition worked
+            MaterialTheme {
+                Column(Modifier.safeDrawingPadding().padding(24.dp)) {
+                    Text("Payload version ${host.version()}")
+                    Text("Taps survive live updates: $taps")
+                    Button(onClick = { taps++ }) { Text("Tap") }
+                    Button(onClick = { host.updates().checkNow() }) { Text("Check for updates") }
+                }
+            }
+        }
+    }
+    ```
+
+    <Warning>
+      Never use Java serialization for the state: the previous generation's classes are gone when the
+      next one starts. Use JSON or protobuf with a version field.
+    </Warning>
+  </Step>
+
+  <Step title="Build the frozen host">
+    `app/build.gradle.kts` has the **same `applicationId`** and only the host library:
+
+    ```kotlin
+    plugins {
+        id("com.android.application")
+        id("io.github.dixonsolutions.andysu") version "0.1.62"
+    }
+
+    android {
+        namespace = "com.example.hello.host"
+        defaultConfig { applicationId = "com.example.hello"; minSdk = 23; versionCode = 1; versionName = "host-1" }
+    }
+
+    andysu {
+        role.set("host")
+        config.set(file("../build/andysu/config.json"))
+        factory.set(file("../build/andysu/factory"))     // version 1.0, built in
+    }
+
+    dependencies { implementation("io.github.dixonsolutions.andysu:host:0.1.62") }
+    ```
+
+    Build the payload, turn it into the built-in slot, then build the host:
+
+    ```sh
+    ./gradlew :payload:andysuPayloadRelease
+    andysu pack payload/build/andysu/payload/release --site build/andysu/factory-site \
+      --emit-slot build/andysu/factory --host build/andysu/andysu-host.json
+    ./gradlew :app:assembleRelease
+    adb install app/build/outputs/apk/release/app-release.apk
+    ```
+
+    The app starts on the payload built into the APK (version 1.0, `isFactory() == true`). This is the
+    **only** time the user installs anything.
+  </Step>
+
+  <Step title="Publish 1.1">
+    Change something visible, for example the first `Text`, and set `versionName = "1.1"` in the
+    payload module. Then pack, sign and upload:
+
+    ```sh
+    ./gradlew :payload:andysuPayloadRelease
+    andysu pack payload/build/andysu/payload/release --site site --host build/andysu/andysu-host.json
+    andysu publish --site site --release 1.1 --key .andysu/andysu-root.key
+    andysu verify site/stable/update.json --pub andysu-public.pem --blobs
+    ```
+
+    Push the contents of `site/` to the `gh-pages` branch of `you/hello-updates`, or let CI do it,
+    see [Publish from GitHub Actions](/tutorials/github-actions).
+  </Step>
+
+  <Step title="Watch it swap in">
+    With the app open, tap a few times, then press **Check for updates** and watch:
+
+    ```sh
+    adb logcat -s AndySU-Event
+    ```
+
+    You should see `update_status` go through `checking`, `downloading` and `staged`, then
+    `suspended`, `live_swapped` and `committed`. The screen now shows 1.1, the tap count is unchanged,
+    and the process never restarted. `dumpsys package com.example.hello` still shows `host-1`.
+  </Step>
+</Steps>
+
+## What if 1.1 is broken?
+
+Make `start()` throw, publish it as 1.2, and check again. The host catches the exception, resumes
+1.1 in the same process with the same state, marks 1.2 bad (it is not offered again) and emits
+`live_rollback`. A crash or a hang (no `markHealthy()` within `watchdog_ms` of foreground time) rolls
+back too. See [Watchdog and crash detection](/concepts/watchdog-and-crashes).
+
+## Next
+
+- [Apply policies](/concepts/apply-policies): live, on restart, or on the next start.
+- [Test updates locally](/tutorials/test-locally) without uploading anything.
+- [Production checklist](/tutorials/production-checklist) before your first public release.

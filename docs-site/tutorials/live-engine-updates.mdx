@@ -1,0 +1,128 @@
+---
+title: "Live updates for native engines"
+description: "Swap a game engine's native code while the app keeps running: the resident-loader pattern behind the demo video."
+---
+
+In [transparent mode](/android/transparent-mode) an app's Java code is fixed for the life of the
+process, but its **native** code does not have to be. If the engine can stop, unload and restart
+itself on request, AndySU can hand it a new release live: same process, same APK, no restart. The
+[demo video](/#demo) shows this with Xonotic Touch.
+
+This page describes the pattern in general terms and points to the Xonotic implementation
+(`testbeds/patches/xonotic-touch/`) as a worked example.
+
+## What qualifies
+
+The host offers a release live only when it is `native_live`:
+
+- every changed component is a native library or content outside `dex/`;
+- no dex file was removed;
+- the payload descriptor's `entry`, `dex` and `needs` are unchanged;
+- the app has registered a `LiveSwapHandler` (Host API level 2), `apply = "live"`, and an activity is
+  resumed.
+
+Anything else, such as a Java change, falls back to `live_fallback` (restart or next start).
+
+## The pattern
+
+```
+Java (fixed for the process)            AndySU host
+  Activity  ── registers ──►  setLiveSwapHandler(...)   ◄── release staged, native_live
+     │                                 │ onLiveSwap(slotDir, version, cb)
+     ▼                                 ▼
+  resident loader .so  (never swapped)  ── dlopen(RTLD_LOCAL) ──►  engine copy N
+     loop: rc = engine->run(...)                                 engine copy N+1 (from slotDir)
+           rc == SWAP   → save state, load next copy, continue
+           rc == FAILED → reopen previous copy, report failed()
+```
+
+<Steps>
+  <Step title="Split the engine into a loader and a swappable library">
+    A small **resident loader** library stays loaded for the whole process. The engine becomes a
+    library that exports one entry symbol and is loaded `RTLD_LOCAL`, so two copies never bind to each
+    other's symbols. Xonotic's contract (`loader/andysu_swap.h`):
+
+    ```c
+    enum { ANDYSU_RUN_QUIT = 0, ANDYSU_RUN_SWAP = 1, ANDYSU_RUN_FAILED = 2 };
+
+    typedef struct andysu_loader_api {
+        uint32_t abi, size;
+        int   (*swap_requested)(void);               /* polled once per frame */
+        void  (*put_state)(const char *p, size_t n);  /* engine -> next engine */
+        const char *(*get_state)(size_t *n);          /* NULL on a cold start */
+        void  (*mark_healthy)(void);                  /* -> Host.current().markHealthy() */
+        void  (*emit)(const char *json);              /* -> logcat AndySU-Event */
+        void  (*abort_start)(const char *why);        /* trial only: give up, back to the loader */
+    } andysu_loader_api;
+
+    typedef struct andysu_engine {
+        uint32_t abi, size, java_abi;   /* java_abi: the JNI contract with the running Java code */
+        const char *build_id;
+        int  (*run)(const andysu_loader_api *, int argc, char **argv, int swapped_in);
+    } andysu_engine;
+
+    const andysu_engine *andysu_engine_v1(void);   /* the only exported symbol */
+    ```
+
+    Copy each new engine library to a unique file name before `dlopen`, so the dynamic linker never
+    returns the already-loaded copy.
+  </Step>
+
+  <Step title="Make the engine able to stop cleanly">
+    `run()` must return instead of calling `exit()`: on `swap_requested()` the engine saves what the
+    next copy needs (the current map, menu, connection) with `put_state`, frees its GL objects, audio,
+    threads and files, and returns `ANDYSU_RUN_SWAP`. The new copy reads `get_state` and restores.
+    This is the bulk of the work and is engine-specific; for Xonotic it is patches 0002 to 0004.
+  </Step>
+
+  <Step title="Register the handler">
+    In the Java side of the app (the part that never changes in a running process):
+
+    ```java
+    HostApi host = Host.current();
+    if (host != null && host.apiLevel() >= 2) {
+        host.setLiveSwapHandler((slotDir, version, cb) -> {
+            File lib = new File(slotDir, "lib/" + abi + "/libmain.so");
+            if (!lib.exists() || !engineCanSwapNow()) return false;   // decline: live_fallback applies
+            nativeRequestSwap(lib.getPath(), cb);                     // the loader takes it from here
+            return true;
+        });
+    }
+    ```
+
+    The loader calls `cb.started()` once the new engine is running, or `cb.failed(reason)` if it
+    could not start and the previous engine was restored. After `started()`, the engine calls
+    `mark_healthy()` when it is really working, for example once it has rendered frames, and the host
+    commits. Set `host_api = 2` in `andysu.toml` and use a level-2 host.
+  </Step>
+
+  <Step title="Swap the app's data too">
+    If the engine reads data that the app unpacks from assets (game data, scripts), unpack the new
+    release's data **before** the new engine starts. After a rollback, unpack the previous release's
+    data again before the old engine restarts. Xonotic does this in its `beforeEngineStart` hook
+    (patch 0007), after waiting for the host's slot switch on the main thread.
+  </Step>
+</Steps>
+
+## Failure handling
+
+| What happens | Result |
+|---|---|
+| The new engine fails to initialise (`run` returns `FAILED`, or `abort_start`) | The loader reopens the previous copy, `cb.failed(reason)`, release marked bad, same process |
+| The new engine never calls `mark_healthy()` | The watchdog (foreground time, D31) rolls back by relaunching into the previous slot |
+| The new engine crashes with a native signal | The host's crash handler writes a marker and relaunches into the previous slot |
+| The engine installed its own crash handler | Detected and reported (`crash_handler_replaced`); see [crash signals](/concepts/watchdog-and-crashes#crash-signals-policy) |
+
+The Xonotic test bed checks every row of this table on an emulator, with the engine verified running
+after each step. See [Test beds](/contributing/testbeds) and `testbeds/patches/xonotic-touch/LIVE_SWAP.md`.
+
+## Pitfalls found the hard way
+
+- **Window events from the old copy.** After a swap, SDL still had the old window's
+  `SDL_WINDOWEVENT_HIDDEN` queued, and the new window had the same id, so the new engine stopped
+  drawing. The engine ignores a `HIDDEN` event while its window is shown (patch 0009). Check that frames
+  really reach the screen, not only that the engine loop runs.
+- **Symbols leaking between copies.** Load engines `RTLD_LOCAL` and export only the entry symbol
+  (`-Wl,--exclude-libs,ALL` and a version script).
+- **The engine's own crash handler.** An engine-wide `SIGSEGV` handler that shows a dialog hides
+  crashes from AndySU until the watchdog fires. Leave the signals to the host (Xonotic patch 0006).

@@ -16,8 +16,10 @@ npm install @andysu/capacitor && npx cap sync android
 ```
 
 The Android side needs the [Maven repository](/android/gradle-plugin#repositories) in the app's Gradle
-settings. Package the finished APK with `andysu split --transparent`; web assets update hot when you
-mark them with `--hot`.
+settings. Package the finished APK with `andysu split --transparent`. In transparent mode web assets
+are content like any other: a release applies on restart or on the next start, depending on
+`live_fallback`. Hot updates (`andysu pack --hot`) need stub mode, where a `Payload` reloads the
+content. See [Ship an existing APK](/tutorials/existing-apk#when-does-an-update-apply).
 
 ## Use it
 
