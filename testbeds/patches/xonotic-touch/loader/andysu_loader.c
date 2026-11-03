@@ -195,7 +195,8 @@ static void notify_java(int kind, const char *detail) {
     (*env)->DeleteLocalRef(env, js);
 }
 
-/* 0 = go on. The app unpacks the new release's data here. */
+/* 0 = go on. The app unpacks the data of the release that is about to run here: the new release's
+ * (swapped 1) or, after an in-process rollback, the previous release's (swapped 2). */
 static int java_before_start(int swapped) {
     JNIEnv *env = java_env();
     if (!env || !g_before_start) return 0;
@@ -461,8 +462,10 @@ __attribute__((visibility("default"))) int AndySU_SDL_main(int argc, char *argv[
             e->input_devices(b & 1, (b >> 1) & 1, (b >> 2) & 1);
         }
         int rc;
-        if (swapped == 1 && java_before_start(1)) {
-            snprintf(g_fail_reason, sizeof g_fail_reason, "preparing the new release's data failed");
+        if (swapped >= 1 && java_before_start(swapped)) {
+            /* After a rollback this is final (prev_path is gone): the previous engine must not run on
+             * the failed release's data, so it does not start; the app has asked the host to relaunch. */
+            snprintf(g_fail_reason, sizeof g_fail_reason, "preparing the %s release's data failed", swapped == 1 ? "new" : "previous");
             emitf("{\"event\":\"engine_start_failed\",\"pid\":%d,\"error\":\"%s\"}", (int)getpid(), g_fail_reason);
             rc = ANDYSU_RUN_FAILED;
         } else {

@@ -653,6 +653,10 @@ def live_bed(args):
         if bad:
             raise dt.Fail(f"unexpected events {names}: {bad}")
 
+    def data_version():
+        """The release the unpacked game data belongs to: GameData's stamp, written when an unpack finishes."""
+        return d.sh(f"cat /sdcard/Android/data/{pkg}/files/.bundle-version 2>/dev/null", check=False).strip()
+
     try:
         d.start()
         d.adb("uninstall", pkg, check=False)
@@ -693,6 +697,8 @@ def live_bed(args):
             raise dt.Fail(f"state after commit: {com['state']}")
         if stB["pid"] != pid or d.sh(f"pidof {pkg}", check=False).split() != [str(pid)]:
             raise dt.Fail(f"pid changed: {pid} -> {stB['pid']} / pidof {d.sh(f'pidof {pkg}', check=False)}")
+        if data_version() != rel["B"]:
+            raise dt.Fail(f"after the live swap to B the unpacked game data belongs to {data_version()!r}, expected {rel['B']}")
         step("live swap", f"{rel['A']} -> {rel['B']} in pid {pid}: live_swap_requested, engine_stopped, engine_start(swapped=1), "
              f"live_swapped, committed; state current={rel['B']} (A was the built-in payload, so no previous slot)")
         no_event(el.mark(), ("watchdog", "live_rollback", "relaunch"), 5)
@@ -711,8 +717,20 @@ def live_bed(args):
             raise dt.Fail(f"state after rollback: {rb['state']}")
         if stS["pid"] != pid or d.sh(f"pidof {pkg}", check=False).split() != [str(pid)]:
             raise dt.Fail("the process changed during the in-process rollback")
+        # The game data must belong to the release that runs again. F's start unpacked F's data first (its
+        # stamp); the rollback has to put B's back before B's engine starts, not leave it to the next cold start.
+        if data_version() != rel["B"]:
+            raise dt.Fail(f"after the in-process rollback the unpacked game data belongs to {data_version()!r} (the failed "
+                          f"release is {rel['F']}), expected {rel['B']}: the rollback did not prepare the previous release's data")
+        _, gdF = wait_event(el, mark, "game_data_prepared", "F's data unpacked for the swap", timeout=30, swapped=1)
+        _, gdB = wait_event(el, mark, "game_data_prepared", "B's data unpacked for the rollback", timeout=30, swapped=2)
+        if gdF["data_version"] != rel["F"] or gdB["data_version"] != rel["B"] or gdB["release"] != rel["B"]:
+            raise dt.Fail(f"game data events: F's start {gdF}, rollback {gdB}")
+        if any(e.get("event") == "game_data_failed" for _, e in events_since(el, mark)):
+            raise dt.Fail("a game_data_failed event during the rollback")
         step("in-process rollback", f"{rel['F']} failed its engine init ({rbk['reason'][:60]}); live_rollback; state current="
-             f"{rel['B']}, bad={rb['state']['bad']}; engine {rel['B']} runs again in pid {pid}")
+             f"{rel['B']}, bad={rb['state']['bad']}; game data {rel['F']} (its start) -> {rel['B']} (rollback, "
+             f"{gdB['ms']} ms) before B's engine started again; engine {rel['B']} runs again in pid {pid}")
 
         # ---- 4. cold start boots B (F is bad)
         d.sh(f"am force-stop {pkg}")

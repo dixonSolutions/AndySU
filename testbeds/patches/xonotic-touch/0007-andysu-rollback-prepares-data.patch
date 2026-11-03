@@ -1,0 +1,177 @@
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/EngineSwap.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/EngineSwap.java
+@@ -2,6 +2,9 @@
+ 
+ import android.content.Context;
+ import android.os.Build;
++import android.os.Handler;
++import android.os.Looper;
++import android.os.Process;
+ import android.util.Log;
+ 
+ import java.io.File;
+@@ -9,6 +12,8 @@
+ import java.lang.reflect.InvocationHandler;
+ import java.lang.reflect.Method;
+ import java.lang.reflect.Proxy;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * Live engine swap under an AndySU host (Host API level 2, D29), by reflection so the same sources
+@@ -31,6 +36,8 @@
+     private static volatile Context appContext;
+     private static volatile Object callback;       // com.andysu.api.LiveSwapCallback
+     private static volatile Object host;           // com.andysu.api.HostApi
++    private static volatile String fromVersion;    // the release running before the swap: where a rollback goes
++    private static volatile String toVersion;      // the release being swapped in
+ 
+     private EngineSwap() {}
+ 
+@@ -88,14 +95,20 @@
+             Log.w(TAG, "Live swap to " + version + " declined: no libmain in " + slotDir);
+             return false;
+         }
++        // Before the loader may start the swap: the host has not switched its slot yet, so this is
++        // still the running release, and a rollback goes back to it.
++        fromVersion = AndySUCompat.payloadVersion();
++        toVersion = version;
+         try {
+             String refused = nativeRequestSwap(lib.getAbsolutePath());
+             if (refused != null) {
+                 Log.w(TAG, "Live swap to " + version + " declined by the loader: " + refused);
++                fromVersion = toVersion = null;
+                 return false;
+             }
+         } catch (UnsatisfiedLinkError e) {
+             Log.w(TAG, "Live swap to " + version + " declined: no loader in this build", e);
++            fromVersion = toVersion = null;
+             return false;
+         }
+         callback = cb;
+@@ -162,21 +175,74 @@
+     }
+ 
+     /**
+-     * SDL thread, after the old engine is gone and before the new one starts: the new release's
+-     * game data (QuakeC progs, menu skin) has to be unpacked from the new slot's assets (the host
+-     * already switched the app's asset loader). 0 = go on, anything else abandons the start.
++     * SDL thread, after the old engine is gone and before the next one starts: the game data
++     * (QuakeC progs, menu skin) has to belong to the release that is about to run, unpacked from
++     * that release's assets. {@code swapped} 1 = the new release (the host already switched the
++     * app's asset loader), 2 = the in-process rollback to the previous one. 0 = go on, anything
++     * else abandons the start.
+      */
+     static int beforeEngineStart(int swapped) {
+         Context c = appContext;
+-        if (swapped != 1 || c == null) {
++        if (swapped < 1 || c == null) {
+             return 0;
+         }
++        GameData data = new GameData(c);
++        long t0 = System.currentTimeMillis();
+         try {
+-            new GameData(c).prepare((text, note, percent) -> { });
++            if (fromVersion != null) { // driven by an AndySU host: its slot switch has to be done first
++                // The host switches its slot (version, asset loader) on the main thread: right after
++                // onLiveSwap returns for the swap (same main-thread task), and in onLiveFailed, posted
++                // by the loader's failed(reason) just before this call, for the rollback. A task queued
++                // now runs after either, so once it has run the assets are the right release's.
++                awaitMainLooper();
++                String want = swapped == 1 ? toVersion : fromVersion;
++                if (!want.equals(AndySUCompat.payloadVersion())) {
++                    throw new IOException("the host is on " + AndySUCompat.payloadVersion() + ", not " + want);
++                }
++            }
++            if (swapped == 1 || fromVersion == null) { // fromVersion null: no host, nothing changes between releases
++                data.prepare((text, note, percent) -> { });
++            } else {
++                data.prepareAfterRollback((text, note, percent) -> { }, toVersion);
++            }
++            Log.i("AndySU-Event", "{\"event\":\"game_data_prepared\",\"pid\":" + Process.myPid() + ",\"swapped\":" + swapped
++                    + ",\"release\":\"" + AndySUCompat.payloadVersion() + "\",\"data_version\":\"" + data.bundleVersion()
++                    + "\",\"ms\":" + (System.currentTimeMillis() - t0) + "}");
+             return 0;
+-        } catch (IOException | RuntimeException e) {
+-            Log.e(TAG, "Preparing the new release's data failed", e);
++        } catch (IOException | RuntimeException | InterruptedException e) {
++            Log.e(TAG, "Preparing the game data failed (swapped=" + swapped + ")", e);
++            Log.i("AndySU-Event", "{\"event\":\"game_data_failed\",\"pid\":" + Process.myPid() + ",\"swapped\":" + swapped + "}");
++            if (swapped == 2) {
++                // The previous engine must not run on a mix of two releases' data. Make the next
++                // start unpack everything and let the host relaunch the app now; if that is not
++                // possible the loader stops (return 1) and the next start does it.
++                data.invalidateBundle();
++                restartThroughHost();
++            }
+             return 1;
+         }
+     }
++
++    /** Returns once the main thread has run everything queued before this call. */
++    private static void awaitMainLooper() throws InterruptedException, IOException {
++        CountDownLatch done = new CountDownLatch(1);
++        new Handler(Looper.getMainLooper()).post(done::countDown);
++        if (!done.await(10, TimeUnit.SECONDS)) {
++            throw new IOException("the main thread did not process the host's rollback in time");
++        }
++    }
++
++    /** {@code HostApi.updates().restartNow()}: the host relaunches the app (does not return). */
++    private static void restartThroughHost() {
++        try {
++            Object h = host;
++            if (h == null) {
++                return;
++            }
++            Object updates = Class.forName("com.andysu.api.HostApi").getMethod("updates").invoke(h);
++            Class.forName("com.andysu.api.UpdateClient").getMethod("restartNow").invoke(updates);
++        } catch (Throwable t) {
++            Log.w(TAG, "Could not ask the AndySU host to relaunch", t);
++        }
++    }
+ }
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java
+@@ -192,6 +192,41 @@
+      */
+     private static final Object PREPARE_LOCK = new Object();
+ 
++    /** The release the unpacked bundle belongs to (the stamp written when an unpack finished), or null. */
++    String bundleVersion() {
++        File stamp = new File(baseDir(), BUNDLE_STAMP);
++        try {
++            return stamp.isFile() ? readAll(stamp) : null;
++        } catch (IOException e) {
++            return null;
++        }
++    }
++
++    /** Forget what was unpacked: the next {@link #prepare} unpacks the whole bundle again. */
++    void invalidateBundle() {
++        for (String name : new String[] { BUNDLE_STAMP, BUNDLE_MANIFEST }) {
++            File f = new File(baseDir(), name);
++            if (f.exists() && !f.delete()) {
++                Log.w(TAG, "Could not delete " + f);
++            }
++        }
++    }
++
++    /**
++     * In-process rollback: the game data must belong to the release that runs again, not to
++     * {@code failedVersion}, which has been unpacking over it. When the failed release's unpack
++     * finished (its stamp is there) the manifest it left is exact and only what differs is
++     * written; otherwise files of both releases may be mixed, so everything is unpacked again.
++     */
++    void prepareAfterRollback(Progress progress, String failedVersion) throws IOException {
++        synchronized (PREPARE_LOCK) {
++            if (!failedVersion.equals(bundleVersion())) {
++                invalidateBundle();
++            }
++            prepare(progress);
++        }
++    }
++
+     void prepare(Progress progress) throws IOException {
+         synchronized (PREPARE_LOCK) {
+             File base = baseDir();
