@@ -1,0 +1,146 @@
+---
+title: "Troubleshooting and FAQ"
+description: "Common problems, what the events mean, and answers to common questions."
+---
+
+Start with the event log. It shows what the host decided and why:
+
+```sh
+adb logcat -s AndySU-Event
+```
+
+Each line is JSON. The names are in the [events reference](/reference/events), the updater states and
+error codes in [Status and errors](/reference/status-and-errors). The host's own state is on disk in
+`noBackupFilesDir/andysu/state.json` (use `adb shell run-as <package>` on a debuggable build).
+
+## The app never updates
+
+<AccordionGroup>
+  <Accordion title="The status stays up_to_date">
+    Check that the remote serves the new manifest at the URL the host uses (`andysu remote` prints it)
+    and that the new release has a higher `sequence`. Run
+    `andysu verify <url> --pub andysu-public.pem --blobs`. A release is also skipped when its
+    `requires` are not met (`host_api_min`, `api_min`, ABI) or when its rollout does not include this
+    install.
+  </Accordion>
+  <Accordion title="The status is staged but nothing happens">
+    That is what `apply = "next_start"` and `mode = "download_only"` do. With `apply = "live"`, a live
+    swap needs an activity on screen; a staged release otherwise applies on the next start. A swap is
+    also not started while another release is still in TRIAL.
+  </Accordion>
+  <Accordion title="The status is deferred">
+    `network = "unmetered"` is set and the device is on a metered network.
+  </Accordion>
+  <Accordion title="bad_signature, wrong_app, wrong_channel, expired">
+    See [Status and errors](/reference/status-and-errors#common-situations).
+  </Accordion>
+  <Accordion title="Updates over plain HTTP fail">
+    Android blocks cleartext traffic by default. Real remotes use HTTPS. For local testing build the
+    host with `andysu split --cleartext`.
+  </Accordion>
+</AccordionGroup>
+
+## A release was rolled back
+
+Look for `rolled_back` and its `reason`, plus the events just before it:
+
+| Sequence of events | Cause |
+|---|---|
+| `uncaught` with `trial: true`, then `relaunch`; the next `booted` shows the previous version | a Java exception during TRIAL |
+| `native_crash`, then `relaunch`, then `rolled_back` with a reason that mentions the crash | a native signal during TRIAL |
+| `watchdog`, then `live_rollback` or `rolled_back` | `markHealthy()` was never called within `watchdog_ms` of foreground time |
+| `rolled_back` on the launch, without `booted` | too many cold boots of a TRIAL slot (`max_boot_attempts`) |
+| `live_rollback` with a reason | `start()` threw, or the app reported `failed()` |
+
+A rolled-back release is marked bad locally and not offered again. Publish a fixed release with a
+higher sequence.
+
+<Tip>
+  A payload that crashes in `start()` before it can call `markHealthy()` is exactly what rollback is
+  for. Call `markHealthy()` only once the app is really working, such as after the first screen is
+  composed.
+</Tip>
+
+## A crash in a trial hangs on a crash dialog
+
+The engine installed its own `SIGSEGV` or `SIGABRT` handler and replaced the host's, so no crash marker
+was written. Look for a `crash_handler_replaced` event. Either make the payload chain to the previous
+handler, or set `crash_signals = "host"` in `[policy]` (not for Mono or Unity). See
+[Watchdog and crash detection](/concepts/watchdog-and-crashes#crash-signals-policy).
+
+## Trial rolled back after the user left the app
+
+Before the watchdog counted foreground time only (D31), a user who left the app right after an update
+could lose a good release. Hosts built with that fix pause the watchdog while no activity is started
+(`watchdog_paused` and `watchdog_resumed`). Update the host if you see a rollback with `watchdog` while
+the app was in the background.
+
+## `pack` fails
+
+| Message | What to do |
+|---|---|
+| the payload needs a permission or component the frozen host does not declare ("this would need an APK update") | add the permission or stub counts to `[host]` and ship a new host, or remove the need |
+| `host_api_min` above the host's level | raise `host_api` in a new host, or pass `--allow-shell` and plan a shell update |
+| a library is not 16 KB aligned | rebuild the library with 16 KB alignment; `--require-16k` turns the warning into an error |
+
+## Android specifics
+
+<AccordionGroup>
+  <Accordion title="Payload content hidden behind an action bar (Android 15+)">
+    Stub activities have no action bar since D28, and windows draw edge to edge on target SDK 35+. Pad
+    your content for the system bars (`safeDrawingPadding()` in Compose, `fitsSystemWindows` in views).
+  </Accordion>
+  <Accordion title="Writable dex is refused on Android 14">
+    Android 14 refuses to load any writable file as code. Slots are made read-only automatically; do not
+    write into the slot directory.
+  </Accordion>
+  <Accordion title="Asset listing does not work in transparent mode">
+    Payload assets reach `getAssets()` through a `ResourcesLoader`, which does not support listing.
+    Open assets by name.
+  </Accordion>
+  <Accordion title="The game's own updater opens the 'install unknown apps' screen">
+    An app with its own APK self-updater fights AndySU, and installing a full APK would replace the
+    host. Make the updater stand down when `com.andysu.api.Host.current()` is not null. The test beds
+    do this with patches in `testbeds/patches/`, see [Test beds](/contributing/testbeds).
+  </Accordion>
+  <Accordion title="Log lines are missing">
+    `liblog` drops writes while `logd` is busy. The host's state is also in `state.json`, and the host
+    falls back to it for the `staged` status.
+  </Accordion>
+</AccordionGroup>
+
+## FAQ
+
+<AccordionGroup>
+  <Accordion title="Can I use AndySU in an app on Google Play or F-Droid?">
+    No. Google Play does not allow downloading executable code, and F-Droid requires self-updaters to be
+    off. AndySU does not try to work around either.
+  </Accordion>
+  <Accordion title="Do users have to grant anything?">
+    No. The host declares only `INTERNET`, `ACCESS_NETWORK_STATE` and `RECEIVE_BOOT_COMPLETED`, all
+    install-time permissions. There is no install prompt and no "unknown sources" toggle after the first
+    install.
+  </Accordion>
+  <Accordion title="Can I change the app's permissions through an update?">
+    No. Permissions and components are fixed in the host APK. `andysu pack` fails when a payload needs
+    more. Declare everything the app may ever need in `[host]` before the first release.
+  </Accordion>
+  <Accordion title="What happens if every payload is broken?">
+    The host shows a recovery screen, and the recovery updater can fetch a fix. It never changes.
+  </Accordion>
+  <Accordion title="Does it work on a real phone?">
+    The suite runs on emulators and a BlissOS VM (a full Android 13 system). It has not been run on a
+    physical phone yet.
+  </Accordion>
+  <Accordion title="Can I use my own server?">
+    Yes. Any static HTTPS host with the layout in [Remotes](/publishing/remotes) works: set
+    `type = "custom"` and `base`.
+  </Accordion>
+  <Accordion title="How much does an update download?">
+    Usually a delta against the previous release, or against the payload built into the host for the first
+    update. See [Deltas and cleanup](/concepts/deltas-and-gc).
+  </Accordion>
+  <Accordion title="Which license?">
+    Apache-2.0.
+  </Accordion>
+</AccordionGroup>

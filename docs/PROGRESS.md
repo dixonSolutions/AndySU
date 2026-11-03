@@ -23,7 +23,7 @@ local.
 | 8 Bindings | done and compiled; Flutter tests only in CI; Godot/Unity runtime not exercised |
 | 9 Publishing | live: every merge to `main` is a release. v0.1.33 and v0.1.41 fully green (all tests, registries installed from the live URLs, `brew install` on Linux and macOS, signed checksums, demo channel verified blob by blob). v0.1.46: only the Homebrew formula push failed (rebase conflict); after the fix (PR #13), v0.1.49 is fully green including `brew install` |
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
-| 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated |
+| 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated. Developer docs site in `docs-site/` (Mintlify, 41 pages: guides, reference, how we work), written by a worker (Sonnet), passing `mint validate` and `mint broken-links`; spot-checked by the lead against the CLI and registries. The Mintlify deploy from `main` is being connected |
 
 ## Environment (2026-11-02)
 - rustup stable 1.99.1 in `~/.cargo` with aarch64/armv7/x86_64/i686 Android targets, cargo-ndk 4.1.2,

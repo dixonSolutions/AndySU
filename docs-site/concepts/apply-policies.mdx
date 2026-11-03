@@ -1,0 +1,91 @@
+---
+title: "Apply policies"
+description: "Live, restart or next start; hot content updates; live native swaps."
+---
+
+After a release is staged, the **apply policy** decides when it runs. Set it in `andysu.toml` under
+`[policy]`; an app can change it per install at runtime.
+
+| `apply` | Behaviour |
+|---|---|
+| `live` (default) | Swap the payload in-process while the app runs. Content-only releases apply hot. |
+| `restart` | Relaunch once to apply (`restart_when = "now"`, the default), or end the process when the user leaves (`restart_when = "background"`). |
+| `next_start` | Stage only. The next cold start applies it. |
+
+Every policy goes through the same [TRIAL, commit and rollback](/concepts/update-lifecycle) path.
+
+## Fetch mode
+
+`mode` controls how much the host does by itself:
+
+| `mode` | Behaviour |
+|---|---|
+| `auto` (default) | Check, download, stage and apply according to `apply`. |
+| `download_only` | Check, download and stage. Applying is left to the app (`UpdateClient.applyNow()`). |
+| `check_only` | Check only. The status becomes `available`. |
+| `off` | Never check. |
+
+Background checks can be constrained with `network` (`any` or `unmetered`), `charging` and
+`battery_not_low`. The host checks on every app open, plus periodically with the platform
+`JobScheduler` (`check_interval_minutes`, default 360). Checks on app open and manual `checkNow()` calls respect `network`
+(the status becomes `deferred`); background jobs rely on the `JobScheduler` constraints. There are no foreground
+services and no notification permission.
+
+## Live swaps
+
+In stub mode, a live apply is a **generation swap**:
+
+1. The old payload's `suspend()` returns versioned, language-neutral state (JSON or protobuf,
+   never Java serialization) and releases threads, GL objects, audio and file handles. The host
+   keeps the Activity alive.
+2. A new class loader is created and the new native libraries are loaded under their unique names.
+3. The new payload's `start(host, state)` receives the state.
+4. The release is in TRIAL until `markHealthy()`. If anything fails, the old generation is resumed
+   with the same state, in the same process.
+
+A live apply needs an activity on screen. If the app is in the background, the release stays staged
+and applies on the next start. A live swap is not started while another release is still in TRIAL.
+
+## Hot (content-only) updates
+
+A release is **hot** when every changed component (ignoring the descriptor) is `kind: content` with
+`apply: hot`, nothing was removed, and the descriptor's code-facing fields (`entry`, `dex`, `native`,
+`native_dir`, `needs`) did not change. The host applies it in place and calls
+`Payload.onContentUpdated(slotDir)` without suspending anything.
+
+Which content is hot is decided at pack time: pass path prefixes with `andysu pack --hot assets/`.
+Components that do not match stay `apply: restart`.
+
+## Live native swaps in transparent mode
+
+In [transparent mode](/android/transparent-mode) the app's Java code cannot be replaced in a running
+process. A release that changes only native libraries and content can still go live if the app
+swaps its native part itself. This needs **Host API level 2** and a `LiveSwapHandler`. Such a
+release is reported as `native_live`.
+
+If the app declines, or no handler is registered, `live_fallback` decides: `next_start` (default)
+or `restart`. See [Host API](/android/host-api#live-native-swaps) for the interface.
+
+## Changing the policy at runtime
+
+```kotlin
+host.updates().setApplyPolicy("restart")   // "live", "restart", "next_start", or null
+host.updates().applyPolicy()               // the policy in effect
+```
+
+The override is stored in `noBackupFilesDir/andysu/apply_policy`. `null` returns to the configured
+policy. Every binding exposes it:
+
+| Binding | Call |
+|---|---|
+| Kotlin or Java | `updates().setApplyPolicy("restart")` |
+| React Native | `setApplyPolicy('restart')` |
+| Capacitor | `AndySU.setApplyPolicy({ policy: 'restart' })` |
+| Flutter | `AndySU.setApplyPolicy(ApplyPolicy.restart)` |
+| Unity | `AndySU.Updates.SetApplyPolicy(AndySU.ApplyPolicy.Restart)` |
+| Godot | `AndySU.set_apply_policy("restart")` |
+
+## Applying on demand
+
+`UpdateClient.applyNow()` applies a staged update now: live if the payload supports it, otherwise by
+restarting. `restartNow()` restarts into the newest staged or committed payload.

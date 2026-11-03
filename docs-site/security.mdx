@@ -1,0 +1,70 @@
+---
+title: "Security"
+description: "The threat model: what AndySU defends against, and what it does not."
+---
+
+AndySU downloads and runs code, so this page says what it defends against and what it does not. The
+full document is
+[`docs/THREAT_MODEL.md`](https://github.com/dixonSolutions/AndySU/blob/main/docs/THREAT_MODEL.md);
+every defence there names the test that exercises it.
+
+## Trust anchors
+
+- The **frozen host APK**, signed with your Android key and installed once: its manifest, updater,
+  trusted root public keys and Host API level never change without a reinstall.
+- An **offline Ed25519 root key**. It signs short-lived release keys, which sign channel manifests. A
+  root may also sign a manifest directly.
+- Nothing else. TLS, GitHub, Pages, CDNs, DNS and the remote's file layout are untrusted transport.
+
+## Defences
+
+| Threat | Defence |
+|---|---|
+| Forged or modified manifest | Ed25519 over the exact bytes is verified **before** parsing. |
+| Modified blob, delta or archive | Every component's SHA-256 is verified before use. A delta must reproduce the target hash, or the full blob is fetched. |
+| Rollback attack (an old, validly signed manifest) | `sequence` never goes down; the same sequence must come with identical bytes. |
+| Freeze attack (withholding updates) | `expires` on every manifest; "now" is `max(device clock, last issued time seen)`. |
+| Stolen release key | Release keys are certified with a validity window and expire on their own. |
+| Zip-slip, zip bombs, symlinks, duplicate entries | Extraction refuses them, enforces size limits and always extracts into staging, then renames. |
+| Malformed input crashing the verifier | The parsers are fuzzed (libFuzzer) and property-tested. |
+| Torn state after a crash or power loss | Atomic writes (temp file, fsync, rename, fsync dir) under a file lock. |
+| Another app writing into the payload | Slots are in `noBackupFilesDir`, private to the app; code files are read-only. |
+| Payload needing more than the host grants | `andysu pack` refuses it. Permissions cannot be gained without a reinstall. |
+| Broken release bricking the app | TRIAL with a watchdog and boot counter, live rollback, crash markers, rollback before loading after repeated failed boots, and a recovery screen. |
+| Tracking through updates | Rollout bucketing uses a random local UUID. No device identifiers are sent, and requests are plain static GETs. |
+
+## Not defended
+
+- **A stolen root key.** AndySU cannot prevent it. Keep the root offline, sign with release keys, and
+  ship hosts that trust two roots so one can be retired.
+- **A compromised device** (root, a malicious system image, an attacker with `adb`).
+- **A malicious developer.** AndySU proves that code came from the key holder, not that it is benign.
+- **Confidentiality of payloads.** Payloads are public files. Do not put secrets in them.
+- **Denial of service by the network.** An attacker who blocks the remote stops updates; the app keeps
+  running what it has, and expiry limits how long a stale manifest is accepted.
+
+## Store policy
+
+<Warning>
+  Google Play forbids apps from downloading executable code (dex or `.so`) from outside Play, and
+  F-Droid requires in-app updaters to be disabled. AndySU is for apps distributed outside those stores:
+  direct downloads, GitHub releases, enterprise and kiosk deployments, games shipped from your own
+  site. It does not try to evade either policy.
+</Warning>
+
+## Operational guidance
+
+- Keep the root key offline. CI holds a release key with a short validity
+  (`andysu keygen --release-from root.key --days 90`) and its certificate.
+- Re-sign channel manifests before they expire (`andysu sign`). Scheduled CI can do it.
+- Use staged rollouts (`--rollout`) for risky releases, and `andysu rollback` to republish a known-good
+  release under a new sequence.
+- Treat anything that can write to your remote's storage as able to *delay* or *withhold* updates, but
+  not to change what runs.
+
+## Test hook
+
+On a debuggable app or a `userdebug`/`eng` system image, the host reads a fake free-storage figure
+from `<root>/test_allocatable_bytes`. It only changes how much the GC keeps and when a download stops
+with `no_space`; signatures, sequence checks and slot choice are unaffected. It is irrelevant on a
+production build.

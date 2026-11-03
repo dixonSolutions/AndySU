@@ -17,7 +17,7 @@ on:
   push:
     branches: [main]
     # A merge that only touches documentation is not a release.
-    paths-ignore: ["docs/**", "**/*.md", "testbeds/patches/**/*.md"]
+    paths-ignore: ["docs/**", "docs-site/**", "**/*.md", "testbeds/patches/**/*.md"]
 
 permissions:
   contents: write

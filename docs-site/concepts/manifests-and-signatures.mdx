@@ -1,0 +1,88 @@
+---
+title: "Manifests and signatures"
+description: "Ed25519 signatures, certified release keys, sequence numbers, expiry and rollout."
+---
+
+The remote is static files. The only thing a client trusts is the signature on the channel
+manifest. TLS, GitHub, Pages, CDNs and DNS are untrusted transport.
+
+## Files on the remote
+
+```
+<base>/<channel>/update.json        signed manifest (UTF-8 JSON)
+<base>/<channel>/update.json.sig    signature envelope (JSON, at most 4096 bytes)
+<base>/blobs/sha256/<hex>           component blobs, content-addressed
+<base>/deltas/<from>-<to>/<hex>     binary patches
+```
+
+A channel name matches `^[a-z0-9][a-z0-9._-]{0,63}$`. The full format is in the
+[manifest format reference](/reference/manifest-format).
+
+## Signature envelope
+
+`update.json.sig` holds an Ed25519 signature over the **exact bytes** of `update.json`:
+
+- **Without a certificate**, the signature must verify under one of the host's trusted **root**
+  keys.
+- **With a certificate**, the root key signs a short-lived **release key** for a validity window
+  (`not_before` to `not_after`). The release key then signs the manifest. This is how an offline
+  root delegates to a key that lives in CI.
+
+Keys are standard PEM: public keys as SPKI, private keys as PKCS#8, so `openssl pkey` can read them.
+A key's id is the first 8 bytes of the SHA-256 of the raw 32-byte public key, as hex.
+
+## Checks a client always makes
+
+In order, for every manifest it fetches:
+
+<Steps>
+  <Step title="Signature">
+    Verified over the exact bytes **before** the manifest is parsed. A tampered or unparseable
+    manifest fails as `bad_signature`.
+  </Step>
+  <Step title="Parse">
+    Reject on any schema violation.
+  </Step>
+  <Step title="App and channel">
+    `app` must equal the host's application id, `channel` the requested channel.
+  </Step>
+  <Step title="Expiry">
+    `expires` must be in the future. "Now" is `max(device clock, last accepted issued)`, so setting
+    the clock back does not revive an expired manifest (freeze-attack protection).
+  </Step>
+  <Step title="Sequence">
+    `sequence` must be at least the last accepted one (rollback-attack protection). If equal, the
+    bytes must be identical to the ones accepted before (`sequence_reuse` otherwise).
+  </Step>
+</Steps>
+
+Every blob, whether downloaded in full, resumed or produced by a delta, is verified against its
+SHA-256 before use. A delta must reproduce the component's own hash, or the client fetches the full
+blob instead.
+
+## Sequence and expiry in practice
+
+- Each `andysu publish`, `andysu sign` and `andysu rollback` raises the manifest's `sequence`.
+- A manifest expires after `--expires-days` (default 30). **Re-sign before expiry** with `andysu
+  sign`. A scheduled CI job can do it; the [remote template](/publishing/rollouts-and-channels)
+  re-signs weekly.
+- Clients never install a release with a lower release `sequence` than the one they run. That is why
+  remote rollback republishes the old content under a new, higher sequence.
+
+## Release selection
+
+Among releases whose `sequence` is greater than the installed one, not marked bad locally, with
+`requires` met (`host_api_min`, `shell_min`, `api_min`, `abis`) and whose rollout includes this
+install, the client picks the highest `sequence`. If the best release fails only `host_api_min` or
+`shell_min` and has a `shell` entry, the client reports `shell_update` instead.
+
+## Rollout bucketing
+
+`bucket = be_u64(SHA-256(install_id || ":" || salt)[0..8]) mod 100`. The install is included when
+`bucket < percent`. `install_id` is a random UUID created locally on first run; no device
+identifiers are sent. Requests are plain static GETs.
+
+## Key rotation
+
+Hosts trust the root keys in `roots`. To move to a new root, ship a host that trusts both, wait for
+it to spread, then switch signing. See [Keys and certificates](/publishing/keys-and-certificates).

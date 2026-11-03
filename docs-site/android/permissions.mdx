@@ -1,0 +1,66 @@
+---
+title: "Permissions and components"
+description: "What the host declares, why nothing prompts, and how the build enforces it."
+---
+
+## Permissions
+
+The host manifest declares only normal, install-time permissions. They are granted at install with no
+prompt:
+
+- `android.permission.INTERNET`
+- `android.permission.ACCESS_NETWORK_STATE`
+- `android.permission.RECEIVE_BOOT_COMPLETED` (so periodic checks survive a reboot)
+- an app-defined, signature-level `<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`, which
+  AndroidX core in payloads uses before API 33. The host declares it because the payload's own
+  manifest never reaches the device.
+
+There are no runtime (dangerous) permissions and no `REQUEST_INSTALL_PACKAGES`. The device tests
+check `dumpsys package` for this on every API level, and that no permission, installer or crash dialog
+ever takes focus.
+
+The host runs no foreground services. On Android 13+ those need the runtime permission
+`POST_NOTIFICATIONS`.
+
+## Components
+
+Because the host APK never changes, it declares in advance every component the app might ever use:
+
+- stub activities (the first is the launcher), with different orientations and launch modes. They
+  have no action bar, because the payload owns the whole window; on Android 15+ the window is edge to
+  edge and the payload handles system-bar insets;
+- stub services, stub receivers and a file provider (`${applicationId}.andysu.files`);
+- the update job service and a receiver for shell-install status;
+- a phoenix activity in the `:andysu_phoenix` process, used to relaunch after a crash.
+
+Counts are set in `andysu.toml`:
+
+```toml
+[host]
+permissions = ["CAMERA"]                # extra permissions the app may ever need
+stubs = { activities = 4, services = 2 }
+```
+
+Defaults are 4 activities, 2 services, 2 receivers and 1 provider. Short names are expanded to
+`android.permission.X`; names containing a dot are used as they are. `features` lists
+`uses-feature` entries; `min_sdk` and `shell_version` are also declared there.
+
+<Warning>
+  A permission added here later does not reach installed hosts. Declare everything the app may ever
+  need up front, and expect that a dangerous permission still needs its normal runtime prompt when
+  the app uses it.
+</Warning>
+
+## The build enforces it
+
+A payload's descriptor lists what it `needs`: permissions, and counts of activities, services,
+receivers and providers. `andysu pack --host andysu-host.json` compares that with what the frozen
+host declares and **fails the build** when the payload needs more ("this would need an APK update").
+It also refuses a payload whose `host_api_min` is above the host's level, unless you pass
+`--allow-shell` and plan a tier C shell update.
+
+## Tier C: updating the host itself
+
+The optional shell update path downloads a new host APK and hands it to `PackageInstaller`. It needs
+`REQUEST_INSTALL_PACKAGES` and user approval, so the host reports `shell_update_unavailable` when that
+permission is not declared. It is a rare fallback, not part of the normal flow.

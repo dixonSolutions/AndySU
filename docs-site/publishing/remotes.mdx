@@ -1,0 +1,118 @@
+---
+title: "Remotes"
+description: "Where the signed files live: GitHub releases, GitHub Pages or any static host."
+---
+
+A remote is static files you control. The host fetches `<channel>/update.json` and its signature, then
+the blobs and deltas the manifest names. There is no server code.
+
+## Choosing a remote
+
+Set it in `andysu.toml`:
+
+<Tabs>
+  <Tab title="GitHub releases">
+    ```toml
+    [remote]
+    type = "github"
+    repo = "you/app-updates"
+    channel = "stable"
+    ```
+
+    The stable manifest is the asset `update.json` (plus `update.json.sig`) of the **latest** release,
+    fetched from `https://github.com/OWNER/REPO/releases/latest/download/update.json`. That is a
+    stable redirect and does not use the 60-requests-per-hour unauthenticated API quota.
+
+    Other channels use a moving release tagged `channel-<name>`:
+    `https://github.com/OWNER/REPO/releases/download/channel-<name>/update.json`.
+
+    Blobs are release assets named by their SHA-256 and listed in the manifest by absolute URL, because
+    a blob is uploaded once, to the release that first introduced it. Use a repository whose
+    "latest" release is always the payload; a dedicated updates repository works well.
+  </Tab>
+  <Tab title="GitHub Pages">
+    ```toml
+    [remote]
+    type = "pages"
+    repo = "you/app-updates"
+    channel = "stable"
+    ```
+
+    Clients fetch `https://you.github.io/app-updates/<channel>/update.json` (the owner name is lower-cased).
+    The whole site (manifests, blobs, deltas) lives on the Pages branch. The
+    [remote template](#the-remote-template) sets this up.
+  </Tab>
+  <Tab title="Any static host">
+    ```toml
+    [remote]
+    type = "custom"
+    base = "https://updates.example.com"
+    channel = "stable"
+    ```
+
+    Clients fetch `https://updates.example.com/<channel>/update.json`. Any host that serves static
+    files with HTTPS works; `Range` support makes downloads resumable and `ETag` makes checks cheap.
+  </Tab>
+</Tabs>
+
+`andysu remote` prints what `andysu.toml` describes (type, repo, base, channel, `manifest_url`) as
+JSON.
+
+<Warning>
+  Payloads are public files on the remote. Do not put secrets in them. See [Security](/security).
+</Warning>
+
+## Layout
+
+```
+<base>/<channel>/update.json        signed manifest
+<base>/<channel>/update.json.sig    Ed25519 signature envelope
+<base>/blobs/sha256/<hash>          dex, per-ABI .so, asset packs, stored once each
+<base>/deltas/<from>-<to>/<hash>    zstd --patch-from or bsdiff patches
+```
+
+Component and delta `urls` may be absolute or relative to the manifest URL. If `urls` is empty, a
+client uses `../blobs/sha256/<sha256>` relative to the manifest.
+
+## The publish action
+
+For `github` and `pages` remotes the composite action packs, signs and publishes in one step:
+
+```yaml
+- uses: dixonSolutions/AndySU/actions/publish@main
+  with:
+    payload: build/andysu/payload
+    config: andysu.toml
+    signing-key: ${{ secrets.ANDYSU_SIGNING_KEY }}
+```
+
+| Input | Default | Meaning |
+|---|---|---|
+| `payload` | required | payload directory |
+| `config` | `andysu.toml` | remote type, repository, channel |
+| `signing-key` | required | signing key PEM (a secret) |
+| `signing-cert` | empty | root certificate JSON when the key is a certified release key |
+| `version` | the payload's version | release id |
+| `channel` | the one in `andysu.toml` | channel |
+| `pack-args` | empty | extra `andysu pack` arguments, for example `--hot assets/ --archive assets/data --no-rename` |
+| `rollout` | empty | staged rollout percentage, 1 to 100 |
+| `pages-branch` | `gh-pages` | branch Pages serves (type `pages`) |
+| `andysu-version` | `latest` | CLI release to use |
+| `token` | `github.token` | token with `contents: write` |
+
+Outputs: `manifest-url` and `release`. With `type = "github"`, stable releases are tagged
+`andysu-<version>`, other channels `andysu-<channel>-<version>` plus the moving `channel-<channel>`
+release. For `type = "custom"` the action stops: run `andysu pack` and `andysu publish` and upload the
+site yourself.
+
+## The remote template
+
+`templates/remote/` in the repository is a GitHub template for an app's update remote, served by
+Pages. You change what users get by editing `channels.toml` in a pull request. See
+[Rollouts and channels](/publishing/rollouts-and-channels). It is tested in CI and ready to be split
+into its own repository.
+
+## Writing your own `Remote`
+
+Anything that serves the same layout works. The Android host also accepts any base URL with that
+layout, and the protocol is small enough to implement: see the [manifest format](/reference/manifest-format).

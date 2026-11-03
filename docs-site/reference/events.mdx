@@ -1,0 +1,84 @@
+---
+title: "Events reference"
+description: "The AndySU-Event log lines the host emits."
+---
+
+The host writes one JSON object per event to Android's log at priority INFO, with the tag
+`AndySU-Event`. Every object has an `event` field naming the event; the other fields depend on the
+event. Payloads, tests and tooling can follow progress without any API:
+
+```sh
+adb logcat -s AndySU-Event
+```
+
+The device test suite uses exactly these lines. Be aware that `liblog` can drop lines while `logd` is
+busy, so do not treat a missing line as proof that something did not happen. The host's state is
+always in `state.json`.
+
+## Start-up
+
+| Event | Fields | When |
+|---|---|---|
+| `init` | `core`, `sdk`, `abi` | the host initialised; `core` is the core library version |
+| `launch` | the core's launch decision (JSON) | cold-start decision: promote pending, count a trial boot |
+| `booted` | `version`, `factory`, `trial`, and `transparent` in transparent mode | a payload generation was loaded |
+| `boot_error` | `error` | loading a payload failed |
+
+## Updating
+
+| Event | Fields | When |
+|---|---|---|
+| `update_status` | `status` (object with `state`, see [Status and errors](/reference/status-and-errors)) | every status change of the updater |
+| `resume` | `key`, `offset` | a download resumed from a partial file |
+| `download_interrupted` | `key`, `error` | a download attempt failed with an I/O error; the host retries the URL up to 3 times, resuming from the partial file |
+| `gc` | `result`, `low_storage` | garbage collection ran |
+| `gc_skipped` | `reason`, `kept` | GC did not run because it would delete the slot the process booted from |
+| `shell_update_unavailable` | `reason` | a tier C update exists but `REQUEST_INSTALL_PACKAGES` is not declared |
+| `shell_download_failed` | `error` | the shell APK download failed |
+| `shell_install_committed` | `session` | the shell install session was committed |
+| `shell_install_status` | `status`, `message` | `PackageInstaller` status callback |
+
+## Applying and trial
+
+| Event | Fields | When |
+|---|---|---|
+| `apply_policy` | `policy` | the apply policy was set at runtime |
+| `apply_decision` | `pending`, `native_live`, `handler`, `resumed` | transparent mode, `apply = "live"`: whether a live native swap is possible |
+| `restart_to_apply` | `when` (`background` or `on_background`) | the host will end the process to apply an update |
+| `suspended` | `version`, `state_bytes` | the old generation's `suspend()` returned |
+| `suspend_timeout` | none | `suspend()` did not return within 3 seconds |
+| `begin_live_failed` | `error` | starting the live trial failed after suspending; the old generation resumes |
+| `live_swapped` | `from`, `to` | a live swap completed |
+| `hot_applied` | `from`, `dir` | a hot (content-only) update was applied |
+| `committed` | `version`, `result`, `state` | `markHealthy()` committed the generation |
+| `crash_signals` | `mode` | the crash signals mode in effect |
+
+## Live native swaps (transparent mode)
+
+| Event | Fields | When |
+|---|---|---|
+| `live_swap_requested` | `from`, `to` | the app's handler accepted a swap |
+| `live_swap_declined` | `to` | the handler declined, so `live_fallback` applies |
+| `live_begin_failed` | `error` | the host could not start the live trial |
+| `live_swapped` | `from`, `to` | the app reported `started()` |
+| `live_rollback` | `reason`, `from`, `to` | rolled back in-process |
+
+## Rollback and crashes
+
+| Event | Fields | When |
+|---|---|---|
+| `rolled_back` | `reason`, `result` (and `state` for live rollbacks) | a slot was rolled back |
+| `watchdog` | `version` | the TRIAL watchdog fired |
+| `watchdog_paused` | `remaining_ms` | the last activity stopped during a trial |
+| `watchdog_resumed` | `remaining_ms` | an activity started again |
+| `uncaught` | `thread`, `error`, `trial`, `stack` | an uncaught Java exception |
+| `native_crash` | `signal` | a native signal during a trial reached the watcher thread |
+| `crash_handler_replaced` | `signals`, `chained` | a payload replaced the host's crash handlers |
+| `relaunch` | `reason` | the host relaunches the app through the phoenix activity |
+| `relaunch_suppressed` | `reason` | more than 3 relaunches within a minute |
+
+## Notes
+
+- `update_status` carries the same JSON that `UpdateClient.status()` returns, nested under `status`.
+- The device tests also read events that their own test payloads emit (for example `sample_started`
+  from the samples). Those are not part of the host.

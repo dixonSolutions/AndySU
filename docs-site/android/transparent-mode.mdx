@@ -1,0 +1,105 @@
+---
+title: "Transparent mode and andysu split"
+description: "Make any finished APK updatable: games, engines, Flutter, React Native, Cordova, NDK."
+---
+
+`andysu split` turns **any finished APK** into a frozen host APK plus a payload directory. It is what
+makes AndySU independent of language and framework. You do not change the app's code.
+
+```sh
+andysu split app-release.apk --out out --transparent \
+  --host-template andysu-host-template-<version>.zip --config config.json \
+  --keystore release.jks --ks-pass pass:secret --key-alias release
+```
+
+The output directory receives:
+
+- `payload/`: dex, `lib/<abi>` native libraries, assets, Java resources as `dex/resources.jar`, and
+  the descriptor `andysu-payload.json` with `needs` read from the binary manifest;
+- `andysu-host.json`: what the host declares;
+- `host.apk` when you pass `--host-template`: the frozen host, signed with the keystore you give.
+  Use the app's own key so it installs over the original.
+
+## Two flavours of split
+
+| | Stub mode (no `--transparent`) | Transparent mode (`--transparent`) |
+|---|---|---|
+| App code | implements `com.andysu.api.Payload`; name it with `--entry-class` (or `--entry-native LIB:SYMBOL`) | unchanged |
+| Components | mapped onto the host's stubs | all original components kept under their real names |
+| Android | API 21+ | API 28+ (30+ when the payload has assets) |
+| Live swap | yes, with `suspend()` and `start(state)` | native-only releases, with a `LiveSwapHandler` (level 2); otherwise next start |
+
+## How transparent mode works
+
+For apps that cannot implement `Payload`, such as SDL games whose Activity must be an `SDLActivity`,
+the host keeps every component of the original manifest and sets `android:appComponentFactory` to
+the host's `AndySUComponentFactory`.
+
+- The factory's `instantiateClassLoader` (public API since Android 9) runs the core's boot decision
+  and returns the slot's class loader. The app's own `Application`, activities and services load
+  from the payload under their real names.
+- `ApplicationInfo.nativeLibraryDir` is pointed into the slot.
+- Payload assets reach `getAssets()` and `AAssetManager` through a `ResourcesLoader` with an
+  `AssetsProvider` (Android 11+). Asset **listing** is not supported.
+- A generation is **committed** once an activity has stayed resumed for `auto_healthy_ms` (default
+  8000) without a crash. The app does not have to call `markHealthy()`, though it may.
+- Library names are kept (`andysu pack --no-rename`): one generation per process, and engines that
+  `dlopen("libmain.so")` by name keep working. `split` does this for the built-in payload; **pass
+  `--no-rename` yourself when packing updates.**
+- Updates apply on the next start. Native-only releases can go live if the app registers a
+  `LiveSwapHandler`, see [Host API](/android/host-api#live-native-swaps).
+- Hosts made by `split` keep each activity's own theme.
+
+Split hosts store native libraries uncompressed, 16 KB aligned, with `extractNativeLibs=false`.
+
+## The recipe
+
+<Steps>
+  <Step title="Generate the host config">
+    ```sh
+    andysu host-config --config-out config.json --host-out andysu-host.json
+    ```
+  </Step>
+  <Step title="Split version A">
+    Version A is what users install first. `split` packs it into a built-in payload and builds the
+    host.
+
+    ```sh
+    andysu split app-1.0.apk --out out --transparent \
+      --host-template andysu-host-template-<version>.zip --config config.json --keystore release.jks
+    ```
+  </Step>
+  <Step title="Split and pack every later version">
+    ```sh
+    andysu split app-1.1.apk --out out-1.1 --transparent
+    andysu pack out-1.1/payload --site site --host andysu-host.json --no-rename
+    andysu publish --site site --release 1.1 --key andysu-root.key
+    ```
+  </Step>
+</Steps>
+
+Without `--host-template`, `split` writes only the payload, which is what you want for later versions.
+
+## Options
+
+| Flag | Meaning |
+|---|---|
+| `--out`, `-o` | Output directory (required) |
+| `--app` | Application id (default: the APK's package) |
+| `--version` | Payload version (default: the APK's `versionName`) |
+| `--entry-class` | JVM entry class implementing `com.andysu.api.Payload` |
+| `--entry-native` | Native entry, `LIB:SYMBOL`, for example `libgame:andysu_payload_v1` |
+| `--host-api` | Host API level the payload needs (default 1) |
+| `--abi` | Keep only these ABIs (default: all) |
+| `--host-template` | Also build the host APK from this template zip |
+| `--config` | Host `config.json` from `andysu host-config` |
+| `--keystore`, `--ks-pass`, `--key-alias` | Sign the host APK. `--ks-pass` takes the `apksigner` form, such as `pass:secret` or `env:VAR` |
+| `--cleartext` | Allow plain-HTTP remotes (local testing only) |
+| `--transparent` | Transparent mode |
+
+## Verified on
+
+Real apps: the Xonotic Touch and SuperTuxKart Touch test beds, from their published release APKs
+without any rebuild. See [Test beds](/contributing/testbeds). Flutter, Unity, Godot, React Native and
+Cordova apps are all the same class of input (a finished APK), but the repository's tests run the
+split on the test beds and sample APKs, not on every framework.

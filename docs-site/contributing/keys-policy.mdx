@@ -1,0 +1,51 @@
+---
+title: "Keys policy"
+description: "Test keys only in CI, and never commit a private key."
+---
+
+## The rules
+
+- **Never commit a private key.** Not for tests, not temporarily. `*.key` and `*.jks` are in
+  `.gitignore`, and `andysu init` adds `.andysu/` and `*.key` to a project's `.gitignore`.
+- **Every signing key in this repository's CI is a test key**, stored as an Actions secret. Nothing
+  that real users trust is signed with it.
+- No workflow names a specific key. They read secrets, so replacing the test keys with real ones
+  changes the secrets and nothing else.
+- Tests generate throwaway keys at runtime. The only fixed key in source is the published RFC 8032 test
+  vector. Only the public half of the CI test key is committed
+  (`keys/andysu-ci-test-public.pem`).
+
+## What exists today
+
+The CI test keys were generated on the owner's machine with this repository's tools and are kept
+outside the repository in `~/.config/andysu/keys/` (mode 0600).
+
+| Secret | What it is |
+|---|---|
+| `ANDYSU_SIGNING_KEY` | Ed25519 root key; signs `SHA256SUMS` and the demo channel |
+| `ANDYSU_SIGNING_CERT` | optional; set when the key is a release key certified by an offline root |
+| `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` | PKCS12 keystore (EC P-256) for the demo APK in each release |
+| `CARGO_REGISTRY_TOKEN`, `NPM_TOKEN` | optional; turn on the crates.io and npmjs.com jobs |
+
+## Loading and swapping secrets
+
+```sh
+scripts/setup-secrets.sh                # dixonSolutions/AndySU, the CI test keys
+```
+
+The script reads files and pipes them to `gh secret set`, so a key never passes through the command line
+or shell history. To use other keys, point it at other files with `ANDYSU_KEY_FILE`, `ANDYSU_CERT_FILE`,
+`ANDROID_KEYSTORE`, `ANDROID_KEYSTORE_PASS_FILE`, `ANDROID_KEY_ALIAS`, `CARGO_REGISTRY_TOKEN` and
+`NPM_TOKEN`. If `ANDYSU_SIGNING_KEY` is missing the release fails; if the keystore secrets are missing
+the demo APK is signed with the debug key.
+
+## Rotating
+
+When the CI signing key changes, replace `keys/andysu-ci-test-public.pem`; the release workflow warns when
+`SHA256SUMS` is not signed by that file. For an app's own hosts, see
+[Keys and certificates](/publishing/keys-and-certificates#rotating-the-root-key).
+
+## Agent and tool rules
+
+The same rules bind automated workers: they do not create files with private key material in the
+repository, and they never print or paste secret values.

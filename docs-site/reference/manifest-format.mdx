@@ -1,0 +1,162 @@
+---
+title: "Manifest format"
+description: "The update protocol: remote layout, signature envelope, manifest and payload descriptor."
+---
+
+This page summarises the protocol. The normative sources are
+[`spec/SPEC.md`](https://github.com/dixonSolutions/AndySU/blob/main/spec/SPEC.md) and the JSON Schemas in
+[`spec/schema/`](https://github.com/dixonSolutions/AndySU/tree/main/spec/schema) (`manifest`,
+`signature`, `payload`, `state`). The protocol is "v0 (schema 1)", and anyone can implement it from
+those files. The Rust core in `core/` is the reference implementation.
+
+## Terms
+
+- **Host**: the frozen part of an app. Holds the trusted root public keys, the bootloader and the
+  recovery updater.
+- **Payload**: everything else, installed as a **slot**.
+- **Release**: one complete payload version in a manifest.
+- **Component**: one file (or one archive expanded into a directory) of a release.
+- **Remote**: static files the developer controls.
+- **Channel**: a named stream of releases.
+
+## Remote layout
+
+```
+<base>/<channel>/update.json        manifest (UTF-8 JSON)
+<base>/<channel>/update.json.sig    signature envelope
+<base>/blobs/sha256/<hex>           component blobs, content-addressed
+<base>/deltas/<from>-<to>/<hex>     binary patches (from, to and hex are SHA-256 digests)
+```
+
+## Signature envelope
+
+`update.json.sig`, at most 4096 bytes:
+
+```json
+{
+  "v": 1,
+  "alg": "ed25519",
+  "sig": "<base64 of the 64-byte Ed25519 signature over the exact bytes of update.json>",
+  "cert": {
+    "key": "<base64 of a 32-byte Ed25519 release public key>",
+    "not_before": "2026-11-01T00:00:00Z",
+    "not_after":  "2027-02-01T00:00:00Z",
+    "sig": "<base64 of the root key's signature over the certificate message>"
+  }
+}
+```
+
+- Base64 is the standard alphabet with padding.
+- Without `cert`, `sig` must verify under a trusted root key.
+- With `cert`, the certificate must verify under a trusted root, the time of check must lie in
+  `[not_before, not_after]`, and `sig` must verify under `cert.key`.
+- The certificate message is `"andysu-cert-v1" || 0x00 || key(32 bytes) || be_i64(not_before) ||
+  be_i64(not_after)`, the times being Unix seconds.
+- A client must verify the signature **before** parsing the manifest.
+
+## Manifest
+
+Timestamps are RFC 3339 in UTC with a literal `Z` and no fractional seconds. SHA-256 values are 64
+lowercase hex digits. Clients ignore unknown fields. `schema` changes only for an incompatible
+change.
+
+A trimmed example, based on the repository's `full.json` fixture:
+
+```json
+{
+  "schema": 1,
+  "app": "com.example.app",
+  "channel": "stable",
+  "issued": "2026-11-01T00:00:00Z",
+  "expires": "2026-12-01T00:00:00Z",
+  "sequence": 7,
+  "releases": [
+    {
+      "id": "1.2.0",
+      "sequence": 3,
+      "requires": { "host_api_min": 1, "shell_min": 1, "api_min": 24, "abis": ["arm64-v8a", "x86_64"] },
+      "rollout": { "percent": 100, "salt": "1.2.0" },
+      "mandatory": false,
+      "notes_url": "https://example.com/notes/1.2.0",
+      "components": [
+        { "name": "descriptor", "kind": "content", "apply": "restart", "path": "andysu-payload.json",
+          "sha256": "<64 hex>", "size": 210 },
+        { "name": "classes", "kind": "dex", "apply": "restart", "path": "dex/classes.dex",
+          "sha256": "<64 hex>", "size": 120000,
+          "urls": ["../blobs/sha256/<64 hex>"],
+          "deltas": [{ "from_sha256": "<64 hex>", "format": "zstd", "sha256": "<64 hex>", "size": 900 }] },
+        { "name": "assets", "kind": "content", "apply": "hot", "path": "assets", "archive": "zip",
+          "unpacked_size": 90000, "sha256": "<64 hex>", "size": 40000 }
+      ]
+    }
+  ]
+}
+```
+
+### Top level
+
+| Field | Meaning |
+|---|---|
+| `schema` | 1 |
+| `app` | application id |
+| `channel` | channel name |
+| `issued`, `expires` | timestamps |
+| `sequence` | monotonic manifest sequence |
+| `releases` | up to 256 releases |
+
+### Release
+
+| Field | Meaning |
+|---|---|
+| `id` | `[A-Za-z0-9][A-Za-z0-9._+-]{0,63}` |
+| `sequence` | release sequence; clients only move to a higher one |
+| `requires` | `host_api_min`, `shell_min`, `api_min` (OS API level), `abis` |
+| `rollout` | `percent` (0 to 100) and `salt` |
+| `mandatory` | boolean |
+| `notes_url` | link to release notes |
+| `components` | at least one; must include the descriptor, `path` = `andysu-payload.json` |
+| `shell` | optional tier C host APK: `version_code`, `sha256`, `size`, `urls` |
+
+### Component
+
+| Field | Meaning |
+|---|---|
+| `name` | identifier |
+| `kind` | `content`, `dex` or `native` |
+| `apply` | `hot` or `restart` (default `restart`) |
+| `abi` | only installed on devices using this ABI; no `abi` means everywhere |
+| `path` | slot-relative path with `/` separators; no absolute paths, `..`, `.`, empty segments or backslashes |
+| `archive` | `zip`: the blob is expanded into the directory `path` (zip-slip safe) |
+| `unpacked_size` | for archives |
+| `sha256`, `size` | of the blob |
+| `urls` | absolute or relative to the manifest; empty means `../blobs/sha256/<sha256>` |
+| `deltas` | up to 16 patches: `from_sha256`, `format` (`zstd` or `bsdiff`), `sha256` of the patch, `size`, `urls` |
+
+A delta, applied to the blob named by `from_sha256`, yields the component, which is then verified
+against the component's own `sha256`.
+
+## Client checks
+
+For every fetched manifest, in order: signature, parse, app and channel, `expires` greater than now
+(`now` is `max(clock, last accepted issued)`), `sequence` at least the last accepted (equal means
+identical bytes), then remember `sequence`, `issued` and the manifest hash. See
+[Manifests and signatures](/concepts/manifests-and-signatures).
+
+## Payload descriptor
+
+`andysu-payload.json` names the payload `app`, `version`, `host_api_min`, the entry point and `needs`.
+The fields are in the [configuration reference](/reference/config#payload-descriptor).
+
+## Archive extraction
+
+Zip entries are rejected if their name is absolute, contains a `..` or empty segment, a backslash, a
+NUL or a drive prefix, or if they are symlinks. Extraction targets a staging directory only. The
+total uncompressed size is capped (`unpacked_size` when given, otherwise 64 times the archive size,
+at most 4 GiB) to stop zip bombs. Duplicate entry names are rejected by comparing the central
+directory count.
+
+## Client state
+
+`state.json` (schema `spec/schema/state.schema.json`) is written atomically under an exclusive lock.
+Every launch of a TRIAL slot increments `boot_attempts` before loading. See
+[Update lifecycle](/concepts/update-lifecycle).

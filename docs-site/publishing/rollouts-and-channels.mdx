@@ -1,0 +1,75 @@
+---
+title: "Rollouts and channels"
+description: "Beta and stable channels, staged rollouts and rollbacks."
+---
+
+## Channels
+
+A channel is a named stream of releases, with its own manifest at `<base>/<channel>/update.json`.
+Names match `^[a-z0-9][a-z0-9._-]{0,63}$`. `stable` is the default; `beta` is the usual second one.
+A host follows exactly one channel, set by `[remote] channel` in `andysu.toml`.
+
+Publish to another channel with `--channel beta` on `pack` and `publish`.
+
+## Staged rollouts
+
+```sh
+andysu publish --site site --release 1.1 --key andysu-root.key --rollout 10
+andysu sign --site site --rollout 1.1=50 --key andysu-root.key     # later
+andysu sign --site site --rollout 1.1=100 --key andysu-root.key
+```
+
+An install joins the rollout when `bucket < percent`, where the bucket is
+`hash(install_id + salt) mod 100`. The `install_id` is a random local UUID and the salt is the release
+id by default. The same install gets a stable answer, and no device identifiers are sent. Installs
+outside the rollout stay on the previous release.
+
+## Rolling back a channel
+
+```sh
+andysu rollback --site site --to 1.0 --key andysu-root.key
+```
+
+Clients never install a lower release sequence. So rollback removes the newer releases from the
+channel and republishes 1.0's components as a **new** release `1.0-r<seq>` with a higher sequence. The
+content is already cached on most devices, so almost nothing is downloaded.
+
+## The remote template
+
+`templates/remote/` is a repository template that manages channels with pull requests. You edit
+`channels.toml`:
+
+```toml
+expires_days = 30
+
+[channels.beta]
+release = "1.1.0"
+
+[channels.stable]
+release = "1.0.0"
+rollout = 100
+```
+
+| You want to | Change | What happens on merge |
+|---|---|---|
+| ship to testers | `[channels.beta] release = "1.2.0"` (the ingest workflow opens this PR) | beta offers 1.2.0 |
+| promote | `[channels.stable] release = "1.2.0"` | stable offers 1.2.0 |
+| stage a rollout | `rollout = 10`, later `50`, `100` | that share of installs gets it |
+| roll back | `release = "1.1.0"` (an older id) | 1.1.0 is republished under a new sequence |
+
+Workflows:
+
+- **ingest** downloads a payload `.tar.gz`, packs it into the site and opens a PR that offers it on a
+  channel. With `auto_apply` it publishes right away.
+- **apply** runs on pushes to `main` that touch `channels.toml`, makes the signed site match it, pushes
+  `gh-pages` and verifies every channel the way a client would.
+- **rollback** is the emergency button. It also records the rollback in `channels.toml`.
+- **resign** runs weekly and refreshes every channel, because manifests expire.
+
+Set it up by creating a repository from the template (or copying the directory), generating keys
+(`andysu keygen --name updates`), storing the private key as `ANDYSU_SIGNING_KEY`, enabling Pages from
+the `gh-pages` branch, and pointing the app at it with `type = "pages"`. Extra `andysu pack` arguments
+go in a `pack-args` file at the repository root.
+
+The template's own test (`templates/remote/test.sh`) covers ingest, promote, a 20% rollout (41 of 200
+simulated installs took it), 100%, rollback and re-sign, and every step passes `andysu verify --blobs`.

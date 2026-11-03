@@ -1,0 +1,144 @@
+---
+title: "Configuration reference"
+description: "Every key of andysu.toml and of the host's config.json, with defaults."
+---
+
+Configuration lives in two places. `andysu.toml` is the file you write. `andysu host-config` turns it
+into `config.json`, which is frozen inside the host APK. Unknown or invalid values in `[policy]` make
+`andysu` fail with a message that lists the allowed values.
+
+## andysu.toml
+
+```toml
+app = "com.example.app"
+host_api = 1
+public_key = "andysu-public.pem"
+
+[remote]
+type = "github"            # github | pages | custom
+repo = "you/app-updates"
+channel = "stable"
+
+[policy]
+mode = "auto"
+network = "any"
+apply = "live"
+restart_when = "now"
+
+[host]
+permissions = []
+stubs = { activities = 4, services = 2 }
+```
+
+### Top level
+
+| Key | Default | Meaning |
+|---|---|---|
+| `app` | required | Android application id |
+| `host_api` | 1 | Host API level the frozen host declares. `pack` checks payloads against it. The host uses the smaller of this and the level its AAR implements. |
+| `public_key` | required | path of the root public key (PEM), relative to `andysu.toml` |
+
+### `[remote]`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `type` | required | `github`, `pages` or `custom` |
+| `repo` | none | `owner/name`; required for `github` and `pages` |
+| `base` | none | `https://...`; required for `custom` |
+| `channel` | `stable` | the channel this host follows |
+
+The manifest URL is derived from these:
+
+| `type` | `channel` | Manifest URL |
+|---|---|---|
+| `github` | `stable` | `https://github.com/<repo>/releases/latest/download/update.json` |
+| `github` | other | `https://github.com/<repo>/releases/download/channel-<channel>/update.json` |
+| `pages` | any | `https://<owner, lower case>.github.io/<name>/<channel>/update.json` |
+| `custom` | any | `<base>/<channel>/update.json` |
+
+### `[policy]`
+
+| Key | Default | Values | Meaning |
+|---|---|---|---|
+| `mode` | `auto` | `auto`, `download_only`, `check_only`, `off` | how much the host does by itself |
+| `network` | `any` | `any`, `unmetered` | network constraint for checks |
+| `apply` | `live` | `live`, `restart`, `next_start` | when a staged release runs |
+| `restart_when` | `now` | `now`, `background` | with `apply = "restart"`: relaunch at once, or end the process when the user leaves |
+| `live_fallback` | `next_start` | `next_start`, `restart` | what `live` does when a live swap is impossible (transparent mode) |
+| `crash_signals` | `payload` | `payload`, `host` | who owns the native crash signals during a trial |
+| `charging` | `false` | boolean | background checks only while charging |
+| `battery_not_low` | `true` | boolean | background checks only while the battery is not low |
+| `check_interval_minutes` | 360 | integer | period of background checks |
+| `watchdog_ms` | 10000 | integer | TRIAL deadline for `markHealthy()`, in foreground time |
+
+See [Apply policies](/concepts/apply-policies) and [Watchdog and crash detection](/concepts/watchdog-and-crashes).
+
+### `[host]`
+
+| Key | Default | Meaning |
+|---|---|---|
+| `permissions` | `[]` | extra Android permissions the app may ever need. Short names become `android.permission.X`; names with a dot are used as given. |
+| `features` | `[]` | `uses-feature` names the host declares |
+| `stubs` | see below | stub component counts |
+| `shell_version` | 0 | the host's shell version, for `shell_min` checks |
+| `min_sdk` | 0 | minimum Android API; when above 0 it becomes `requires.api_min` of each release |
+
+`stubs` keys: `activities` (4), `services` (2), `receivers` (2), `providers` (1). Counts that you do
+not set keep their default. The host always declares `INTERNET`, `ACCESS_NETWORK_STATE` and
+`RECEIVE_BOOT_COMPLETED`, plus the app's `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`.
+
+## host config.json
+
+The host reads `assets/andysu/config.json`. The column "Set by" says whether `andysu host-config`
+writes the key from `andysu.toml`.
+
+| Key | Default | Set by | Meaning |
+|---|---|---|---|
+| `app` | required | `app` | application id |
+| `channel` | `stable` | `[remote] channel` | channel to follow |
+| `manifest_url` | required | derived from `[remote]` | where to fetch the manifest |
+| `roots` | required | `public_key` | trusted root public keys (PEM or base64); more than one during a rotation |
+| `mode` | `auto` | `[policy] mode` | `auto`, `download_only`, `check_only`, `off` |
+| `apply` | `live` | `[policy] apply` | `live`, `restart`, `next_start` |
+| `restart_when` | `now` | `[policy] restart_when` | `now` or `background` |
+| `live_fallback` | `next_start` | `[policy] live_fallback` | `next_start` or `restart` |
+| `crash_signals` | `payload` | `[policy] crash_signals` | `payload` or `host` |
+| `network` | `any` | `[policy] network` | `any` or `unmetered` |
+| `charging` | `false` | `[policy] charging` | |
+| `battery_not_low` | `true` | `[policy] battery_not_low` | |
+| `check_on_open` | `true` | not written | check every time the app opens |
+| `check_interval_minutes` | 360 | `[policy] check_interval_minutes` | |
+| `watchdog_ms` | 10000 | `[policy] watchdog_ms` | TRIAL deadline, foreground time only |
+| `auto_healthy_ms` | 8000 | not written | transparent mode: commit after an activity stayed resumed this long |
+| `max_boot_attempts` | 2 | not written | cold boots of a TRIAL slot before rolling back without loading it |
+| `host_api` | 1 | `host_api` | what the frozen host offers; the host uses `min(host_api, level its AAR implements)` |
+| `shell_version` | 0 | `[host] shell_version` | tier C shell version |
+| `stub_activities` | 4 | `[host] stubs` | stub activities declared |
+| `stub_services` | 2 | `[host] stubs` | stub services declared |
+
+To change a key that `host-config` does not write, add it to `config.json` before building the host.
+The runtime override for the apply policy is stored in `<root>/apply_policy`, see
+[Apply policies](/concepts/apply-policies#changing-the-policy-at-runtime).
+
+## andysu-host.json
+
+Written by `host-config --host-out`. It is the host's declaration, input to `andysu pack --host`:
+the application id, `host_api`, `shell_version`, `min_sdk`, the full permission list, the stub counts
+(`activities`, `services`, `receivers`, `providers`) and `features`.
+
+## Payload descriptor
+
+Every payload carries `andysu-payload.json` (schema: `spec/schema/payload.schema.json`). `andysu pack`
+and `andysu split` write it for you.
+
+| Field | Meaning |
+|---|---|
+| `schema` | 1 |
+| `app` | application id |
+| `version` | payload version, `[A-Za-z0-9][A-Za-z0-9._+-]{0,63}` |
+| `host_api_min` | the Host API level the payload needs |
+| `entry` | `dex_class`; or `native_lib` with `symbol`; `transparent` for transparent mode |
+| `dex` | slot-relative dex paths, in class-path order |
+| `native_dir` | directory holding `lib/<abi>/` trees (default `lib`) |
+| `native` | per-ABI libraries in load order, dependencies first (written by `pack`) |
+| `needs` | `permissions`, `activities`, `services`, `receivers`, `providers`, `features` |

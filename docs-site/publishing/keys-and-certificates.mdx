@@ -1,0 +1,81 @@
+---
+title: "Keys and certificates"
+description: "Root keys, short-lived release keys, rotation and checking releases."
+---
+
+There are two kinds of key in an AndySU app:
+
+| Key | Signs | Lives |
+|---|---|---|
+| Android APK key | the host APK, once | your normal keystore |
+| AndySU Ed25519 payload key | every manifest | a CI secret (a release key) with the root kept offline |
+
+## Generate
+
+```sh
+andysu keygen --name myapp          # writes myapp-root.key and myapp-public.pem
+```
+
+`--dir` chooses the output directory (default `.`). Keys are standard PEM: public keys as SPKI,
+private keys as PKCS#8, so `openssl pkey` can read them. `andysu pubkey --key myapp-root.key` derives the
+public key again, for example from a CI secret.
+
+`andysu init` runs this for you and puts the private key in `.andysu/`, which it adds to `.gitignore`
+together with `*.key`.
+
+<Warning>
+  Never commit a private key. The public `.pem` is committed and compiled into the host.
+</Warning>
+
+## Release keys
+
+Day-to-day signing should use a short-lived release key certified by an offline root. It expires on its
+own, and rotating it does not touch installed hosts.
+
+```sh
+andysu keygen --release-from myapp-root.key --days 90
+```
+
+This writes `<name>-release.key` and `<name>-release.cert.json` (`--name` defaults to `andysu`; the
+certificate is signed by the root and valid for `--days`, default 90). Store the key as
+`ANDYSU_SIGNING_KEY` and the certificate as `ANDYSU_SIGNING_CERT`. When publishing, pass both:
+`andysu publish --key andysu-release.key --cert andysu-release.cert.json`, or use the environment
+variables `ANDYSU_KEY_FILE` and `ANDYSU_CERT_FILE`.
+
+Keep the root offline and re-sign channel manifests before they expire.
+
+## Rotating the root key
+
+Hosts trust the root public keys built into them (`roots` accepts a list).
+
+1. Ship a host that trusts **both** the old and the new root, and wait for it to spread.
+2. Switch the signing key to the new root.
+
+## Check a release
+
+Releases of AndySU itself carry `SHA256SUMS` with a detached signature, made with `andysu sign-file`
+and checked with `andysu verify-file`:
+
+```sh
+gh release download v0.1.62 --repo dixonSolutions/AndySU
+sha256sum -c --ignore-missing SHA256SUMS
+./andysu-x86_64-unknown-linux-musl verify-file SHA256SUMS --pub keys/andysu-ci-test-public.pem
+```
+
+A file signature covers `andysu-file-v1\0<sha256>\0<size>`, a different message from a manifest
+signature, so a file signature can never pass as a manifest signature.
+
+<Note>
+  AndySU's own releases are signed with CI **test** keys that nobody should rely on beyond this
+  project's tests. See [Keys policy](/contributing/keys-policy).
+</Note>
+
+## Secrets for CI
+
+| Secret | Used for |
+|---|---|
+| `ANDYSU_SIGNING_KEY` | signs manifests (the publish action and your CI) |
+| `ANDYSU_SIGNING_CERT` | optional; set when the key is a certified release key |
+
+`gh secret set ANDYSU_SIGNING_KEY < .andysu/andysu-root.key` loads the key without it passing through
+the command line.

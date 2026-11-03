@@ -1,0 +1,76 @@
+---
+title: "Test beds"
+description: "Xonotic Touch and SuperTuxKart Touch as real-world tests, and the patches that live here."
+---
+
+Two real games test AndySU against software it was not written for:
+
+- **Xonotic Touch** (DarkPlaces C engine, QuakeC, pk3 data, a Java host).
+- **SuperTuxKart Touch** (a large asset tree: more than 4096 files).
+
+## Ground rules
+
+- Clones live in `testbeds/`, which is git-ignored (only `testbeds/patches/` is tracked). They are
+  shallow clones of other projects.
+- **Never edit, commit to or push to** `~/Projects/Xonotic-Touch`, or to the `xonotic-touch`,
+  `SuperTuxKart-Touch` or `stk-code` GitHub repositories. Other people work in them.
+- Integration patches live only in `testbeds/patches/`, and their APKs are built here or in AndySU's own
+  CI. They are **never pushed upstream**.
+
+## What the beds do
+
+`android/tests/testbed_tests.py` takes the projects' **published x86_64 release APKs**, with no rebuild
+and no source change, and runs `andysu split --transparent`:
+
+| | Xonotic Touch 1.2.104 to 1.2.105 | SuperTuxKart Touch 1.0.29 to 1.0.31 |
+|---|---|---|
+| A runs from the built-in payload | ok | ok |
+| B downloaded, applied on next start, committed; installed APK still version A | ok | ok |
+| broken B (truncated dex) fails on start, crash handler rolls back, one relaunch, B | ok | ok |
+
+Run on an API 34 emulator without internet; the remote is reached over `adb reverse`. For Xonotic, the
+bed seeds the game's data and requires the engine's own proof of running from the payload: SDL's
+log line `Running main function SDL_main from library .../no_backup/andysu/<slot>/lib/x86_64/libmain.so` with the
+expected slot, the `========Initialized=========` banner and `GL_RENDERER`. An earlier version waited
+only for AndySU's events and did not show that the game ran; that was found in review and fixed.
+
+The beds found real bugs: a race in which the crash handler's rollback was overwritten by a stale state
+write from the updater thread (now `Store::locked`, with a concurrency test), STK's more than 4096 asset
+files (now auto-archived into 395 components), and aapt2 dropping dot-files (hence `andysu-slot.json`).
+
+## Live .so swap in Xonotic
+
+The Xonotic engine can be swapped live. `testbeds/patches/xonotic-touch/LIVE_SWAP.md` describes the
+design: a resident loader runs on SDL's thread instead of `SDL_main`, `dlopen`s the engine library
+(`libmain.<hash>.so`) and, on a swap request, the engine saves a small JSON state, runs `Host_Shutdown`
+and returns to the loader, which starts the next engine. Rollback has three layers: the app's in-process
+rollback, the watchdog, and a native crash.
+
+`testbed_tests.py --live` (API 34), all in one process: the built-in engine runs through the loader; a
+new release is checked, staged, swapped in live and **committed by AndySU**; a deliberately broken one
+fails its engine init and rolls back in-process; a cold start boots the new one; a Java-changing release
+falls back to the next start. `--live-failures` covers watchdog expiry, a native crash in a live trial and
+a second live swap after a cold start; `--low-storage` covers the GC guard; game data is re-unpacked after
+an in-process rollback. This is what Host API level 2 was built for, see
+[Host API](/android/host-api#live-native-swaps).
+
+Known costs per swap: about 2 extra file descriptors and about 10 MB RSS (20 MB with a map loaded), and a
+rolled-back start leaves its copy mapped. The host should prefer a cold start after a few swaps.
+
+## The patches
+
+| Patch | Why |
+|---|---|
+| `xonotic-touch/0001-andysu-payload-version-and-updater.patch` | `GameData` re-unpacks its data when `PackageInfo.versionName` changes; under AndySU that is the frozen host's version, so it asks AndySU for the payload version. `AppUpdater` (PackageInstaller APK updates) stands down. |
+| `SuperTuxKart-Touch/0001-andysu-updater-stands-down.patch` | `STKUpdateChecker` stands down under AndySU, since installing a full APK would replace the host. |
+| `xonotic-touch/0002` to `0007` | the live swap: the resident loader, the engine swap, the handler registration through reflection, test variants, no engine crash handlers (D30), game data after rollback |
+
+All use reflection on `com.andysu.api.Host`, so the patched apps build and run with or without AndySU. The
+unmodified release APKs also pass the basic beds; the patches are for the projects' maintainers. They
+have not been through the projects' full engine builds, except the reproducible Xonotic build in
+`testbeds/patches/xonotic-touch/build.sh`.
+
+## Evidence
+
+Screenshots and logs from the runs are in `docs/evidence/` (for example `xonotic-engine-log.txt`,
+`live-failures.json`, `stk-*` screenshots).

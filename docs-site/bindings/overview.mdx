@@ -1,0 +1,50 @@
+---
+title: "Bindings overview"
+description: "How each ecosystem talks to the host."
+---
+
+Every binding is a thin wrapper over the host's `com.andysu.api.Host.current()`, so it works in stub
+mode and in [transparent mode](/android/transparent-mode) alike. Without an AndySU host (iOS, desktop,
+a plain debug build) every call returns neutral values, so the same app code runs everywhere.
+
+The bindings give you **update status and control**, not the packaging. You still produce the host and
+payload from the finished APK with `andysu split`, or with the Gradle plugin.
+
+| Ecosystem | Package | Page |
+|---|---|---|
+| Flutter | `andysu` (pub) | [Flutter](/bindings/flutter) |
+| React Native and Expo | `@andysu/react-native` | [React Native](/bindings/react-native) |
+| Capacitor and Cordova | `@andysu/capacitor` | [Capacitor](/bindings/capacitor) |
+| Unity | `com.andysu.unity` (UPM) | [Unity](/bindings/unity) |
+| Godot | addon `andysu`, autoload `AndySU` | [Godot](/bindings/godot) |
+| C and native | `andysu_payload.h`, CMake package | [C](/bindings/c) |
+| Kotlin and Java | `io.github.dixonsolutions.andysu:api` | [Host API](/android/host-api) |
+
+## What every binding offers
+
+| Capability | Meaning |
+|---|---|
+| info | is AndySU present, API level, running version, factory or updated, slot directory |
+| status | current updater state as JSON |
+| check now | check, and download and apply per the configured mode |
+| apply now | apply a staged update now, live if possible, otherwise by restarting |
+| restart now | restart into the newest staged or committed payload |
+| mark healthy | commit the running payload |
+| set apply policy | `live`, `restart`, `next_start`, or none for the configured policy |
+| status events | a listener or stream for status changes |
+
+For apps in transparent mode, calling mark healthy is optional: the host commits after an activity has
+stayed resumed for `auto_healthy_ms`.
+
+## What is verified
+
+| Binding | Verified |
+|---|---|
+| C and CMake | `bindings/c/test.sh`: install, then build and run a consumer |
+| React Native and Expo | `tsc` build and a smoke test; the Android library compiles against the API |
+| Capacitor | `tsc` build and a smoke test; the Android library compiles |
+| Flutter | the Android library compiles; `flutter test` runs **only in CI** |
+| Unity | the C# compiles with `dotnet build` against stub `UnityEngine` types; the runtime has **not** been run, as Unity needs a licence |
+| Godot | the Android library compiles against Godot 4.7.2; the GDScript has **not** been run |
+
+CI's `bindings` job runs all of the above.

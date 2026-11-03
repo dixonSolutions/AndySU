@@ -1,0 +1,135 @@
+---
+title: "Gradle plugin"
+description: "Build a frozen host and a payload from a Kotlin or Java app."
+---
+
+The Gradle plugin `io.github.dixonsolutions.andysu` builds both halves of an AndySU app. You
+implement `com.andysu.api.Payload`; the plugin turns your app module into a payload and a second
+module into the frozen host.
+
+<Info>
+  The examples use version `0.1.62`. Versions are `<major.minor>.<commits on main>`; take the newest
+  from the [releases page](https://github.com/dixonSolutions/AndySU/releases).
+</Info>
+
+## Repositories
+
+AndySU's packages come from a static Maven repository on GitHub Pages, so no token is needed.
+`settings.gradle.kts`:
+
+```kotlin
+pluginManagement {
+    repositories {
+        maven("https://dixonsolutions.github.io/AndySU/maven")
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+dependencyResolutionManagement {
+    repositories {
+        maven("https://dixonsolutions.github.io/AndySU/maven")
+        google()
+        mavenCentral()
+    }
+}
+```
+
+The plugin shells out to the `andysu` CLI. By default it uses `andysu` from `PATH` (or a
+`target/release/andysu` or `target/debug/andysu` found in a parent directory that contains
+`core/Cargo.toml`, which is how the repository's own samples work). Override it with `andysu.cli`.
+
+## The payload module
+
+This is your app, built as a normal Android application module.
+
+```kotlin
+plugins {
+    id("com.android.application")
+    id("io.github.dixonsolutions.andysu") version "0.1.62"
+}
+
+andysu {
+    role.set("payload")                       // the default
+    entryClass.set("com.example.Main")        // implements com.andysu.api.Payload
+}
+
+dependencies {
+    // The Host API is compileOnly: the host carries the one runtime copy.
+    compileOnly("io.github.dixonsolutions.andysu:api:0.1.62")
+    // Lifecycle and saved-state owners, so Jetpack Compose works in a payload.
+    implementation("io.github.dixonsolutions.andysu:payload-kit:0.1.62")
+}
+```
+
+```kotlin
+class Main : PayloadAdapter() {
+    override fun start(host: HostApi, state: ByteArray?) { /* restore state */ }
+
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+        // build your UI on the host's stub activity
+        // call host.markHealthy() once the first screen works
+    }
+
+    override fun suspend(): ByteArray = saveState()   // optional: enables live swaps
+}
+```
+
+`./gradlew andysuPayload<Variant>` (for example `andysuPayloadRelease`) runs `andysu split` on the
+variant's APK and writes the payload directory to `build/andysu/payload/<variant>`.
+
+### Extension properties
+
+| Property | Role | Meaning |
+|---|---|---|
+| `role` | both | `"payload"` (default) or `"host"` |
+| `cli` | both | Path to the `andysu` CLI |
+| `entryClass` | payload | JVM entry class implementing `com.andysu.api.Payload` |
+| `entryNative` | payload | native entry, `"libname:symbol"` |
+| `app` | payload | application id of the host (default: the variant's application id) |
+| `version` | payload | payload version (default: the variant's `versionName`, else `"0"`) |
+| `hostApi` | payload | Host API level the payload needs (default 1) |
+| `abis` | payload | ABIs to keep |
+| `config` | host | `config.json` for the host (from `andysu host-config`) |
+| `factory` | host | slot directory of the built-in payload (from `andysu pack --emit-slot`) |
+
+## The host module
+
+A second application module with the same `applicationId` as your app. The plugin generates
+`assets/andysu/config.json` and the built-in payload under `assets/andysu-factory/`.
+
+```kotlin
+plugins {
+    id("com.android.application")
+    id("io.github.dixonsolutions.andysu") version "0.1.62"
+}
+
+andysu {
+    role.set("host")
+    config.set(file("build/andysu/config.json"))   // andysu host-config --config-out ...
+    factory.set(file("build/andysu/factory"))      // andysu pack ... --emit-slot ...
+}
+
+dependencies { implementation("io.github.dixonsolutions.andysu:host:0.1.62") }
+```
+
+Produce the inputs with the CLI:
+
+```sh
+andysu host-config --toml andysu.toml --config-out build/andysu/config.json --host-out build/andysu/andysu-host.json
+andysu pack build/andysu/payload/release --site build/andysu/factory-site \
+  --emit-slot build/andysu/factory --host build/andysu/andysu-host.json
+```
+
+The host AAR contains the core library for `arm64-v8a`, `armeabi-v7a`, `x86_64` and `x86`. Its
+`minSdk` is 21.
+
+<Tip>
+  The repository's `android/samples/build.sh` does all of this end to end with a throwaway key, for
+  the Compose, native GLES and WebView samples. It is the best working reference.
+</Tip>
+
+## Publishing the payload
+
+Once you have a payload directory, pack and publish it, by hand or with the GitHub Action. See
+[Publish flow](/publishing/publish-flow).

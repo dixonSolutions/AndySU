@@ -1,0 +1,197 @@
+---
+title: "CLI reference"
+description: "Every andysu command and flag, from the --help output."
+---
+
+`andysu` is a single static binary. `andysu --help` lists the commands; `andysu <command> --help`
+prints the flags. This page mirrors that output.
+
+| Command | Purpose |
+|---|---|
+| [`keygen`](#keygen) | Generate a root key pair, or a certified release key |
+| [`pubkey`](#pubkey) | Print the public key (PEM) of a private key |
+| [`sign-file`](#sign-file-and-verify-file) | Write a detached signature for release files |
+| [`verify-file`](#sign-file-and-verify-file) | Check detached signatures |
+| [`init`](#init) | Set up AndySU in a project |
+| [`host-config`](#host-config) | `andysu.toml` to the host's `config.json` and `andysu-host.json` |
+| [`remote`](#remote) | Print the remote that `andysu.toml` describes |
+| [`split`](#split) | Split a finished APK into host and payload |
+| [`pack`](#pack) | Turn a payload directory into a release in a site directory |
+| [`publish`](#publish) | Add a packed release to a channel manifest and sign it |
+| [`sign`](#sign) | Re-sign a channel manifest |
+| [`rollback`](#rollback) | Republish a known-good release with a higher sequence |
+| [`verify`](#verify) | Verify a manifest exactly as a client would |
+| [`diff`](#diff-and-patch), [`patch`](#diff-and-patch) | Create and apply binary deltas |
+| [`elf`](#elf) | Inspect an ELF shared library |
+| [`client`](#client) | A simulated client over a local state directory |
+| [`serve`](#serve) | Serve a directory over HTTP with Range and ETag support |
+
+`-h`/`--help` and `-V`/`--version` work everywhere.
+
+## keygen
+
+Generate a root key pair (`<name>-root.key`, `<name>-public.pem`), or a certified release key
+(`<name>-release.key`, `<name>-release.cert.json`).
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--dir <DIR>` | `.` | output directory |
+| `--name <NAME>` | `andysu` | file name prefix |
+| `--release-from <ROOT_KEY>` | none | create a short-lived release key certified by this root key instead |
+| `--days <DAYS>` | 90 | validity of the release key |
+
+## pubkey
+
+`andysu pubkey --key <KEY>` prints the public key (PEM). `--key` can also come from `ANDYSU_KEY_FILE`.
+
+## sign-file and verify-file
+
+`andysu sign-file --key <KEY> [--cert <CERT>] <FILES>...` writes `<file>.sig` next to each file.
+`--key` and `--cert` read `ANDYSU_KEY_FILE` and `ANDYSU_CERT_FILE`.
+
+`andysu verify-file --pub <PUBLIC> <FILES>...` checks them.
+
+## init
+
+`andysu init [OPTIONS] [DIR]` detects the project type, generates keys, writes `andysu.toml` and the
+CI workflow `.github/workflows/andysu.yml`.
+
+| Flag | Meaning |
+|---|---|
+| `--app <APP>` | application id (required; for example `com.example.app`) |
+| `--repo <REPO>` | GitHub repository `owner/name` that hosts releases; without it the remote is `custom` |
+| `--no-keys` | do not generate keys |
+
+It refuses to overwrite an existing `andysu.toml`. Detected types: flutter, godot, unity, capacitor,
+expo, react-native, cordova, gradle, cmake and generic.
+
+## host-config
+
+`andysu host-config --config-out <PATH> [--host-out <PATH>] [--toml <PATH>]`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--toml <TOML>` | `andysu.toml` | the project file |
+| `--config-out <PATH>` | required | the host's `config.json` |
+| `--host-out <PATH>` | none | `andysu-host.json`, what the host declares |
+
+## remote
+
+`andysu remote [--toml <TOML>]` prints `type`, `repo`, `base`, `channel` and `manifest_url` as JSON.
+
+## split
+
+`andysu split [OPTIONS] --out <OUT> <APK>`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `-o, --out <OUT>` | required | output directory (receives `payload/` and `andysu-host.json`) |
+| `--app <APP>` | the APK's package | application id |
+| `--version <VERSION>` | the APK's versionName | payload version |
+| `--entry-class <CLASS>` | none | JVM entry class implementing `com.andysu.api.Payload` |
+| `--entry-native <LIB:SYMBOL>` | none | native entry, for example `libgame:andysu_payload_v1` |
+| `--host-api <N>` | 1 | Host API level the payload needs |
+| `--abi <ABI>` | all | keep only these ABIs |
+| `--host-template <ZIP>` | none | also build the frozen host APK from this template (`andysu-host-template-<version>.zip`) |
+| `--config <PATH>` | none | host `config.json` (from `host-config`) |
+| `--keystore <PATH>` | none | keystore for signing the host APK (the app's own key, so it installs over the original) |
+| `--ks-pass <VALUE>` | none | `apksigner --ks-pass` value, for example `pass:secret` or `env:VAR` |
+| `--key-alias <ALIAS>` | none | key alias |
+| `--cleartext` | off | allow plain-HTTP remotes (local testing only) |
+| `--transparent` | off | transparent mode (Android 9+); no entry class needed; updates apply on the next start |
+
+## pack
+
+`andysu pack [OPTIONS] --site <SITE> <PAYLOAD>`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--site <SITE>` | required | site directory (the remote's contents) |
+| `--channel <CHANNEL>` | `stable` | channel |
+| `--id <ID>` | the payload's version | release id |
+| `--host <PATH>` | none | frozen host declaration (`andysu-host.json`); the build fails if the payload needs more |
+| `--hot <PREFIX>` | none | content path prefixes that can be applied hot |
+| `--archive <DIR>` | none | payload directories shipped as one zip component |
+| `--deltas <N>` | 3 | build deltas against this many recent releases |
+| `--delta-format <F>` | `zstd` | `zstd` or `bsdiff` |
+| `--base-url <URL>` | none | absolute URL prefix for new blobs (for example a GitHub release download URL) |
+| `--require-16k` | off | fail instead of warn when a library is not 16 KB aligned |
+| `--allow-shell` | off | allow `host_api_min` above the host's level (a tier C shell update will be needed) |
+| `--emit-slot <DIR>` | none | also write the release as a ready slot directory (the payload built into a host APK) |
+| `--no-rename` | off | keep native library names (transparent-mode payloads) |
+
+## publish
+
+`andysu publish [OPTIONS] --site <SITE> --release <RELEASE> --key <KEY>`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--site <SITE>` | required | site directory |
+| `--channel <CHANNEL>` | `stable` | channel |
+| `--release <ID>` | required | the packed release to add |
+| `--rollout <PERCENT>` | none | staged rollout percentage |
+| `--mandatory` | off | mark mandatory |
+| `--notes-url <URL>` | none | release notes link |
+| `--keep <N>` | 5 | releases kept in the manifest |
+| `--key <KEY>` | `$ANDYSU_KEY_FILE` | signing key (root, or a release key with `--cert`) |
+| `--cert <CERT>` | `$ANDYSU_CERT_FILE` | root-signed certificate for a release key |
+| `--expires-days <N>` | 30 | days until the manifest expires |
+
+## sign
+
+`andysu sign [OPTIONS] --site <SITE> --key <KEY>` re-signs a manifest. Flags: `--channel` (default
+`stable`), `--rollout RELEASE=PERCENT`, `--cert`, `--expires-days` (default 30).
+
+## rollback
+
+`andysu rollback [OPTIONS] --site <SITE> --to <TO> --key <KEY>` republishes release `<TO>` with a
+higher sequence. Flags: `--channel` (default `stable`), `--cert`, `--expires-days` (default 30).
+
+## verify
+
+`andysu verify [OPTIONS] --pub <PUBLIC> <SRC>` where `<SRC>` is a path or a URL.
+
+| Flag | Meaning |
+|---|---|
+| `--pub <PUBLIC>` | trusted root public key |
+| `--app <APP>` | require this application id |
+| `--channel <CHANNEL>` | require this channel |
+| `--blobs` | also download and hash every blob and delta |
+
+On success it prints a line like `OK <app> channel <channel> sequence <n> expires <time> (root <id>)`.
+
+## diff and patch
+
+`andysu diff [--format zstd|bsdiff] -o <OUT> <OLD> <NEW>` and
+`andysu patch [--format zstd|bsdiff] [--max-size <BYTES>] -o <OUT> <OLD> <PATCH>`. The default format is
+`zstd`; `--max-size` defaults to 4294967296.
+
+## elf
+
+`andysu elf <FILE>` prints SONAME, `DT_NEEDED`, ABI and alignment of a shared library.
+
+## client
+
+`andysu client --root <ROOT> <COMMAND>` runs the same state machine as a host over a local directory.
+The desktop host and the end-to-end tests use it.
+
+| Command | Meaning |
+|---|---|
+| `update --url <URL> --pub <PEM> --app <APP>` | check, download (resuming, deltas first), verify and stage. Also `--channel` (`stable`), `--abi` (`x86_64`), `--host-api` (1), `--api-level` (0) |
+| `launch [--no-apply] [--max-attempts <N>]` | cold-start decision: promote pending, count trial boots, roll back crash loops (`--max-attempts` default 2) |
+| `healthy` | the payload reached a healthy state: commit |
+| `fail [--reason <TEXT>]` | init exception, crash or watchdog: roll back if in trial |
+| `live` | live swap: pending becomes current in trial without a restart |
+| `state` | print the state |
+| `gc [--low-storage]` | garbage-collect |
+
+## serve
+
+`andysu serve [OPTIONS] <DIR>`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--addr <ADDR>` | `127.0.0.1:8787` | listen address |
+| `--drop-after <BYTES>` | none | drop each path's first response after this many body bytes |
+| `--drop-prefix <PREFIX>` | empty | only drop paths with this prefix (for example `blobs/`) |
+| `--throttle-kbps <N>` | none | throttle response bodies to about this many KiB per second |

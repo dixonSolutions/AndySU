@@ -113,7 +113,7 @@ Repository setup for each package manager is in [docs/REGISTRIES.md](docs/REGIST
 ```sh
 andysu split app-release.apk --out out --transparent \
   --host-template andysu-host-template.zip --config config.json --keystore release.jks
-# out/host/…apk: install once.  out/payload/: andysu pack + publish for every update.
+# out/host.apk: install once.  out/payload/: andysu pack + publish for every update.
 ```
 
 **Gradle (Kotlin/Java):** implement `com.andysu.api.Payload` and let the plugin build both halves.
