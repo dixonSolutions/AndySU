@@ -5,7 +5,7 @@ use std::cell::Cell;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use andysu_core::fsx::{Fs, StdFs};
 use andysu_core::state::{self, SlotRef, State};
@@ -156,12 +156,18 @@ fn sigkill_mid_write() {
             .env(CHILD_ENV, d.path())
             .spawn()
             .unwrap();
-        std::thread::sleep(Duration::from_millis(40 + (round * 13 % 70) as u64));
+        // Kill at a varying point after the first complete write. A fixed delay from spawn was
+        // flaky on slow CI runners: the test binary had not even started writing.
+        let p = d.path().join("state.json");
+        let start = Instant::now();
+        while !p.exists() && start.elapsed() < Duration::from_secs(20) {
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        std::thread::sleep(Duration::from_millis((round * 13 % 70) as u64));
         child.kill().unwrap(); // SIGKILL on unix
         child.wait().unwrap();
-        let p = d.path().join("state.json");
         if !p.exists() {
-            continue; // killed before the first rename
+            continue; // never got as far as the first rename
         }
         let st = state::load(&p).unwrap_or_else(|e| panic!("round {round}: {e}")).unwrap();
         assert_eq!(st.last_event, Some(format!("write {}", st.live_swaps)), "round {round}: torn");
