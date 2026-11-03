@@ -32,8 +32,34 @@ class TestPayload : PayloadAdapter() {
     private val behavior = BuildConfig.TP_BEHAVIOR
 
     private fun emit(event: String, o: JSONObject = JSONObject()) {
-        o.put("event", event).put("version", BuildConfig.TP_VERSION).put("behavior", behavior)
-        Log.i("AndySU-Event", o.toString())
+        o.put("event", event).put("version", BuildConfig.TP_VERSION).put("behavior", behavior).put("pid", Process.myPid())
+        // liblog drops writes when logd is busy; the harness falls back to this file (see Device.wait).
+        // The drop-log marker (harness only) makes the next emit of that event skip logcat, to test that.
+        val dropped = recordEvent(event, o)
+        if (!dropped) Log.i("AndySU-Event", o.toString())
+    }
+
+    /** Remembers the latest emit of each event in filesDir; returns true when the harness asked to drop this log line. */
+    @Synchronized
+    private fun recordEvent(event: String, o: JSONObject): Boolean {
+        var drop = false
+        try {
+            val dir = host.context().filesDir
+            val marker = File(dir, "drop-log")
+            if (marker.isFile && marker.readText().trim() == event) {
+                marker.delete()
+                drop = true
+            }
+            val file = File(dir, "andysu-last-events.json")
+            val all = try { JSONObject(file.readText()) } catch (e: Exception) { JSONObject() }
+            all.put(event, o)
+            val tmp = File(dir, "andysu-last-events.json.tmp")
+            tmp.writeText(all.toString())
+            tmp.renameTo(file)
+        } catch (e: Exception) {
+            // diagnostics only: never let it affect the payload
+        }
+        return drop
     }
 
     private val tick = object : Runnable {

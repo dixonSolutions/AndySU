@@ -1,5 +1,6 @@
 package com.andysu.host
 
+import android.util.Log
 import dalvik.system.DexClassLoader
 
 /**
@@ -21,16 +22,25 @@ class PayloadClassLoader(
 ) : DexClassLoader(dexPath, optimizedDir, librarySearchPath, parent) {
 
     override fun loadClass(name: String, resolve: Boolean): Class<*> {
-        findLoadedClass(name)?.let { return it }
-        if (name.startsWith("com.andysu.api.") || name.startsWith("java.") || name.startsWith("android.") ||
-            name.startsWith("dalvik.") || name.startsWith("javax.")
-        ) {
-            return super.loadClass(name, resolve)
-        }
-        return try {
-            findClass(name)
+        try {
+            findLoadedClass(name)?.let { return it }
+            if (name.startsWith("com.andysu.api.") || name.startsWith("java.") || name.startsWith("android.") ||
+                name.startsWith("dalvik.") || name.startsWith("javax.")
+            ) {
+                return super.loadClass(name, resolve)
+            }
+            return try {
+                findClass(name)
+            } catch (e: ClassNotFoundException) {
+                super.loadClass(name, resolve)
+            }
         } catch (e: ClassNotFoundException) {
-            super.loadClass(name, resolve)
+            throw e
+        } catch (t: Throwable) {
+            // ART calls loadClass from its verifier (also on a background thread) and silently treats any throw
+            // as "class not found"; leave a trace so a verification failure like that can be explained.
+            Log.w("AndySU", "PayloadClassLoader.loadClass($name) threw on ${Thread.currentThread()?.name}: $t")
+            throw t
         }
     }
 

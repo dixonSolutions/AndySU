@@ -37,6 +37,11 @@ The job log names these files. CI uploads the whole reports/ directory.
 
 ANDYSU_TEST_FORCE_FAIL=<scenario> (e.g. hot, gc, crash-loop) makes the run fail right after that
 scenario's check passes, to exercise the failure dumps above.
+
+ANDYSU_TEST_DROP_LOG=<event> (e.g. payload_started) makes the test payload skip that event's logcat line
+once after `pm clear`, to exercise the fallback to the payload's events file (a lost log line must not
+fail a run). --split-loop N repeats only the `split` install + first launch N times;
+ANDYSU_TEST_STRESS=<k> adds k busy loops in the guest.
 """
 import argparse
 import json
@@ -104,6 +109,7 @@ class Fail(Exception):
 SLOW = 1.0  # --slow: multiplies every timeout (software-emulated devices)
 CONTAINER = False  # --container: run emulators inside the andysu-emulator podman image
 FORCE_FAIL = os.environ.get("ANDYSU_TEST_FORCE_FAIL", "")  # scenario name: fail after it (tests the dumps)
+DROP_LOG = os.environ.get("ANDYSU_TEST_DROP_LOG", "")  # payload event name whose log line is dropped once
 STAMP = time.strftime("%Y%m%d-%H%M%S")
 REPORTS = os.path.join(ANDROID, "tests", "reports")
 
@@ -490,8 +496,26 @@ class Device:
                 continue
             if pred(ev):
                 return ev
+        # A payload event can vanish if liblog drops the write (logd busy). The payload also keeps its
+        # latest emit of each event in a file (with its pid); accept that only for the app's live process.
+        for ev in self.payload_file_events():
+            if pred(ev):
+                log(f"[{self.api}] WARNING: {what}: log line missing, accepted from the payload's events file "
+                    f"(pid {ev.get('pid')})")
+                ev = dict(ev, _from_file=True)
+                self.events.append(ev)
+                return ev
         tail = "\n".join(json.dumps(e)[:300] for e in self.events[-20:])
         raise Fail(f"timed out waiting for {what}\n{tail}")
+
+    def payload_file_events(self):
+        """The test payload's latest events from its app data, only those written by a live app process."""
+        try:
+            pids = set(self.sh(f"pidof {PKG}", check=False, timeout=20).split())
+            data = json.loads(self.sh(f"run-as {PKG} cat files/andysu-last-events.json", check=False, timeout=20))
+            return [e for e in data.values() if isinstance(e, dict) and str(e.get("pid")) in pids]
+        except Exception:
+            return []
 
     def payload(self, version, timeout=90):
         ev = self.wait(lambda e: e.get("event") == "payload_started" and e.get("version") == version,
@@ -524,6 +548,8 @@ def scenarios(d, b, r, results):
     d.install(b.apk)
     d.adb("reverse", f"tcp:{r.port}", f"tcp:{r.port}")
     d.clear()
+    if DROP_LOG:  # make the payload skip that event's logcat line once, to exercise Device.payload_file_events
+        d.sh(f"run-as {PKG} sh -c 'mkdir -p files && echo {DROP_LOG} > files/drop-log'")
     r.reset()
     d.watch()
 
@@ -808,6 +834,36 @@ def scenarios(d, b, r, results):
     ok("no-dialog", f"{len(d.focus_log)} focus changes observed, none to an installer, permission or crash dialog")
 
 
+def split_loop(d, b, r, n, results):
+    """--split-loop N: only the `split` install-and-first-launch, N times (flake hunting).
+
+    Each round: uninstall, install the `andysu split` host, launch, and wait for either the built-in
+    payload to start or the host's boot_error. Counts and prints the failures; raises Fail when any."""
+    d.adb("reverse", f"tcp:{r.port}", f"tcp:{r.port}")
+    r.reset()
+    bad = []
+    # ANDYSU_TEST_STRESS=<k>: k busy loops in the guest (CPU contention, like a loaded CI runner)
+    for _ in range(int(os.environ.get("ANDYSU_TEST_STRESS", "0"))):
+        subprocess.Popen([ADB, "-s", d.serial, "shell", "sh -c 'while :; do :; done'"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for i in range(n):
+        d.adb("uninstall", PKG, check=False)
+        d.install(b.split_apk)
+        d.watch()
+        d.launch()
+        ev = d.wait(lambda e: e.get("event") in ("payload_started", "boot_error"), f"split round {i}", 60)
+        if ev.get("event") == "boot_error":
+            bad.append((i, ev.get("error", "")[:300]))
+            log(f"[{d.api}] split round {i}/{n}: BOOT ERROR {ev.get('error', '')[:200]}")
+        else:
+            log(f"[{d.api}] split round {i}/{n}: ok")
+        d.force_stop()
+    results.append({"api": d.api, "sdk": d.sdk, "scenario": "split-loop", "ok": not bad,
+                    "detail": f"{len(bad)} of {n} first launches failed"})
+    log(f"[{d.api}] split-loop: {len(bad)} of {n} failed")
+    if bad:
+        raise Fail(f"split-loop: {len(bad)} of {n} first launches failed: {bad}")
+
+
 # ----------------------------------------------------------------------------- main
 
 
@@ -825,6 +881,8 @@ def main():
     ap.add_argument("--keep", action="store_true", help="keep the work directory")
     ap.add_argument("--device", help="run on this already-running device (adb serial) instead of emulators")
     ap.add_argument("--container", action="store_true", help="run emulators in a podman container (tests/emulator)")
+    ap.add_argument("--split-loop", type=int, default=0, metavar="N",
+                    help="only repeat the `split` install + first launch N times and count boot errors")
     ap.add_argument("--slow", type=float, default=1.0, help="timeout multiplier for slow (TCG) devices")
     args = ap.parse_args()
     global SLOW, CONTAINER
@@ -854,7 +912,10 @@ def main():
         d = Device(api, i, existing=args.device)
         try:
             d.start()
-            scenarios(d, b, r, results)
+            if args.split_loop:
+                split_loop(d, b, r, args.split_loop, results)
+            else:
+                scenarios(d, b, r, results)
         except Exception as e:
             try:
                 files = d.dump_failure(r, str(e))
