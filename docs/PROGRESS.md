@@ -548,13 +548,14 @@ rollout, against a bare git repo and a stand-in `gh`, then a simulated client up
 
 **Public registries (2026-11-04).** The optional `crates-io` and `npmjs` release jobs now use GitHub
 OIDC trusted publishing and are gated by `PUBLISH_CRATES_IO`/`PUBLISH_NPMJS`. They run only after the
-GitHub Pages/Releases consumer verification passes. crates.io still needs one manual initial publish
-per crate before trust can be configured. npm's `@andysu` scope is unavailable, so npmjs.com uses
+GitHub Pages/Releases consumer verification passes. npm's `@andysu` scope is unavailable, so npmjs.com uses
 `andysu`, `andysu-react-native`, `andysu-capacitor` and `com.andysu.unity`;
 `scripts/npm-public-name.sh` maps the historical scoped tarball names at publish time. All four were
 brought up on npmjs.com at 0.1.90, and trusted publishers now point at `dixonSolutions/AndySU`,
-workflow `release.yml`, with publish permission. `PUBLISH_NPMJS=true` is set, so the next release
-publishes through OIDC. The release and demo channels now sign with a certified production release
+workflow `release.yml`, with publish permission. `andysu-core` and `andysu-cli` were published to
+crates.io at 0.1.90, their trusted publishers point at the same repository and workflow, and both now
+require trusted publishing for new versions. `PUBLISH_NPMJS=true` and `PUBLISH_CRATES_IO=true` are
+set, so the next release publishes through OIDC on both registries. The release and demo channels now sign with a certified production release
 key; the offline root public key is committed as `keys/andysu-release-root-public.pem`. The demo APK
 still uses the CI test keystore.
 

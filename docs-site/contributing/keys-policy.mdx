@@ -41,12 +41,12 @@ or shell history. To use other signing material, point it at other files with `A
 `ANDYSU_SIGNING_KEY` is missing the release fails; if the keystore secrets are missing the demo APK is
 signed with the debug key.
 
-Public registry jobs use GitHub OIDC, not long-lived npm or crates.io tokens. Leave both repository
-variables unset until each registry trusts owner `dixonSolutions`, repository `AndySU`, workflow
-`release.yml`. crates.io needs a one-time manual publication of both crates before that trust can be
-configured. For npm, use `scripts/bootstrap-npmjs.sh <version>` to verify and initially publish the
-release packages, then create their trust configurations. After setup, set `PUBLISH_NPMJS=true` and
-trigger a release within two days so npm can validate the trusted publisher. See
+Public registry jobs use GitHub OIDC, not long-lived npm or crates.io tokens. Both are configured as of
+2026-11-04: npm packages `andysu`, `andysu-react-native`, `andysu-capacitor` and `com.andysu.unity`
+were bootstrapped at 0.1.90 with trusted publishers pointing at owner `dixonSolutions`, repository
+`AndySU`, workflow `release.yml`; `andysu-core` and `andysu-cli` 0.1.90 were published to crates.io
+with the same trust configuration, and both crates now require trusted publishing for new versions.
+`PUBLISH_NPMJS=true` and `PUBLISH_CRATES_IO=true` are set. See
 [Package registries](/bindings/registries).
 
 ## Rotating
