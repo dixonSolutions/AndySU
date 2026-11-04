@@ -57,7 +57,11 @@ class TestPayload : PayloadAdapter() {
             }
             val file = File(dir, "andysu-last-events.json")
             val all = try { JSONObject(file.readText()) } catch (e: Exception) { JSONObject() }
-            all.put(event, o)
+            // Key by event and version. A live rollback starts the old payload again, and its
+            // payload_started must not overwrite the new version's: the watchdog can roll back
+            // before the harness, which only reads this file after a timeout, notices the event.
+            all.remove(event)
+            all.put("$event@${BuildConfig.TP_VERSION}", o)
             val tmp = File(dir, "andysu-last-events.json.tmp")
             tmp.writeText(all.toString())
             tmp.renameTo(file)

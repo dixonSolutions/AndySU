@@ -517,6 +517,10 @@ with the Actions secrets set by `scripts/setup-secrets.sh` (CI test keys) and Pa
     of each kind in a file. On a timeout the harness accepts the event from that file only if
     its pid matches the live app process, and logs a warning. Shown with a deliberately dropped
     line on API 31; the suite passes on API 31 and 34.
+    After API 29 failed the same way on 2026-11-04 (`payload 5.0 started` delayed past the
+    timeout while the watchdog rolled the trial back), the file keys each event by event *and*
+    version: the rollback's `payload_started` for the old payload no longer overwrites the new
+    version's, which the harness needs when it reads the file only after the timeout.
   - CI now retries an emulator job only when the emulator never reached the tests (PR #10).
 - **Crash handlers replaced by a payload** (D30 follow-up). A worker (Sonnet) implemented this;
   the lead sent the first version back and re-ran the suite. The host checks after `start()`
