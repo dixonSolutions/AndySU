@@ -121,12 +121,14 @@ class TestPayload : PayloadAdapter() {
             }
             "handled_segv" -> {
                 // D30 regression: a Mono-like runtime handles a SIGSEGV itself and resumes, then stays healthy.
+                // Fault at 3 s so the host's 2 s crash-handler check reports the replaced handler first, but
+                // leave enough room for the 6 s trial watchdog on slow API 24 images (dex2oat can delay the start).
                 thread(name = "payload-handler") { Thread.sleep(300); Native.installHandlingHandler() }
                 main.postDelayed({
                     val handled = Native.faultHandled()
                     emit("segv_handled", JSONObject().put("handled", handled))
-                    main.postDelayed({ host.markHealthy() }, 500)
-                }, 4000)
+                    main.post { host.markHealthy() }
+                }, 3000)
             }
         }
     }
