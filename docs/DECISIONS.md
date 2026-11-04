@@ -314,9 +314,13 @@ already had `mode`, but a payload could only call `checkNow()`/`applyNow()`; it 
 per-install choice, and changing it at runtime would not re-schedule `JobScheduler`.
 
 Host API level 3 adds `UpdateClient.setMode(String)` and `mode()`. The value is `auto`,
-`download_only`, `check_only`, `off` or `null` (clear the override). The host stores it atomically in
-`noBackupFilesDir/andysu/update_mode` so it is readable before class loading in transparent mode, and
-`Jobs.schedule` is re-run with the effective mode. `off` also cancels periodic work and prevents an
+`download_only`, `check_only`, `off` or `null` (clear the override). The host stores it in
+`noBackupFilesDir/andysu/update_mode` so it is readable before class loading in transparent mode.
+The write is a synced temporary file followed by a rename, with the old file removed first: some
+Android images refused `AtomicFile`'s rename over an existing file and silently lost the override
+(seen once in CI on API 34). A crash in the short delete window leaves no file, so the configured
+mode applies. The host re-runs `Jobs.schedule` with the effective mode. `off` also cancels periodic
+work and prevents an
 in-flight check from staging or automatically applying; `check_only` reports `available` without
 downloading; `download_only` stages without applying. `applyNow()` still works for an already staged
 release, and an explicit `restartNow()` promotes the pending release once through a one-shot
