@@ -80,7 +80,7 @@ the configured mode. The override persists across process restarts.
 
 ```sh
 brew tap dixonsolutions/andysu https://github.com/dixonSolutions/AndySU && brew install andysu
-#   or: cargo install andysu-cli --registry andysu   /   npx andysu   (docs/REGISTRIES.md)
+#   or: cargo install andysu-cli (crates.io)   /   npx andysu (npmjs.com)   (docs/REGISTRIES.md)
 
 andysu init --app com.example.app --repo you/app-updates   # keys, andysu.toml, CI workflow
 gh secret set ANDYSU_SIGNING_KEY < .andysu/andysu-root.key # then keep the key offline

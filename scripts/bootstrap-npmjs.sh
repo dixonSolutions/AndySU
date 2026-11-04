@@ -9,6 +9,7 @@
 # interactive npm credentials; subsequent CI releases use OIDC via release.yml.
 set -euo pipefail
 
+npm_bin="${NPM_BIN:-npm}"
 version="${1:?usage: bootstrap-npmjs.sh VERSION [owner/repo]}"
 repo="${2:-dixonSolutions/AndySU}"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][A-Za-z0-9.-]+)?$ ]] || {
@@ -17,7 +18,7 @@ repo="${2:-dixonSolutions/AndySU}"
 }
 
 command -v gh >/dev/null || { echo "gh is required" >&2; exit 1; }
-command -v npm >/dev/null || { echo "npm is required" >&2; exit 1; }
+command -v "$npm_bin" >/dev/null || { echo "npm is required" >&2; exit 1; }
 andysu_bin="${ANDYSU_BIN:-andysu}"
 command -v "$andysu_bin" >/dev/null || {
   echo "install the AndySU verifier or set ANDYSU_BIN to it" >&2
@@ -28,12 +29,12 @@ const [major, minor, patch] = process.versions.node.split('.').map(Number);
 if (major < 22 || (major === 22 && minor < 14)) {
   throw new Error('npm trusted publishing requires Node.js >=22.14.0');
 }
-const [npmMajor, npmMinor, npmPatch] = require('child_process').execFileSync('npm', ['--version'], {encoding:'utf8'}).trim().split('.').map(Number);
+const [npmMajor, npmMinor, npmPatch] = require('child_process').execFileSync(process.env.NPM_BIN || 'npm', ['--version'], {encoding:'utf8'}).trim().split('.').map(Number);
 if (npmMajor < 11 || (npmMajor === 11 && npmMinor < 15)) {
   throw new Error('npm trust CLI requires npm >=11.15.0');
 }
 NODE
-npm whoami --registry=https://registry.npmjs.org/ >/dev/null || {
+"$npm_bin" whoami --registry=https://registry.npmjs.org/ >/dev/null || {
   echo "log in to npm with an account that can publish all package names in this release" >&2
   exit 1
 }
@@ -62,12 +63,12 @@ for archive in "${packages[@]}"; do
   metadata="$(tar -xzOf "$archive" package/package.json)"
   name="$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).name)' "$metadata")"
   public_name="$("$root/scripts/npm-public-name.sh" "$name")"
-  existing="$(npm trust list "$public_name" --json 2>/dev/null || true)"
+  existing="$("$npm_bin" trust list "$public_name" --json 2>/dev/null || true)"
   if [[ "$existing" == *"dixonSolutions/AndySU"* && "$existing" == *"release.yml"* ]]; then
     echo "$public_name already has a release.yml trust relationship; check that direct publish is allowed"
     continue
   fi
-  npm trust github "$public_name" --file release.yml --repo dixonSolutions/AndySU --allow-publish --yes
+  "$npm_bin" trust github "$public_name" --file release.yml --repo dixonSolutions/AndySU --allow-publish --yes
   sleep 2
 done
 

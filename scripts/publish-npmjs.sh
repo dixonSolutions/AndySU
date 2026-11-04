@@ -18,6 +18,7 @@ shift
 registry=https://registry.npmjs.org/
 expected_repository=https://github.com/dixonSolutions/AndySU
 here="$(cd "$(dirname "$0")" && pwd)"
+npm_bin="${NPM_BIN:-npm}"
 count=0
 
 for archive in "$@"; do
@@ -42,14 +43,14 @@ for archive in "$@"; do
     tar -xzf "$archive" -C "$rewrite_dir"
     node -e 'const fs=require("fs"); const p=process.argv[1]; const n=process.argv[2]; const m=JSON.parse(fs.readFileSync(p,"utf8")); m.name=n; fs.writeFileSync(p, JSON.stringify(m,null,2)+"\n")' \
       "$rewrite_dir/package/package.json" "$publish_name"
-    (cd "$rewrite_dir/package" && npm pack --silent --pack-destination "$rewrite_dir" >/dev/null)
+    (cd "$rewrite_dir/package" && "$npm_bin" pack --silent --pack-destination "$rewrite_dir" >/dev/null)
     publish_archive="$(find "$rewrite_dir" -maxdepth 1 -name '*.tgz' -print -quit)"
     [[ -n "$publish_archive" ]] || { echo "npm pack produced no tarball for $publish_name" >&2; exit 1; }
   fi
   integrity="sha512-$(openssl dgst -sha512 -binary "$publish_archive" | openssl base64 -A)"
 
   # Distinguish a missing version from authentication, network, and registry errors.
-  if remote="$(npm view "$publish_name@$version" dist.integrity --json --registry="$registry" 2>&1)"; then
+  if remote="$("$npm_bin" view "$publish_name@$version" dist.integrity --json --registry="$registry" 2>&1)"; then
     remote_integrity="$(node -e 'let x=JSON.parse(process.argv[1]); if(Array.isArray(x)) x=x[0]; if(typeof x === "string") process.stdout.write(x)' "$remote")"
     [[ "$remote_integrity" == "$integrity" ]] || {
       echo "$publish_name@$version already exists with different content" >&2
@@ -62,7 +63,7 @@ for archive in "$@"; do
       exit 1
     fi
     echo "publishing $publish_name@$version"
-    npm publish "$publish_archive" --access public --registry="$registry"
+    "$npm_bin" publish "$publish_archive" --access public --registry="$registry"
   fi
   [[ -z "$rewrite_dir" ]] || rm -rf "$rewrite_dir"
   count=$((count + 1))

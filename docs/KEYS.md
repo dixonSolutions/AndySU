@@ -80,6 +80,10 @@ The workflow publishes `andysu-core` first, waits for the version to appear in t
 publishes `andysu-cli`. Set the repository variable `PUBLISH_CRATES_IO=true` only after both crate
 trust configurations are saved. The next passing release publishes through OIDC.
 
+Done on 2026-11-04: `andysu-core` and `andysu-cli` 0.1.90 were published with a short-lived API token,
+both trusted publishers now name `dixonSolutions/AndySU` and workflow `release.yml`, both crates
+require trusted publishing for new versions, and `PUBLISH_CRATES_IO=true` is set.
+
 ### npm trusted publishing
 
 The package names must first be publishable by the authorized npm account (including the `@andysu`

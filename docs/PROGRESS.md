@@ -454,9 +454,11 @@ Everything goes to our own GitHub remote (D25), with consumer instructions in
   `SHA256SUMS` plus `SHA256SUMS.sig` (`andysu sign-file`); `gh-pages`; a Homebrew formula; then
   consumer verification against the live URLs, signature verification of the release, and
   `brew install` on Linux and macOS.
-- Keys (D26, [KEYS.md](KEYS.md)): CI test keys generated on 2026-11-02 and kept outside the repo,
-  loaded by `scripts/setup-secrets.sh`. Real keys and tokens replace them by re-running that
-  script. The crates.io and npmjs.com jobs are wired up but stay off until their tokens exist.
+- Keys (D26, [KEYS.md](KEYS.md)): CI test keys were generated on 2026-11-02 and kept outside the
+  repo, loaded by `scripts/setup-secrets.sh`. On 2026-11-04 the release and demo channels moved to a
+  certified production release key whose offline root is committed as
+  `keys/andysu-release-root-public.pem` (D33); the test keys remain only for reproducing historical
+  releases. The crates.io and npmjs.com jobs stay off until trusted publishing is configured.
 - `actions/publish`: the composite action that `andysu init` puts in an app's CI, for
   `type = "github"` (blobs as release assets, manifest on the latest release) and
   `type = "pages"`.
@@ -525,7 +527,9 @@ with the Actions secrets set by `scripts/setup-secrets.sh` (CI test keys) and Pa
   - `[policy] crash_signals = "host"` opts in to a takeover. The host re-installs its handler and
     chains the payload's after writing the crash marker. It is meant for engines with a crash
     dialog that never chain.
-  - `device_tests` scenario `crash-handler`, all three passing on API 34 (lead), 24 and 31 (worker):
+  - `device_tests` scenario `crash-handler`, all three passing on API 34 (lead), 24 and 31 (worker).
+    On 2026-11-04 the `handled_segv` payload was moved to fault at 3 s and mark healthy immediately:
+    on API 24, dex2oat could delay a 4.5 s markHealthy past the 6 s watchdog. API 24 now passes 22/22:
     - default mode, a Mono-style handled `SIGSEGV` resumes and the release commits (no relaunch);
     - default mode, a hanging handler on a payload thread is rolled back by the watchdog;
     - `host` mode, a hanging handler on the main thread writes the marker, relaunches once and
@@ -544,12 +548,16 @@ rollout, against a bare git repo and a stand-in `gh`, then a simulated client up
 
 **Public registries (2026-11-04).** The optional `crates-io` and `npmjs` release jobs now use GitHub
 OIDC trusted publishing and are gated by `PUBLISH_CRATES_IO`/`PUBLISH_NPMJS`. They run only after the
-GitHub Pages/Releases consumer verification passes. crates.io still needs one manual initial publish
-per crate before trust can be configured. npm's `@andysu` scope is unavailable, so npmjs.com uses
+GitHub Pages/Releases consumer verification passes. npm's `@andysu` scope is unavailable, so npmjs.com uses
 `andysu`, `andysu-react-native`, `andysu-capacitor` and `com.andysu.unity`;
-`scripts/npm-public-name.sh` maps the historical scoped tarball names at publish time. The release
-and demo channels now sign with a certified production release key; the offline root public key is
-committed as `keys/andysu-release-root-public.pem`. The demo APK still uses the CI test keystore.
+`scripts/npm-public-name.sh` maps the historical scoped tarball names at publish time. All four were
+brought up on npmjs.com at 0.1.90, and trusted publishers now point at `dixonSolutions/AndySU`,
+workflow `release.yml`, with publish permission. `andysu-core` and `andysu-cli` were published to
+crates.io at 0.1.90, their trusted publishers point at the same repository and workflow, and both now
+require trusted publishing for new versions. `PUBLISH_NPMJS=true` and `PUBLISH_CRATES_IO=true` are
+set, so the next release publishes through OIDC on both registries. The release and demo channels now sign with a certified production release
+key; the offline root public key is committed as `keys/andysu-release-root-public.pem`. The demo APK
+still uses the CI test keystore.
 
 ### Demo channel (2026-11-03, owner request: "remote and self GitHub release ... so we can hot swap it")
 Each release now runs `scripts/demo.sh`. It publishes the Compose sample's payload to

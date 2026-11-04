@@ -78,8 +78,10 @@ See the pages for [Gradle](/android/gradle-plugin#repositories), [Unity](/bindin
 
 ## Optional public registries
 
-The crates.io and npmjs.com jobs use trusted publishing through GitHub OIDC. They remain disabled
-unless `PUBLISH_CRATES_IO=true` or `PUBLISH_NPMJS=true` is set as a repository variable after each
-package has its trusted publisher configured. They do not require long-lived registry write tokens.
-See [Keys policy](/contributing/keys-policy) for initial publication and setup. These optional jobs
-do not change the GitHub Pages and Releases installation instructions above.
+The crates.io and npmjs.com jobs use trusted publishing through GitHub OIDC. As of 2026-11-04 the
+npm packages and both crates are bootstrapped at 0.1.90, their trusted publishers point at
+`dixonSolutions/AndySU` workflow `release.yml`, and `PUBLISH_NPMJS=true` plus
+`PUBLISH_CRATES_IO=true` are set. The jobs do not use long-lived registry write tokens. Consumers can
+use `cargo install andysu-cli`, `npx andysu`, `npm install andysu-react-native` and
+`npm install andysu-capacitor` directly. The GitHub Pages names above remain unchanged. See
+[Keys policy](/contributing/keys-policy) for the setup.

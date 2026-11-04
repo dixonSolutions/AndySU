@@ -17,12 +17,13 @@ other remotes see [Remotes](/publishing/remotes).
     ```
 
     ```sh Cargo
-    # .cargo/config.toml needs the registry entry, see Package registries
-    cargo install andysu-cli --registry andysu
+    cargo install andysu-cli          # crates.io
+    # or, from the project's static registry: cargo install andysu-cli --registry andysu
     ```
 
     ```sh npm
-    npx @andysu/cli --version
+    npx andysu --version              # npmjs.com
+    # or, from the project's static registry: npx @andysu/cli
     ```
 
     ```sh Release binary
