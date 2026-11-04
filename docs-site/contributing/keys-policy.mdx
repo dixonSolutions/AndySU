@@ -1,48 +1,59 @@
 ---
 title: "Keys policy"
-description: "Test keys only in CI, and never commit a private key."
+description: "Published root key, certified release keys in CI, and never commit a private key."
 ---
 
 ## The rules
 
 - **Never commit a private key.** Not for tests, not temporarily. `*.key` and `*.jks` are in
   `.gitignore`, and `andysu init` adds `.andysu/` and `*.key` to a project's `.gitignore`.
-- **Every signing key in this repository's CI is a test key**, stored as an Actions secret. Nothing
-  that real users trust is signed with it.
-- No workflow names a specific key. They read secrets, so replacing the test keys with real ones
-  changes the secrets and nothing else.
-- Tests generate throwaway keys at runtime. The only fixed key in source is the published RFC 8032 test
-  vector. Only the public half of the CI test key is committed
-  (`keys/andysu-ci-test-public.pem`).
+- **CI signs with a short-lived release key certified by the offline root.** The release key and its
+  certificate are Actions secrets; only the root public key is committed
+  (`keys/andysu-release-root-public.pem`).
+- No workflow names a specific key. They read secrets, so rotating the release key changes the
+  secrets and nothing else.
+- Tests generate throwaway keys at runtime. The only fixed key in source is the published RFC 8032
+  test vector.
 
 ## What exists today
 
-The CI test keys were generated on the owner's machine with this repository's tools and are kept
-outside the repository in `~/.config/andysu/keys/` (mode 0600).
+The production signing material is kept outside the repository in
+`~/.config/andysu/keys/production/` (mode 0600).
 
 | Secret | What it is |
 |---|---|
-| `ANDYSU_SIGNING_KEY` | Ed25519 root key; signs `SHA256SUMS` and the demo channel |
-| `ANDYSU_SIGNING_CERT` | optional; set when the key is a release key certified by an offline root |
-| `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` | PKCS12 keystore (EC P-256) for the demo APK in each release |
-| `CARGO_REGISTRY_TOKEN`, `NPM_TOKEN` | optional; turn on the crates.io and npmjs.com jobs |
+| `ANDYSU_SIGNING_KEY`, `ANDYSU_DEMO_SIGNING_KEY` | certified Ed25519 release key; signs `SHA256SUMS` and the demo channel |
+| `ANDYSU_SIGNING_CERT`, `ANDYSU_DEMO_SIGNING_CERT` | root certificate for that release key |
+| `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` | PKCS12 keystore (EC P-256) for the demo APK in each release; still the CI test keystore |
+| `PUBLISH_CRATES_IO`, `PUBLISH_NPMJS` (repository variables) | optional; gate the crates.io and npmjs.com OIDC jobs |
 
 ## Loading and swapping secrets
 
 ```sh
-scripts/setup-secrets.sh                # dixonSolutions/AndySU, the CI test keys
+ANDYSU_KEY_FILE=$HOME/.config/andysu/keys/production/andysu-release.key \
+ANDYSU_CERT_FILE=$HOME/.config/andysu/keys/production/andysu-release.cert.json \
+scripts/setup-secrets.sh                # dixonSolutions/AndySU, production release key
 ```
 
 The script reads files and pipes them to `gh secret set`, so a key never passes through the command line
-or shell history. To use other keys, point it at other files with `ANDYSU_KEY_FILE`, `ANDYSU_CERT_FILE`,
-`ANDROID_KEYSTORE`, `ANDROID_KEYSTORE_PASS_FILE`, `ANDROID_KEY_ALIAS`, `CARGO_REGISTRY_TOKEN` and
-`NPM_TOKEN`. If `ANDYSU_SIGNING_KEY` is missing the release fails; if the keystore secrets are missing
-the demo APK is signed with the debug key.
+or shell history. To use other signing material, point it at other files with `ANDYSU_KEY_FILE`,
+`ANDYSU_CERT_FILE`, `ANDROID_KEYSTORE`, `ANDROID_KEYSTORE_PASS_FILE` and `ANDROID_KEY_ALIAS`. If
+`ANDYSU_SIGNING_KEY` is missing the release fails; if the keystore secrets are missing the demo APK is
+signed with the debug key.
+
+Public registry jobs use GitHub OIDC, not long-lived npm or crates.io tokens. Leave both repository
+variables unset until each registry trusts owner `dixonSolutions`, repository `AndySU`, workflow
+`release.yml`. crates.io needs a one-time manual publication of both crates before that trust can be
+configured. For npm, use `scripts/bootstrap-npmjs.sh <version>` to verify and initially publish the
+release packages, then create their trust configurations. After setup, set `PUBLISH_NPMJS=true` and
+trigger a release within two days so npm can validate the trusted publisher. See
+[Package registries](/bindings/registries).
 
 ## Rotating
 
-When the CI signing key changes, replace `keys/andysu-ci-test-public.pem`; the release workflow warns when
-`SHA256SUMS` is not signed by that file. For an app's own hosts, see
+When the CI release key changes, certify a new one from the offline root and re-run
+`scripts/setup-secrets.sh`. Replace `keys/andysu-release-root-public.pem` only when the root itself
+changes; the release workflow verifies every checksum against that committed root. For an app's own hosts, see
 [Keys and certificates](/publishing/keys-and-certificates#rotating-the-root-key).
 
 ## Agent and tool rules

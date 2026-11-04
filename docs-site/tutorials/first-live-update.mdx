@@ -16,7 +16,7 @@ You will end with two Gradle modules:
 
 <Info>
   Prerequisites: the `andysu` CLI ([Quickstart](/quickstart)), Android Studio or the Android SDK, and
-  a device or emulator with USB debugging. Replace `0.1.62` with the newest version from the
+  a device or emulator with USB debugging. Replace `0.1.78` with the newest version from the
   [releases page](https://github.com/dixonSolutions/AndySU/releases).
 </Info>
 
@@ -68,7 +68,7 @@ You will end with two Gradle modules:
     plugins {
         id("com.android.application")
         id("org.jetbrains.kotlin.plugin.compose")
-        id("io.github.dixonsolutions.andysu") version "0.1.62"
+        id("io.github.dixonsolutions.andysu") version "0.1.78"
     }
 
     android {
@@ -83,8 +83,8 @@ You will end with two Gradle modules:
     }
 
     dependencies {
-        compileOnly("io.github.dixonsolutions.andysu:api:0.1.62")         // the host has the runtime copy
-        implementation("io.github.dixonsolutions.andysu:payload-kit:0.1.62") // lifecycle owners for Compose
+        compileOnly("io.github.dixonsolutions.andysu:api:0.1.78")         // the host has the runtime copy
+        implementation("io.github.dixonsolutions.andysu:payload-kit:0.1.78") // lifecycle owners for Compose
         implementation(platform("androidx.compose:compose-bom:2026.09.00"))
         implementation("androidx.compose.ui:ui")
         implementation("androidx.compose.material3:material3")
@@ -152,7 +152,7 @@ You will end with two Gradle modules:
     ```kotlin
     plugins {
         id("com.android.application")
-        id("io.github.dixonsolutions.andysu") version "0.1.62"
+        id("io.github.dixonsolutions.andysu") version "0.1.78"
     }
 
     android {
@@ -166,7 +166,7 @@ You will end with two Gradle modules:
         factory.set(file("../build/andysu/factory"))     // version 1.0, built in
     }
 
-    dependencies { implementation("io.github.dixonsolutions.andysu:host:0.1.62") }
+    dependencies { implementation("io.github.dixonsolutions.andysu:host:0.1.78") }
     ```
 
     Build the payload, turn it into the built-in slot, then build the host:

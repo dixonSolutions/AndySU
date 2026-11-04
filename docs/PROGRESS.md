@@ -16,7 +16,7 @@ local.
 | 2 Rust core | done |
 | 3 CLI | done |
 | 4 Linux desktop host | done (10 scenarios incl. `--apply restart`) |
-| 5 Android host | `device_tests` (live, crashes, watchdog, resume, apply policies, split, crash handlers, background trial) green in CI on API 24, 29, 31, 34, 36 and 36 with 16 KB pages, locally on 24/31/34, and 21/21 on the owner's BlissOS VM (Android 13 on x86_64; see its section). Not run on a phone |
+| 5 Android host | `device_tests` (live, crashes, watchdog, resume, apply policies, update mode, split, crash handlers, background trial) green in CI on API 24, 29, 31, 34, 36 and 36 with 16 KB pages, locally on 24/31/34, and 21/21 on the owner's BlissOS VM (Android 13 on x86_64; see its section). Not run on a phone |
 | 5 samples | Compose, native GLES, WebView: built-in 1.0 → 2.0 live → committed on API 36, with the version label checked on screen (2026-11-03) |
 | 6 Gradle plugin + split | done |
 | 7 Test beds | Xonotic and STK: built-in → next-start update → broken release rolled back, with the game engine verified running at each step. Live `.so` swap in Xonotic built (`testbeds/patches/xonotic-touch/`): in-process swap committed, rollback, watchdog expiry, native crash, second swap after a cold start, game data re-unpacked on an in-process rollback, low-storage GC guard |
@@ -414,10 +414,20 @@ with three rollback layers. Two feasibility probes ran:
       window id, set `vid_hidden`.
     - The beds missed it because they only counted `engine_frames`, and
       `docs/evidence/live-swap-final.png` actually shows the stuck screen.
-    - Fixed for every swap build. The APKs used by earlier `--live*` runs predate the fix, and the
-      beds do not yet assert that frames reach the screen.
-  - **Still not covered:** real devices, a rollback whose unpack fails (no way to provoke it), and
-    an on-screen check in the live beds.
+    - Fixed for every swap build. Since 2026-11-04 the beds also check that frames reach the screen
+      (`screen_alive`, LIVE_SWAP.md section 13). The check is proven on a build without 0009,
+      where it fails exactly at the live swap. A Haiku worker started it; the lead took it over and
+      ran all three beds on API 36 with rebuilt APKs.
+  - **Still not covered:** real devices, and a rollback whose unpack fails (no way to provoke it).
+- **Update mode (Host API level 3, 2026-11-04).** `UpdateClient.setMode`/`mode` persist a per-install
+  `auto | download_only | check_only | off` override in `noBackupFilesDir/andysu/update_mode`, readable
+  before class loading in transparent mode. `Jobs.schedule` is re-run with the effective mode, `off`
+  cancels the periodic job and suppresses check-on-open/staging, `check_only` reports `available`,
+  and `download_only` stages without applying. An explicit `restartNow()` promotes the pending release
+  once through a one-shot `apply_pending` marker; clearing the override restores `auto`.
+  Verified by the lead: `cargo test --workspace`, clippy `-D warnings`, `:host:assembleRelease`, and
+  `device_tests --api 34 --container` 22/22 including the new `update-mode` scenario. The default remains
+  `auto`, so automatic updates are on out of the box.
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |
@@ -531,6 +541,15 @@ with the Actions secrets set by `scripts/setup-secrets.sh` (CI test keys) and Pa
   on API 34: the warning appeared and the suite passed (20/20).
 `actions/publish/test.sh` covers both remote types: three releases with deltas and a 50%
 rollout, against a bare git repo and a stand-in `gh`, then a simulated client updates from each.
+
+**Public registries (2026-11-04).** The optional `crates-io` and `npmjs` release jobs now use GitHub
+OIDC trusted publishing and are gated by `PUBLISH_CRATES_IO`/`PUBLISH_NPMJS`. They run only after the
+GitHub Pages/Releases consumer verification passes. crates.io still needs one manual initial publish
+per crate before trust can be configured. npm's `@andysu` scope is unavailable, so npmjs.com uses
+`andysu`, `andysu-react-native`, `andysu-capacitor` and `com.andysu.unity`;
+`scripts/npm-public-name.sh` maps the historical scoped tarball names at publish time. The release
+and demo channels now sign with a certified production release key; the offline root public key is
+committed as `keys/andysu-release-root-public.pem`. The demo APK still uses the CI test keystore.
 
 ### Demo channel (2026-11-03, owner request: "remote and self GitHub release ... so we can hot swap it")
 Each release now runs `scripts/demo.sh`. It publishes the Compose sample's payload to

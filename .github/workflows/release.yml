@@ -7,11 +7,14 @@
 #
 # Then every package is installed from those URLs by fresh consumer projects.
 #
-# Secrets (docs/KEYS.md; set with scripts/setup-secrets.sh). Every key here is a CI test key.
-#   ANDYSU_SIGNING_KEY          signs SHA256SUMS (and the demo channel)
-#   ANDYSU_SIGNING_CERT         optional: root certificate when the key above is a release key
-#   CARGO_REGISTRY_TOKEN        optional: also publish the crates to crates.io
-#   NPM_TOKEN                   optional: also publish the npm packages to npmjs.com
+# Secrets (docs/KEYS.md; set with scripts/setup-secrets.sh).
+#   ANDYSU_SIGNING_KEY          certified production release key signs SHA256SUMS
+#   ANDYSU_SIGNING_CERT         required root certificate for that release key
+#   ANDYSU_DEMO_SIGNING_KEY     certified production release key signs the demo channel
+#   ANDYSU_DEMO_SIGNING_CERT    required certificate for that release key
+# Public registry publishing uses OIDC. Set repository variables PUBLISH_CRATES_IO=true and/or
+# PUBLISH_NPMJS=true only after configuring the trusted publisher on every package.
+# crates.io requires an initial manual publish before its trusted publisher can be configured.
 name: release
 on:
   push:
@@ -111,19 +114,21 @@ jobs:
       - run: scripts/package.sh site "$PAGES_URL"
       - name: Demo channel (the Compose sample on Pages; its host APK goes into the release)
         env:
-          ANDYSU_SIGNING_KEY: ${{ secrets.ANDYSU_SIGNING_KEY }}
-          ANDYSU_SIGNING_CERT: ${{ secrets.ANDYSU_SIGNING_CERT }}
+          ANDYSU_DEMO_SIGNING_KEY: ${{ secrets.ANDYSU_DEMO_SIGNING_KEY }}
+          ANDYSU_DEMO_SIGNING_CERT: ${{ secrets.ANDYSU_DEMO_SIGNING_CERT }}
           ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
           umask 077
-          printf '%s\n' "$ANDYSU_SIGNING_KEY" > "$RUNNER_TEMP/demo.key"
+          : "${ANDYSU_DEMO_SIGNING_KEY:?ANDYSU_DEMO_SIGNING_KEY is required for the legacy demo channel}"
+          printf '%s\n' "$ANDYSU_DEMO_SIGNING_KEY" > "$RUNNER_TEMP/demo.key"
           export ANDYSU_KEY_FILE="$RUNNER_TEMP/demo.key"
-          if [ -n "$ANDYSU_SIGNING_CERT" ]; then
-            printf '%s\n' "$ANDYSU_SIGNING_CERT" > "$RUNNER_TEMP/demo.cert.json"
-            export ANDYSU_CERT_FILE="$RUNNER_TEMP/demo.cert.json" ANDYSU_ROOT_PUB=keys/andysu-ci-test-public.pem
+          if [ -n "$ANDYSU_DEMO_SIGNING_CERT" ]; then
+            printf '%s\n' "$ANDYSU_DEMO_SIGNING_CERT" > "$RUNNER_TEMP/demo.cert.json"
+            export ANDYSU_CERT_FILE="$RUNNER_TEMP/demo.cert.json"
           fi
+          export ANDYSU_ROOT_PUB=keys/andysu-release-root-public.pem
           if [ -n "$ANDROID_KEYSTORE_B64" ]; then
             printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/demo.jks"
             printf '%s' "$ANDROID_KEYSTORE_PASSWORD" > "$RUNNER_TEMP/demo.jks.pass"
@@ -133,11 +138,13 @@ jobs:
           umask 022
           scripts/demo.sh site "$PAGES_URL" "${{ needs.version.outputs.version }}" dist/release
           rm -f "$RUNNER_TEMP"/demo.*
-      - name: Checksums, signed with the CI key
+      - name: Checksums, signed by the certified production release key
         env:
           ANDYSU_SIGNING_KEY: ${{ secrets.ANDYSU_SIGNING_KEY }}
           ANDYSU_SIGNING_CERT: ${{ secrets.ANDYSU_SIGNING_CERT }}
         run: |
+          : "${ANDYSU_SIGNING_KEY:?ANDYSU_SIGNING_KEY is required}"
+          : "${ANDYSU_SIGNING_CERT:?ANDYSU_SIGNING_CERT is required}"
           cargo build -q --release -p andysu-cli
           cp dist/cli/* dist/release/
           umask 077
@@ -150,10 +157,9 @@ jobs:
           cd dist/release
           sha256sum * > SHA256SUMS
           ../../target/release/andysu sign-file SHA256SUMS --key "$RUNNER_TEMP/signing.key" $cert
-          ../../target/release/andysu pubkey --key "$RUNNER_TEMP/signing.key" > andysu-release-public.pem
+          cp ../../keys/andysu-release-root-public.pem andysu-release-public.pem
           rm -f "$RUNNER_TEMP/signing.key"
-          ../../target/release/andysu verify-file SHA256SUMS --pub ../../keys/andysu-ci-test-public.pem \
-            || echo "::warning::SHA256SUMS is not signed by keys/andysu-ci-test-public.pem (key rotated? update keys/)"
+          ../../target/release/andysu verify-file SHA256SUMS --pub ../../keys/andysu-release-root-public.pem
       - uses: actions/upload-artifact@v4
         with:
           name: release
@@ -292,7 +298,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download the release and check SHA256SUMS against keys/andysu-ci-test-public.pem
+      - name: Download the release and check SHA256SUMS against the production root
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -300,54 +306,127 @@ jobs:
           gh release download "v${{ needs.version.outputs.version }}" --repo "${{ github.repository }}"
           sha256sum -c --ignore-missing SHA256SUMS
           chmod +x andysu-x86_64-unknown-linux-musl
-          ./andysu-x86_64-unknown-linux-musl verify-file SHA256SUMS --pub ../keys/andysu-ci-test-public.pem
+          ./andysu-x86_64-unknown-linux-musl verify-file SHA256SUMS --pub ../keys/andysu-release-root-public.pem
       - name: The live demo channel verifies like a client would (signature, expiry, every blob)
         run: >-
           r/andysu-x86_64-unknown-linux-musl verify "$PAGES_URL/demo/stable/update.json"
-          --pub keys/andysu-ci-test-public.pem --app com.andysu.sample.compose --blobs
+          --pub keys/andysu-release-root-public.pem --app com.andysu.sample.compose --blobs
 
-  # Optional public registries: these jobs run only once the owner adds the token secret.
+  # Optional public registries. Explicit repository variables gate all OIDC requests and publishes.
+  # crates.io trusted publisher identity: owner=dixonSolutions, repo=AndySU, workflow=release.yml.
   crates-io:
     needs: [version, verify]
+    if: vars.PUBLISH_CRATES_IO == 'true'
     runs-on: ubuntu-latest
-    env:
-      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
-        if: env.CARGO_REGISTRY_TOKEN != ''
       - uses: dtolnay/rust-toolchain@stable
-        if: env.CARGO_REGISTRY_TOKEN != ''
-      - name: cargo publish (andysu-core, then andysu-cli)
-        if: env.CARGO_REGISTRY_TOKEN != ''
+      - name: Set release version and prepare crates.io dependency metadata
         run: |
           scripts/set-version.sh "${{ needs.version.outputs.version }}"
-          # On crates.io the CLI's dependency on the core comes from crates.io itself.
           sed -i 's/, registry = "andysu"//' cli/Cargo.toml
-          cargo publish -p andysu-core --allow-dirty
-          cargo publish -p andysu-cli --allow-dirty
-      - if: env.CARGO_REGISTRY_TOKEN == ''
-        run: echo "CARGO_REGISTRY_TOKEN is not set; crates.io publishing is off"
+      - name: Authenticate for the core crate
+        id: crates-auth-core
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: Publish core before CLI
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth-core.outputs.token }}
+          V: ${{ needs.version.outputs.version }}
+        run: |
+          if ! curl -fsS https://index.crates.io/an/dy/andysu-core | grep -F '"vers":"'"$V"'"' >/dev/null; then
+            cargo publish -p andysu-core --allow-dirty
+          else
+            echo "andysu-core $V is already published; skipping"
+          fi
+      - name: Wait for the core version to appear in the crates.io index
+        env:
+          V: ${{ needs.version.outputs.version }}
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS https://index.crates.io/an/dy/andysu-core | grep -F '"vers":"'"$V"'"' >/dev/null; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "andysu-core $V did not appear in the crates.io index" >&2
+          exit 1
+      - name: Authenticate for the CLI crate
+        id: crates-auth-cli
+        uses: rust-lang/crates-io-auth-action@v1
+      - name: Publish CLI after its core dependency is indexed
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates-auth-cli.outputs.token }}
+          V: ${{ needs.version.outputs.version }}
+        run: |
+          if ! curl -fsS https://index.crates.io/an/dy/andysu-cli | grep -F '"vers":"'"$V"'"' >/dev/null; then
+            cargo publish -p andysu-cli --allow-dirty
+          else
+            echo "andysu-cli $V is already published; skipping"
+          fi
+      - name: Verify a fresh cargo install from crates.io
+        env:
+          V: ${{ needs.version.outputs.version }}
+        run: |
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          for i in $(seq 1 12); do
+            if CARGO_HOME="$work/cargo-home" cargo install andysu-cli --version "=$V" --locked --root "$work/install"; then
+              break
+            fi
+            [ "$i" -lt 12 ] || exit 1
+            sleep 10
+          done
+          "$work/install/bin/andysu" --version | grep -F "$V"
 
+  # npm trusted publisher identity: owner=dixonSolutions, repo=AndySU, workflow=release.yml.
   npmjs:
     needs: [version, verify]
+    if: vars.PUBLISH_NPMJS == 'true'
     runs-on: ubuntu-latest
-    env:
-      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    permissions:
+      contents: read
+      id-token: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
-        if: env.NPM_TOKEN != ''
         with:
           name: release
           path: dist
       - uses: actions/setup-node@v4
-        if: env.NPM_TOKEN != ''
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
-      - name: npm publish (@andysu/* and the Unity package)
-        if: env.NPM_TOKEN != ''
+      - name: Install npm with trusted publishing support
+        run: |
+          npm install --global npm@11.15.0
+          node --version
+          npm --version
+          node -e 'const [a,b,c]=process.versions.node.split(".").map(Number); if(a<22 || (a===22 && b<14)) process.exit(1)'
+          test "$(npm --version)" = 11.15.0
+      - name: Publish npm packages and Unity package through OIDC
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: for t in dist/*.tgz; do npm publish "$t" --access public; done
-      - if: env.NPM_TOKEN == ''
-        run: echo "NPM_TOKEN is not set; npmjs.com publishing is off"
+          V: ${{ needs.version.outputs.version }}
+        run: scripts/publish-npmjs.sh "$V" dist/*.tgz
+      - name: Verify installation from the public npm registry in a fresh consumer
+        env:
+          V: ${{ needs.version.outputs.version }}
+        run: |
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          cd "$work"
+          npm init -y >/dev/null
+          for i in $(seq 1 12); do
+            if npm install --no-audit --no-fund --registry=https://registry.npmjs.org \
+              "andysu-react-native@$V" "andysu-capacitor@$V" "andysu@$V" "com.andysu.unity@$V"; then
+              break
+            fi
+            [ "$i" -lt 12 ] || exit 1
+            sleep 10
+          done
+          node -e 'for(const p of ["andysu-react-native","andysu-capacitor"]) require.resolve(p); const u=require("./node_modules/com.andysu.unity/package.json"); if(u.version!==process.env.V) throw Error(`Unity package version ${u.version}`);'
+          ./node_modules/.bin/andysu --version | grep -F "$V"

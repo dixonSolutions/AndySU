@@ -8,7 +8,7 @@ implement `com.andysu.api.Payload`; the plugin turns your app module into a payl
 module into the frozen host.
 
 <Info>
-  The examples use version `0.1.62`. Versions are `<major.minor>.<commits on main>`; take the newest
+  The examples use version `0.1.78`. Versions are `<major.minor>.<commits on main>`; take the newest
   from the [releases page](https://github.com/dixonSolutions/AndySU/releases).
 </Info>
 
@@ -46,7 +46,7 @@ This is your app, built as a normal Android application module.
 ```kotlin
 plugins {
     id("com.android.application")
-    id("io.github.dixonsolutions.andysu") version "0.1.62"
+    id("io.github.dixonsolutions.andysu") version "0.1.78"
 }
 
 andysu {
@@ -56,9 +56,9 @@ andysu {
 
 dependencies {
     // The Host API is compileOnly: the host carries the one runtime copy.
-    compileOnly("io.github.dixonsolutions.andysu:api:0.1.62")
+    compileOnly("io.github.dixonsolutions.andysu:api:0.1.78")
     // Lifecycle and saved-state owners, so Jetpack Compose works in a payload.
-    implementation("io.github.dixonsolutions.andysu:payload-kit:0.1.62")
+    implementation("io.github.dixonsolutions.andysu:payload-kit:0.1.78")
 }
 ```
 
@@ -101,7 +101,7 @@ A second application module with the same `applicationId` as your app. The plugi
 ```kotlin
 plugins {
     id("com.android.application")
-    id("io.github.dixonsolutions.andysu") version "0.1.62"
+    id("io.github.dixonsolutions.andysu") version "0.1.78"
 }
 
 andysu {
@@ -110,7 +110,7 @@ andysu {
     factory.set(file("build/andysu/factory"))      // andysu pack ... --emit-slot ...
 }
 
-dependencies { implementation("io.github.dixonsolutions.andysu:host:0.1.62") }
+dependencies { implementation("io.github.dixonsolutions.andysu:host:0.1.78") }
 ```
 
 Produce the inputs with the CLI:

@@ -825,3 +825,72 @@ The emulator image has no `curl`; that the emulator reaches the remote is shown 
 events for 1.2.9102 (`downloading`, `staged`) fetched from the Pages URL. Left panel notes: the long JSON of
 `update_status` and `committed` is shown without its constant fields, the publisher's terminal is the output captured
 when the site was built (its timestamps are those of that run), `lib` paths are shortened with `...`.
+
+---------------------------------------------------------------------------------------------------
+
+## 13. On-screen check: frames must reach the screen, 2026-11-04
+
+The beds used to accept "the engine runs" from AndySU events alone (`engine_frames`), which kept
+counting while the screen was frozen after a live swap (section 12, fixed by patch 0009). Every
+point where a bed accepts a running engine now also calls `screen_alive(d, what)` in
+`android/tests/testbed_tests.py`:
+
+- capture the raw framebuffer (`adb exec-out screencap`, no PNG: a 12- or 16-byte header, then
+  RGBA; standard library only, sampled every 8th pixel);
+- press a key that only a live, drawing engine answers: first `` ` `` (`KEYCODE_GRAVE`, the console
+  slides over the top half; it is closed again), then `DPAD_DOWN`, then `DPAD_UP`;
+- pass when a capture 1.5 s later is non-uniform (std-dev >= 10) and at least **2 %** of the sampled
+  pixels changed; fail after three keys, saving a PNG of the screen to `docs/evidence/`.
+
+Two things made it deterministic: the beds now skip Xonotic Touch's first-run dialogs (profile,
+touch setup, terms of service: the README demo's engine arguments, `FIRST_RUN_SKIP`), and mark
+Android's "Viewing full screen" bubble as confirmed on their own emulators (`no_immersive_prompt`).
+Both had covered the game and swallowed the key presses. The Xonotic beds now default to API 36
+`google_apis`, which captures the game's GL frames (ATD images capture them as black).
+
+Results, API 36, APKs rebuilt with patch 0009 (`testbeds/build/apks-0009`), lead's runs:
+
+| Bed | Checks | Change after the key |
+|---|---|---|
+| `--live` | built-in, live swap, in-process rollback, cold start | 61.7 %, 61.6 %, 92.3 %, 62.0 % (all on the first key) |
+| `--live-failures` | built-in, watchdog relaunch, crash relaunch | 62.0 %, 62.4 %, 62.2 % |
+| `--low-storage` | built-in, two cold starts | 25.3 % each (run with the earlier DPAD-first key order) |
+
+**Without patch 0009** (A and B rebuilt without it, `scripts/build-without-patch-0009.sh`, which
+takes the heavy-job lock itself: do not wrap it in `heavy.sh`), `--live` passes the built-in check
+(61.7 %) and then fails exactly at the live swap:
+`screen not alive (live-B-swapped): std 15.7/15.7, but only 0.0% of pixels changed after 3 key
+presses (need 2%): frozen`. The screen: `docs/evidence/screen-check-frozen-without-0009.png`, the
+stuck "Loading models" plaque.
+
+A Haiku worker started this; its versions depended on numpy (not installed), used an unmeasured
+threshold and once dropped the change requirement altogether. The lead took it over, rewrote the
+check as above and ran every bed.
+
+## 14. AndySU update UI in the live Xonotic Touch checkout (2026-11-04)
+
+The live `~/Projects/Xonotic-Touch` checkout already has the Touch updates dialog; the testbed clone
+is older and does not, so this part is kept as a snapshot rather than a numbered patch in `build.sh`.
+The snapshot is `testbeds/patches/xonotic-touch/live/andysu-update-ui-8afbabe.diff` (base commit
+`8afbabe`, the live checkout's HEAD on 2026-11-04). It covers:
+
+- `AndySUBridge.java` (new): reads `touch/andysu-update-request.txt`, calls the host's
+  `UpdateClient` through `AndySUCompat`, and publishes `touch/andysu-update-status.txt` for QuakeC.
+- `AndySUCompat.java`: `mode()`, `setMode()`, `checkNow()`, `applyNow()` by reflection. Older hosts
+  simply lack the methods; the menu treats that as an incompatible payload API.
+- `XonoticActivity.java`: starts the AndySU bridge beside the APK updater; the menu's
+  "Update automatically" checkbox changes the host's persistent mode (`auto`/`off`) when AndySU is
+  present, and the APK updater preference otherwise.
+- `UpdateBridge.java`: reports the same auto value from the host mode, so the checkbox stays
+  consistent.
+- `touch_update_util.qh/qc` and `dialog_touch_updates.qh/qc`: an "AndySU payload" section with the
+  installed payload version, latest release, status, indeterminate progress while busy, and
+  "Check payload" / "Apply staged" buttons. The section polls the status file once per second.
+- `GameData.java`: the live base has only `.bundle-version` (no `.bundle-manifest`), so
+  `invalidateBundle()` deletes the stamp; the testbed base keeps patch 0007's two-file version.
+
+Verification on 2026-11-04: the live checkout built with
+`scripts/android-build.sh --abi x86_64 --version 1.2.9999 --code 9999` after the QuakeC
+`-Werror` fix at `dialog_touch_updates.qc:270` (parenthesise `managed && !payloadAvailable`).
+Native libraries, Java and both `csprogs.dat`/`menu.dat` compiled; the APK is 29 MB. Running the APK
+on a device and exercising the dialog is still to do.

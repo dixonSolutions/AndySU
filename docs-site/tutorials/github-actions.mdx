@@ -8,14 +8,17 @@ manifest and uploads everything to your remote. `andysu init` writes a starting 
 `.github/workflows/andysu.yml`.
 
 <Steps>
-  <Step title="Store the signing key as a secret">
+  <Step title="Create an offline root and a CI release key">
     ```sh
-    gh secret set ANDYSU_SIGNING_KEY < .andysu/andysu-root.key
+    andysu keygen --name myapp --dir .andysu
+    andysu keygen --release-from .andysu/myapp-root.key --days 90 --name ci
+    gh secret set ANDYSU_SIGNING_KEY < .andysu/ci-release.key
+    gh secret set ANDYSU_SIGNING_CERT < .andysu/ci-release.cert.json
     ```
 
-    Then move the key file somewhere safe and offline. The public half, `andysu-public.pem`, is
-    committed; it is built into the host. For day-to-day signing you can use a short-lived release
-    key certified by the root instead, see [Keys and certificates](/publishing/keys-and-certificates).
+    Keep the root private key offline after certifying the release key. Commit the public root key;
+    it is built into the host. Renew the release key before its certificate expires. See
+    [Keys and certificates](/publishing/keys-and-certificates).
   </Step>
 
   <Step title="Write the workflow">
@@ -74,7 +77,7 @@ manifest and uploads everything to your remote. `andysu init` writes a starting 
 | `pack-args` | | extra `andysu pack` arguments, for example `--no-rename` (transparent payloads), `--hot assets/`, `--archive assets/data` |
 | `rollout` | | staged rollout percentage, 1 to 100 |
 | `pages-branch` | `gh-pages` | branch GitHub Pages serves (`type = "pages"`) |
-| `andysu-version` | `latest` | CLI release to use, for example `0.1.62` |
+| `andysu-version` | `latest` | CLI release to use, for example `0.1.78` |
 | `token` | `github.token` | token with `contents: write` |
 
 Outputs: `manifest-url` and `release`.

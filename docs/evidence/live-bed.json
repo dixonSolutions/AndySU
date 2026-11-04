@@ -1,35 +1,35 @@
 {
-  "api": "34",
+  "api": "36",
   "versions": {
-    "A": "1.2.9011",
-    "B": "1.2.9012",
-    "F": "1.2.9013",
-    "D": "1.2.9014"
+    "A": "1.2.9001",
+    "B": "1.2.9002",
+    "F": "1.2.9003",
+    "D": "1.2.9004"
   },
   "steps": [
     {
       "step": "A built-in",
-      "detail": "1.2.9011 engine ran via the loader (SDL_main -> AndySU_SDL_main -> libmain), pid 2133"
+      "detail": "1.2.9001 engine ran via the loader (SDL_main -> AndySU_SDL_main -> libmain), pid 3328"
     },
     {
       "step": "live swap",
-      "detail": "1.2.9011 -> 1.2.9012 in pid 2133: live_swap_requested, engine_stopped, engine_start(swapped=1), live_swapped, committed; state current=1.2.9012 (A was the built-in payload, so no previous slot)"
+      "detail": "1.2.9001 -> 1.2.9002 in pid 3328: live_swap_requested, engine_stopped, engine_start(swapped=1), live_swapped, committed; state current=1.2.9002 (A was the built-in payload, so no previous slot)"
     },
     {
       "step": "in-process rollback",
-      "detail": "1.2.9013 failed its engine init (ANDYSU_FAIL_INIT: this engine build is deliberately broken  ); live_rollback; state current=1.2.9012, bad=['1.2.9013']; game data 1.2.9013 (its start) -> 1.2.9012 (rollback, 679 ms) before B's engine started again; engine 1.2.9012 runs again in pid 2133"
+      "detail": "1.2.9003 failed its engine init (ANDYSU_FAIL_INIT: this engine build is deliberately broken  ); live_rollback; state current=1.2.9002, bad=['1.2.9003']; game data 1.2.9003 (its start) -> 1.2.9002 (rollback, 565 ms) before B's engine started again; engine 1.2.9002 runs again in pid 3328"
     },
     {
       "step": "cold start",
-      "detail": "boots 1.2.9012 (committed), engine from slots/1.2.9012: slots/1.2.9012/lib/x86_64/libmain.so"
+      "detail": "boots 1.2.9002 (committed), engine from slots/1.2.9002: slots/1.2.9002/lib/x86_64/libmain.so"
     },
     {
       "step": "dex change",
-      "detail": "1.2.9014 staged with native_live=false: no live swap, falls back to the next start"
+      "detail": "1.2.9004 staged with native_live=false: no live swap, falls back to the next start"
     },
     {
       "step": "next start",
-      "detail": "1.2.9014 booted on the next start (trial=True)"
+      "detail": "1.2.9004 booted on the next start (trial=True)"
     }
   ],
   "verdict": "live bed passes"

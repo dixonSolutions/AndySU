@@ -1,0 +1,749 @@
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUBridge.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUBridge.java
+new file mode 100644
+index 0000000..ce3dba9
+--- /dev/null
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUBridge.java
+@@ -0,0 +1,139 @@
++package io.github.dixonsolutions.xonotictouch;
++
++import android.content.Context;
++import android.util.Log;
++
++import org.json.JSONObject;
++
++import java.io.File;
++import java.io.IOException;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.util.List;
++
++/** File bridge between the QuakeC Updates screen and AndySU's payload updater. */
++final class AndySUBridge {
++    private static final String TAG = "XonoticTouch";
++    private static final int FORMAT = 1;
++
++    static final String REQUEST_CHECK = "check";
++    static final String REQUEST_APPLY = "apply";
++    static final String REQUEST_AUTO_ON = "auto-on";
++    static final String REQUEST_AUTO_OFF = "auto-off";
++
++    private final File statusFile;
++    private final File requestFile;
++    private String requestError = "";
++
++    AndySUBridge(Context context, File baseDir) {
++        File touch = new File(GameData.engineWriteDir(baseDir), "touch");
++        statusFile = new File(touch, "andysu-update-status.txt");
++        requestFile = new File(touch, "andysu-update-request.txt");
++    }
++
++    String takeRequest() {
++        if (!requestFile.isFile()) return null;
++        String token = null;
++        try {
++            List<String> lines = Files.readAllLines(requestFile.toPath(), StandardCharsets.UTF_8);
++            if (!lines.isEmpty()) token = lines.get(0).trim();
++        } catch (IOException | RuntimeException e) {
++            Log.w(TAG, "Could not read AndySU update request", e);
++        }
++        if (!requestFile.delete()) Log.w(TAG, "Could not clear " + requestFile);
++        return token == null || token.isEmpty() ? null : token;
++    }
++
++    void serve(String request) {
++        try {
++            switch (request) {
++                case REQUEST_CHECK:
++                    AndySUCompat.checkNow();
++                    requestError = "";
++                    break;
++                case REQUEST_APPLY:
++                    AndySUCompat.applyNow();
++                    requestError = "";
++                    break;
++                case REQUEST_AUTO_ON:
++                    AndySUCompat.setMode("auto");
++                    requestError = "";
++                    break;
++                case REQUEST_AUTO_OFF:
++                    AndySUCompat.setMode("off");
++                    requestError = "";
++                    break;
++                default:
++                    return;
++            }
++        } catch (ReflectiveOperationException | RuntimeException e) {
++            requestError = "Could not contact the AndySU updater: " + oneLine(e.getMessage());
++            Log.w(TAG, requestError, e);
++        }
++        publish();
++    }
++
++    void publish() {
++        String state = "unavailable";
++        String installed = nullSafe(AndySUCompat.payloadVersion());
++        String latest = "";
++        String message = requestError;
++        String mode = "off";
++        int percent = 0; // AndySU reports state transitions, not byte percentages.
++
++        if (AndySUCompat.present()) {
++            try {
++                mode = AndySUCompat.mode();
++                JSONObject status = new JSONObject(AndySUCompat.updateStatus());
++                state = normalize(status.optString("state", "idle"));
++                latest = status.optString("release", status.optString("id", ""));
++                if (message.isEmpty()) {
++                    message = status.optString("message",
++                            status.optString("reason", status.optString("code", "")));
++                }
++                if ("shell_update".equals(state)) {
++                    message = message.isEmpty()
++                            ? "The host APK needs an update before this payload can run."
++                            : message;
++                }
++            } catch (Exception e) {
++                state = "incompatible";
++                message = "This AndySU host does not expose the payload update API.";
++                Log.i(TAG, message, e);
++            }
++        } else {
++            message = "Payload updates are available only in an AndySU-enabled install.";
++        }
++
++        String record = FORMAT + "\n" + state + "\n" + installed + "\n" + nullSafe(latest)
++                + "\n" + percent + "\n" + oneLine(message) + "\n"
++                + ("auto".equals(mode) ? "on" : "off") + "\n" + mode + "\n";
++        try {
++            File dir = statusFile.getParentFile();
++            if (dir != null && !dir.isDirectory() && !dir.mkdirs()) return;
++            File tmp = new File(statusFile.getPath() + ".tmp");
++            Files.write(tmp.toPath(), record.getBytes(StandardCharsets.UTF_8));
++            if (!tmp.renameTo(statusFile)) {
++                Log.w(TAG, "Could not replace " + statusFile);
++                //noinspection ResultOfMethodCallIgnored
++                tmp.delete();
++            }
++        } catch (IOException | RuntimeException e) {
++            Log.w(TAG, "Could not publish AndySU update status", e);
++        }
++    }
++
++    private static String normalize(String state) {
++        if ("up_to_date".equals(state)) return "uptodate";
++        if ("shell_update".equals(state)) return "shell-update";
++        return state;
++    }
++
++    private static String nullSafe(String value) {
++        return value == null ? "" : oneLine(value.trim());
++    }
++
++    private static String oneLine(String value) {
++        return value == null ? "" : value.replace('\n', ' ').replace('\r', ' ');
++    }
++}
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUCompat.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUCompat.java
+new file mode 100644
+index 0000000..259747b
+--- /dev/null
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUCompat.java
+@@ -0,0 +1,88 @@
++package io.github.dixonsolutions.xonotictouch;
++
++import android.content.Context;
++
++/**
++ * Optional AndySU integration, by reflection so the same code builds and runs without it.
++ * Under an AndySU host: the running payload's version, and the APK updater stands down (AndySU
++ * updates the app; installing a full APK would replace the frozen host).
++ */
++final class AndySUCompat {
++    private AndySUCompat() {}
++
++    static Object host() {
++        try {
++            return Class.forName("com.andysu.api.Host").getMethod("current").invoke(null);
++        } catch (Throwable t) {
++            return null;
++        }
++    }
++
++    static boolean present() {
++        return host() != null;
++    }
++
++    static boolean autoEnabled(Context context) {
++        if (present()) {
++            try {
++                return "auto".equals(mode());
++            } catch (ReflectiveOperationException ignored) {
++                // Older hosts keep their configured mode; the Android APK
++                // updater preference remains the best available fallback.
++            }
++        }
++        return AppUpdater.isAutoInstall(context);
++    }
++
++    static String payloadVersion() {
++        Object h = host();
++        if (h == null) return null;
++        try {
++            return (String) api().getMethod("version").invoke(h);
++        } catch (Throwable t) {
++            return null;
++        }
++    }
++
++    static Object updateClient() throws ReflectiveOperationException {
++        Object h = host();
++        if (h == null) return null;
++        return api().getMethod("updates").invoke(h);
++    }
++
++    static String updateStatus() throws ReflectiveOperationException {
++        Object client = updateClient();
++        return client == null ? null : updateApi().getMethod("status").invoke(client).toString();
++    }
++
++    static String mode() throws ReflectiveOperationException {
++        Object client = updateClient();
++        return client == null ? null : updateApi().getMethod("mode").invoke(client).toString();
++    }
++
++    static void setMode(String mode) throws ReflectiveOperationException {
++        Object client = updateClient();
++        if (client == null) throw new IllegalStateException("AndySU host is unavailable");
++        updateApi().getMethod("setMode", String.class).invoke(client, mode);
++    }
++
++    static void checkNow() throws ReflectiveOperationException {
++        Object client = updateClient();
++        if (client == null) throw new IllegalStateException("AndySU host is unavailable");
++        updateApi().getMethod("checkNow").invoke(client);
++    }
++
++    static void applyNow() throws ReflectiveOperationException {
++        Object client = updateClient();
++        if (client == null) throw new IllegalStateException("AndySU host is unavailable");
++        updateApi().getMethod("applyNow").invoke(client);
++    }
++
++    private static Class<?> api() throws ClassNotFoundException {
++        return Class.forName("com.andysu.api.HostApi");
++    }
++
++    private static Class<?> updateApi() throws ClassNotFoundException {
++        return Class.forName("com.andysu.api.UpdateClient");
++    }
++}
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java
+index 95c4b48..a8f9356 100644
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/GameData.java
+@@ -163,6 +163,39 @@ final class GameData {
+      */
+     private static final Object PREPARE_LOCK = new Object();
+ 
++    /** The release the unpacked bundle belongs to (the stamp written when an unpack finished), or null. */
++    String bundleVersion() {
++        File stamp = new File(baseDir(), BUNDLE_STAMP);
++        try {
++            return stamp.isFile() ? readAll(stamp) : null;
++        } catch (IOException e) {
++            return null;
++        }
++    }
++
++    /** Forget what was unpacked: the next {@link #prepare} unpacks the whole bundle again. */
++    void invalidateBundle() {
++        File stamp = new File(baseDir(), BUNDLE_STAMP);
++        if (stamp.exists() && !stamp.delete()) {
++            Log.w(TAG, "Could not delete " + stamp);
++        }
++    }
++
++    /**
++     * In-process rollback: the game data must belong to the release that runs again, not to
++     * {@code failedVersion}, which has been unpacking over it. When the failed release's unpack
++     * finished (its stamp is there) the manifest it left is exact and only what differs is
++     * written; otherwise files of both releases may be mixed, so everything is unpacked again.
++     */
++    void prepareAfterRollback(Progress progress, String failedVersion) throws IOException {
++        synchronized (PREPARE_LOCK) {
++            if (!failedVersion.equals(bundleVersion())) {
++                invalidateBundle();
++            }
++            prepare(progress);
++        }
++    }
++
+     void prepare(Progress progress) throws IOException {
+         synchronized (PREPARE_LOCK) {
+             File base = baseDir();
+@@ -392,6 +425,10 @@ final class GameData {
+     }
+ 
+     private String appVersion() {
++        // Under AndySU the installed APK is a frozen host; the running payload's version is what
++        // the bundled data belongs to.
++        String payload = AndySUCompat.payloadVersion();
++        if (payload != null) return payload;
+         try {
+             return context.getPackageManager()
+                     .getPackageInfo(context.getPackageName(), 0).versionName;
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/UpdateBridge.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/UpdateBridge.java
+index 3ef52b7..fe613cc 100644
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/UpdateBridge.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/UpdateBridge.java
+@@ -192,7 +192,7 @@ final class UpdateBridge {
+                 .append(Math.max(0, behind)).append('\n')
+                 .append(Math.max(0, Math.min(100, percent))).append('\n')
+                 .append(oneLine(message)).append('\n')
+-                .append(AppUpdater.isAutoInstall(context) ? "on" : "off").append('\n');
++                .append(AndySUCompat.autoEnabled(context) ? "on" : "off").append('\n');
+ 
+         try {
+             File dir = statusFile.getParentFile();
+diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
+index 51ec0e2..0bd7349 100644
+--- a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
++++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/XonoticActivity.java
+@@ -33,6 +33,7 @@ public final class XonoticActivity extends SDLActivity {
+ 
+     private String baseDir;
+     private Thread updateService;
++    private AndySUBridge andysuBridge;
+     /** Last release the check found, so Install and Skip know what they mean. */
+     private volatile AppUpdater.Update lastSeenUpdate;
+     /** When this process last asked the release feed (elapsedRealtime). The
+@@ -72,6 +73,9 @@ public final class XonoticActivity extends SDLActivity {
+         if (baseDir == null) {
+             baseDir = new GameData(this).baseDir().getAbsolutePath();
+         }
++        // The host may stage a live update as soon as its activity resumes.
++        // Register before SDL starts its native thread in super.onCreate().
++        EngineSwap.register(this);
+         super.onCreate(savedInstanceState);
+         watchSoftKeyboard();
+         watchInputDevices();
+@@ -84,6 +88,7 @@ public final class XonoticActivity extends SDLActivity {
+             inputManager.unregisterInputDeviceListener(inputDeviceListener);
+         }
+         stopUpdateService();
++        EngineSwap.unregister();
+         super.onDestroy();
+     }
+ 
+@@ -309,6 +314,8 @@ public final class XonoticActivity extends SDLActivity {
+         }
+         final UpdateBridge bridge = new UpdateBridge(this, new File(baseDir));
+         final AppUpdater updater = new AppUpdater(this);
++        andysuBridge = new AndySUBridge(this, new File(baseDir));
++        andysuBridge.publish();
+         updateService = new Thread(() -> {
+             // Whatever BootActivity last published stands until someone asks for
+             // something; re-checking here would double every launch's API call.
+@@ -323,6 +330,12 @@ public final class XonoticActivity extends SDLActivity {
+                 if (request != null) {
+                     serveUpdateRequest(bridge, updater, request);
+                 }
++                AndySUBridge payloadBridge = andysuBridge;
++                if (payloadBridge != null) {
++                    String payloadRequest = payloadBridge.takeRequest();
++                    if (payloadRequest != null) payloadBridge.serve(payloadRequest);
++                    payloadBridge.publish();
++                }
+             }
+         }, "xonotic-update-service");
+         updateService.setDaemon(true);
+@@ -341,14 +354,19 @@ public final class XonoticActivity extends SDLActivity {
+         switch (request) {
+             case "auto-on":
+             case "auto-off":
+-                // Nothing to publish. The preference is the only thing that
+-                // changed, and any record written around it would have to
+-                // invent the seven lines above line 8 -- throwing away a
+-                // release the boot check already found, and greying out the
+-                // Install and Skip buttons that were about to take it. The next
+-                // real publish carries the new preference; until then the menu
+-                // holds the value it just asked for.
+-                AppUpdater.setAutoInstall(this, "auto-on".equals(request));
++                // The menu checkbox controls AndySU's persistent payload mode
++                // when present, otherwise the APK install preference. Its
++                // status file is republished after a payload mode change.
++                if (AndySUCompat.present()) {
++                    try {
++                        AndySUCompat.setMode("auto-on".equals(request) ? "auto" : "off");
++                        if (andysuBridge != null) andysuBridge.publish();
++                    } catch (ReflectiveOperationException | RuntimeException e) {
++                        Log.w("XonoticTouch", "Could not change AndySU update mode", e);
++                    }
++                } else {
++                    AppUpdater.setAutoInstall(this, "auto-on".equals(request));
++                }
+                 return;
+             case "skip": {
+                 AppUpdater.Update target = targetUpdate(bridge, updater, installed);
+@@ -507,8 +525,20 @@ public final class XonoticActivity extends SDLActivity {
+ 
+     @Override
+     protected String[] getLibraries() {
+-        // libpng is absent on purpose: image_png.c dlopen()s it by name.
+-        return new String[] { "SDL2", "main" };
++        // libpng is absent on purpose: image_png.c dlopen()s it by name. libmain is not loaded here
++        // any more: the resident loader dlopen()s it (AndySU live engine swap, see
++        // testbeds/patches/xonotic-touch/LIVE_SWAP.md) and answers nativeInputDevices for it.
++        return new String[] { "SDL2", "andysu_xonotic_loader" };
++    }
++
++    @Override
++    protected String getMainSharedObject() {
++        return getApplicationInfo().nativeLibraryDir + "/libandysu_xonotic_loader.so";
++    }
++
++    @Override
++    protected String getMainFunction() {
++        return "AndySU_SDL_main";
+     }
+ 
+     @Override
+diff --git a/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/dialog_touch_updates.qc b/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/dialog_touch_updates.qc
+index 7fc7dde..553c3cb 100644
+--- a/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/dialog_touch_updates.qc
++++ b/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/dialog_touch_updates.qc
+@@ -40,6 +40,20 @@ void TouchUpdates_Skip_Click(entity btn, entity dlg)
+ 		dlg.statusLabel.setText(dlg.statusLabel, _("This version will be skipped."));
+ }
+ 
++void TouchUpdates_PayloadCheck_Click(entity btn, entity dlg)
++{
++	dlg.payloadRequestFailed = !TouchAndySU_request("check");
++	if (!dlg.payloadRequestFailed)
++		dlg.payloadStatusLabel.setText(dlg.payloadStatusLabel, _("Checking payload updates..."));
++}
++
++void TouchUpdates_PayloadApply_Click(entity btn, entity dlg)
++{
++	dlg.payloadRequestFailed = !TouchAndySU_request("apply");
++	if (!dlg.payloadRequestFailed)
++		dlg.payloadStatusLabel.setText(dlg.payloadStatusLabel, _("Applying staged payload..."));
++}
++
+ void XonoticTouchUpdatesDialog_showNotify(entity me)
+ {
+ 	// Re-read on open so the dialog never shows the previous visit's state, and
+@@ -48,7 +62,13 @@ void XonoticTouchUpdatesDialog_showNotify(entity me)
+ 	TouchUpdate_read();
+ 	me.nextPoll = 0;
+ 	me.requestFailed = false;
+-	if (TouchUpdate_canSelfInstall() && !TouchUpdate_busy())
++	me.payloadRequestFailed = false;
++	if (TouchAndySU_state() != "unavailable" && TouchAndySU_state() != "incompatible")
++	{
++		if (TouchUpdate_autoEnabled() && !TouchAndySU_busy())
++			TouchAndySU_request("check");
++	}
++	else if (TouchUpdate_canSelfInstall() && !TouchUpdate_busy())
+ 		TouchUpdate_request("check");
+ }
+ 
+@@ -78,7 +98,7 @@ void XonoticTouchUpdatesDialog_fill(entity me)
+ 	me.TR(me);
+ 		me.TD(me, 1, me.columns, me.autoBox = makeXonoticCheckBox_T(0, TOUCH_UPDATE_AUTO_CVAR,
+ 			_("Update automatically"),
+-			_("Download new builds as they appear. Android still asks you to confirm every install.")));
++			_("Automatically check, download and apply compatible game updates.")));
+ 
+ 	me.TR(me);
+ 		me.TD(me, 1, 2, me.checkButton = makeXonoticButton(_("Check now"), '0 0 0'));
+@@ -91,6 +111,25 @@ void XonoticTouchUpdatesDialog_fill(entity me)
+ 			me.skipButton.onClick = TouchUpdates_Skip_Click;
+ 			me.skipButton.onClickEntity = me;
+ 
++	me.TR(me);
++		me.TD(me, 1, me.columns, e = makeXonoticHeaderLabel(_("AndySU payload")));
++	me.TR(me);
++		me.TD(me, 1, me.columns, me.payloadStatusLabel = makeXonoticTextLabel(0, ""));
++	me.TR(me);
++		me.TD(me, 1, me.columns, me.payloadLatestLabel = makeXonoticTextLabel(0, ""));
++	me.TR(me);
++		me.TD(me, 1, me.columns, me.payloadProgressBar = makeXonoticProgressBar());
++	me.TR(me);
++		me.TD(me, 1, me.columns, me.payloadMessageLabel = makeXonoticTextLabel(0, ""));
++		me.payloadMessageLabel.allowWrap = true;
++	me.TR(me);
++		me.TD(me, 1, 3, me.payloadCheckButton = makeXonoticButton(_("Check payload"), '0 0 0'));
++			me.payloadCheckButton.onClick = TouchUpdates_PayloadCheck_Click;
++			me.payloadCheckButton.onClickEntity = me;
++		me.TD(me, 1, 3, me.payloadApplyButton = makeXonoticButton(_("Apply staged"), '0 0 0'));
++			me.payloadApplyButton.onClick = TouchUpdates_PayloadApply_Click;
++			me.payloadApplyButton.onClickEntity = me;
++
+ 	me.gotoRC(me, me.rows - 1, 0);
+ 		me.TD(me, 1, me.columns, e = makeXonoticButton(_("OK"), '0 0 0'));
+ 			e.onClick = Dialog_Close;
+@@ -119,14 +158,35 @@ void XonoticTouchUpdatesDialog_draw(entity me)
+ 	}
+ 
+ 	string state = TouchUpdate_stateName();
+-	bool managed = !TouchUpdate_canSelfInstall();
++	string payloadState = TouchAndySU_state();
++	bool payloadAvailable = payloadState != "unavailable" && payloadState != "incompatible";
++	bool payloadBusy = payloadState == "checking" || payloadState == "downloading"
++		|| payloadState == "applying";
++	bool managed = !TouchUpdate_canSelfInstall() || payloadAvailable;
+ 	bool busy = TouchUpdate_busy();
+ 
+ 	me.versionLabel.setText(me.versionLabel, TouchUpdate_versionLine());
+ 	me.statusLabel.setText(me.statusLabel, TouchUpdate_shortStatus());
++	string activeVersion = TouchAndySU_installed();
++	if (payloadAvailable && activeVersion != "")
++		me.payloadStatusLabel.setText(me.payloadStatusLabel,
++			strcat(_("Installed payload:"), " ", activeVersion, " - ", payloadState));
++	else if (payloadState == "unavailable")
++		me.payloadStatusLabel.setText(me.payloadStatusLabel, _("AndySU payload updates are not enabled in this install."));
++	else
++		me.payloadStatusLabel.setText(me.payloadStatusLabel, strcat(_("Payload update status:"), " ", payloadState));
++	string payloadLatest = TouchAndySU_latest();
++	if (payloadLatest != "" && payloadLatest != activeVersion)
++		me.payloadLatestLabel.setText(me.payloadLatestLabel, strcat(_("Latest payload:"), " ", payloadLatest));
++	else
++		me.payloadLatestLabel.setText(me.payloadLatestLabel, "");
++	me.payloadMessageLabel.setText(me.payloadMessageLabel, TouchAndySU_message());
++	if (me.payloadRequestFailed)
++		me.payloadMessageLabel.setText(me.payloadMessageLabel,
++			_("Could not write the AndySU request. Restart Xonotic Touch and try again."));
+ 
+ 	string latest = TouchUpdate_latest();
+-	if (latest != "" && latest != TouchUpdate_installed())
++	if (!managed && latest != "" && latest != TouchUpdate_installed())
+ 		me.latestLabel.setText(me.latestLabel, strcat(_("Latest release:"), " ", latest));
+ 	else
+ 		me.latestLabel.setText(me.latestLabel, "");
+@@ -136,11 +196,16 @@ void XonoticTouchUpdatesDialog_draw(entity me)
+ 		me.messageLabel.setText(me.messageLabel,
+ 			_("Could not reach the updater. Restart Xonotic Touch and try again."));
+ 	}
+-	else if (managed)
++	else if (managed && !payloadAvailable)
+ 	{
+ 		me.messageLabel.setText(me.messageLabel,
+ 			_("This copy is installed by Flatpak or the OpenStore. Update it the same way you installed it."));
+ 	}
++	else if (managed)
++	{
++		me.messageLabel.setText(me.messageLabel,
++			_("AndySU manages this install. Use the payload controls below; host APK updates are separate."));
++	}
+ 	else if (state == TOUCH_UPDATE_NEEDS_PERMISSION)
+ 	{
+ 		// Worth spelling out: the installer flashing open and shut is exactly
+@@ -177,6 +242,24 @@ void XonoticTouchUpdatesDialog_draw(entity me)
+ 		me.progressBar.setProgress(me.progressBar, 0);
+ 	}
+ 
++	if (payloadBusy)
++	{
++		me.payloadProgressBar.indeterminate = true;
++		me.payloadProgressBar.color = TOUCH_UPDATE_COLOR_PROGRESS;
++	}
++	else if (payloadState == "error")
++	{
++		me.payloadProgressBar.indeterminate = false;
++		me.payloadProgressBar.color = TOUCH_UPDATE_COLOR_ERROR;
++		me.payloadProgressBar.setProgress(me.payloadProgressBar, 1);
++	}
++	else
++	{
++		me.payloadProgressBar.indeterminate = false;
++		me.payloadProgressBar.color = TOUCH_UPDATE_COLOR_PROGRESS;
++		me.payloadProgressBar.setProgress(me.payloadProgressBar, TouchAndySU_percent() / 100);
++	}
++
+ 	// Disable rather than hide. A control that vanishes mid-gesture hands the
+ 	// press to whatever moves into its place, which on a touchscreen means the
+ 	// player installs an update they were trying not to.
+@@ -184,7 +267,9 @@ void XonoticTouchUpdatesDialog_draw(entity me)
+ 	me.checkButton.disabled = (managed || busy);
+ 	me.installButton.disabled = (managed || busy || !actionable);
+ 	me.skipButton.disabled = (managed || busy || !actionable);
+-	me.autoBox.disabled = managed;
++	me.autoBox.disabled = (managed && !payloadAvailable);
++	me.payloadCheckButton.disabled = (!payloadAvailable || payloadBusy || TouchUpdate_autoEnabled() == false);
++	me.payloadApplyButton.disabled = (!payloadAvailable || payloadBusy || payloadState != "staged");
+ 
+ 	SUPER(XonoticTouchUpdatesDialog).draw(me);
+ }
+diff --git a/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/dialog_touch_updates.qh b/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/dialog_touch_updates.qh
+index 31803eb..cfdbe77 100644
+--- a/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/dialog_touch_updates.qh
++++ b/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/dialog_touch_updates.qh
+@@ -17,7 +17,7 @@ CLASS(XonoticTouchUpdatesDialog, XonoticDialog)
+ 	ATTRIB(XonoticTouchUpdatesDialog, tooltip, string, _("Installed version, available updates, and how they are installed"));
+ 	ATTRIB(XonoticTouchUpdatesDialog, color, vector, SKINCOLOR_DIALOG_SETTINGS);
+ 	ATTRIB(XonoticTouchUpdatesDialog, intendedWidth, float, 0.8);
+-	ATTRIB(XonoticTouchUpdatesDialog, rows, float, 14);
++	ATTRIB(XonoticTouchUpdatesDialog, rows, float, 20);
+ 	ATTRIB(XonoticTouchUpdatesDialog, columns, float, 6);
+ 
+ 	// Labels re-pointed from the status file every poll rather than rebuilt:
+@@ -32,6 +32,12 @@ CLASS(XonoticTouchUpdatesDialog, XonoticDialog)
+ 	ATTRIB(XonoticTouchUpdatesDialog, installButton, entity);
+ 	ATTRIB(XonoticTouchUpdatesDialog, skipButton, entity);
+ 	ATTRIB(XonoticTouchUpdatesDialog, autoBox, entity);
++	ATTRIB(XonoticTouchUpdatesDialog, payloadStatusLabel, entity);
++	ATTRIB(XonoticTouchUpdatesDialog, payloadLatestLabel, entity);
++	ATTRIB(XonoticTouchUpdatesDialog, payloadMessageLabel, entity);
++	ATTRIB(XonoticTouchUpdatesDialog, payloadProgressBar, entity);
++	ATTRIB(XonoticTouchUpdatesDialog, payloadCheckButton, entity);
++	ATTRIB(XonoticTouchUpdatesDialog, payloadApplyButton, entity);
+ 
+ 	// Poll clock. The status file is written by another process, so there is
+ 	// nothing to subscribe to — but re-reading it every frame would be a file
+@@ -43,6 +49,7 @@ CLASS(XonoticTouchUpdatesDialog, XonoticDialog)
+ 	// Set when a request could not be written; the dialog says so rather than
+ 	// leaving a button that silently does nothing.
+ 	ATTRIB(XonoticTouchUpdatesDialog, requestFailed, bool, false);
++	ATTRIB(XonoticTouchUpdatesDialog, payloadRequestFailed, bool, false);
+ ENDCLASS(XonoticTouchUpdatesDialog)
+ 
+ entity makeXonoticTouchUpdatesDialog();
+diff --git a/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/touch_update_util.qc b/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/touch_update_util.qc
+index dc4f146..752b956 100644
+--- a/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/touch_update_util.qc
++++ b/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/touch_update_util.qc
+@@ -16,6 +16,12 @@ bool touchUpdate_auto;
+ bool touchUpdate_haveStatus;
+ bool touchUpdate_cvarReady;
+ 
++string touchAndySU_state;
++string touchAndySU_installed;
++string touchAndySU_latest;
++string touchAndySU_message;
++float touchAndySU_percent;
++
+ /** The auto-update value we have asked the platform layer for and not yet seen
+  *  come back on line 8; -1 when nothing is in flight.
+  *
+@@ -44,6 +50,7 @@ void TouchUpdate_ensureCvar()
+ void TouchUpdate_read()
+ {
+ 	TouchUpdate_ensureCvar();
++	TouchAndySU_read();
+ 
+ 	float fh = fopen(TOUCH_UPDATE_STATUS_FILE, FILE_READ);
+ 	if (fh < 0)
+@@ -104,6 +111,62 @@ void TouchUpdate_read()
+ 		cvar_set(TOUCH_UPDATE_AUTO_CVAR, touchUpdate_auto ? "1" : "0");
+ }
+ 
++void TouchAndySU_read()
++{
++	float fh = fopen(TOUCH_ANDYSU_STATUS_FILE, FILE_READ);
++	if (fh < 0)
++	{
++		strcpy(touchAndySU_state, "unavailable");
++		strcpy(touchAndySU_installed, "");
++		strcpy(touchAndySU_latest, "");
++		strcpy(touchAndySU_message, "");
++		touchAndySU_percent = 0;
++		return;
++	}
++	string format = fgets(fh);
++	string state = fgets(fh);
++	string installed = fgets(fh);
++	string latest = fgets(fh);
++	string percent = fgets(fh);
++	string message = fgets(fh);
++	fgets(fh); // automatic mode, mirrored by the shared checkbox above
++	fgets(fh); // effective host mode
++	fclose(fh);
++	if (stof(format) != TOUCH_ANDYSU_FORMAT)
++	{
++		strcpy(touchAndySU_state, "unavailable");
++		strcpy(touchAndySU_message, _("Unknown AndySU status format"));
++		return;
++	}
++	strcpy(touchAndySU_state, (state != string_null && state != "") ? state : "idle");
++	strcpy(touchAndySU_installed, (installed != string_null) ? installed : "");
++	strcpy(touchAndySU_latest, (latest != string_null) ? latest : "");
++	strcpy(touchAndySU_message, (message != string_null) ? message : "");
++	touchAndySU_percent = bound(0, stof(percent), 100);
++}
++
++string TouchAndySU_state() { return touchAndySU_state != string_null ? touchAndySU_state : "unavailable"; }
++string TouchAndySU_installed() { return touchAndySU_installed != string_null ? touchAndySU_installed : ""; }
++string TouchAndySU_latest() { return touchAndySU_latest != string_null ? touchAndySU_latest : ""; }
++string TouchAndySU_message() { return touchAndySU_message != string_null ? touchAndySU_message : ""; }
++float TouchAndySU_percent() { return touchAndySU_percent; }
++
++bool TouchAndySU_busy()
++{
++	string state = TouchAndySU_state();
++	return state == "checking" || state == "downloading" || state == "applying";
++}
++
++bool TouchAndySU_request(string token)
++{
++	float fh = fopen(TOUCH_ANDYSU_REQUEST_FILE, FILE_WRITE);
++	if (fh < 0)
++		return false;
++	fputs(fh, strcat(token, "\n"));
++	fclose(fh);
++	return true;
++}
++
+ string TouchUpdate_stateName()
+ {
+ 	return (touchUpdate_state != string_null) ? touchUpdate_state : TOUCH_UPDATE_IDLE;
+@@ -181,7 +244,9 @@ bool TouchUpdate_request(string token)
+ 
+ string TouchUpdate_versionLine()
+ {
+-	string v = TouchUpdate_installed();
++	string v = TouchAndySU_installed();
++	if (v == "")
++		v = TouchUpdate_installed();
+ 	if (v == "")
+ 		return _("Xonotic Touch (development build)");
+ 	return strcat(_("Xonotic Touch"), " ", v);
+@@ -189,6 +254,9 @@ string TouchUpdate_versionLine()
+ 
+ string TouchUpdate_shortStatus()
+ {
++	string payload = TouchAndySU_state();
++	if (payload != "unavailable" && payload != "incompatible")
++		return _("AndySU payload status is shown below");
+ 	string s = TouchUpdate_stateName();
+ 
+ 	if (s == TOUCH_UPDATE_CHECKING)
+diff --git a/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/touch_update_util.qh b/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/touch_update_util.qh
+index 9a2fac6..730f4a7 100644
+--- a/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/touch_update_util.qh
++++ b/engine/data/xonotic-data.pk3dir/qcsrc/menu/xonotic/touch_update_util.qh
+@@ -31,6 +31,11 @@ const string TOUCH_UPDATE_STATUS_FILE = "touch/update-status.txt";
+  */
+ const string TOUCH_UPDATE_REQUEST_FILE = "touch/update-request.txt";
+ 
++/** AndySU owns payload updates separately from the APK updater above. */
++const string TOUCH_ANDYSU_STATUS_FILE = "touch/andysu-update-status.txt";
++const string TOUCH_ANDYSU_REQUEST_FILE = "touch/andysu-update-request.txt";
++const float TOUCH_ANDYSU_FORMAT = 1;
++
+ const float TOUCH_UPDATE_FORMAT = 1;
+ 
+ /** No check has run yet this session. */
+@@ -78,3 +83,12 @@ bool TouchUpdate_isBehind();
+ string TouchUpdate_versionLine();
+ /** "4 versions behind", "Up to date", "Checking…" — one short line for chrome. */
+ string TouchUpdate_shortStatus();
++
++void TouchAndySU_read();
++string TouchAndySU_state();
++string TouchAndySU_installed();
++string TouchAndySU_latest();
++string TouchAndySU_message();
++float TouchAndySU_percent();
++bool TouchAndySU_busy();
++bool TouchAndySU_request(string token);

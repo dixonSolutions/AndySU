@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stores AndySU's CI signing material and publishing tokens as GitHub Actions secrets.
+# Stores AndySU's CI signing material as GitHub Actions secrets.
 #
 #   scripts/setup-secrets.sh [owner/repo]          (default: dixonSolutions/AndySU)
 #
@@ -8,12 +8,13 @@
 #
 # Inputs (environment variables; defaults are the CI test keys kept outside the repo):
 #   ANDYSU_KEY_FILE      payload/release signing key (PEM)   -> ANDYSU_SIGNING_KEY
-#   ANDYSU_CERT_FILE     optional root certificate for a release key -> ANDYSU_SIGNING_CERT
+#   ANDYSU_CERT_FILE     root certificate for a release key  -> ANDYSU_SIGNING_CERT
 #   ANDROID_KEYSTORE     keystore for release APKs            -> ANDROID_KEYSTORE_B64
 #   ANDROID_KEYSTORE_PASS_FILE  file holding its password     -> ANDROID_KEYSTORE_PASSWORD
 #   ANDROID_KEY_ALIAS    key alias                            -> ANDROID_KEY_ALIAS
-#   CARGO_REGISTRY_TOKEN optional: also publish crates to crates.io
-#   NPM_TOKEN            optional: also publish packages to npmjs.com
+# Public registries use trusted publishing (OIDC), not long-lived write tokens. Enable publishing
+# separately with repository variables PUBLISH_CRATES_IO=true and PUBLISH_NPMJS=true after each
+# registry's trusted publisher is configured. crates.io requires a one-time initial manual publish.
 set -eu
 repo="${1:-dixonSolutions/AndySU}"
 keys="${ANDYSU_KEYS_DIR:-$HOME/.config/andysu/keys}"
@@ -28,14 +29,16 @@ for f in "$key" "$ks" "$ks_pass"; do
 done
 
 gh secret set ANDYSU_SIGNING_KEY --repo "$repo" < "$key"
+# The demo channel is signed by the same certified release key.
+gh secret set ANDYSU_DEMO_SIGNING_KEY --repo "$repo" < "$key"
 if [ -n "${ANDYSU_CERT_FILE:-}" ]; then
   gh secret set ANDYSU_SIGNING_CERT --repo "$repo" < "$ANDYSU_CERT_FILE"
+  gh secret set ANDYSU_DEMO_SIGNING_CERT --repo "$repo" < "$ANDYSU_CERT_FILE"
 else
   gh secret delete ANDYSU_SIGNING_CERT --repo "$repo" 2>/dev/null || true
+  gh secret delete ANDYSU_DEMO_SIGNING_CERT --repo "$repo" 2>/dev/null || true
 fi
 base64 -w0 "$ks" | gh secret set ANDROID_KEYSTORE_B64 --repo "$repo"
 tr -d '\n' < "$ks_pass" | gh secret set ANDROID_KEYSTORE_PASSWORD --repo "$repo"
 printf %s "$alias" | gh secret set ANDROID_KEY_ALIAS --repo "$repo"
-[ -z "${CARGO_REGISTRY_TOKEN:-}" ] || printf %s "$CARGO_REGISTRY_TOKEN" | gh secret set CARGO_REGISTRY_TOKEN --repo "$repo"
-[ -z "${NPM_TOKEN:-}" ] || printf %s "$NPM_TOKEN" | gh secret set NPM_TOKEN --repo "$repo"
 gh secret list --repo "$repo"

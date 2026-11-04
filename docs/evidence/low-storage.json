@@ -1,5 +1,5 @@
 {
-  "api": "34",
+  "api": "36",
   "versions": {
     "A": "1.2.9001",
     "B": "1.2.9002",
@@ -10,15 +10,15 @@
   "steps": [
     {
       "step": "setup",
-      "detail": "1.2.9001 -> 1.2.9002 live, committed, cold restart: pid 3025 runs 1.2.9002 from slots/1.2.9002; slots on disk ['1.2.9002'], previous=None"
+      "detail": "1.2.9001 -> 1.2.9002 live, committed, cold restart: pid 5387 runs 1.2.9002 from slots/1.2.9002; slots on disk ['1.2.9002'], previous=None"
     },
     {
       "step": "low-storage GC keeps the booted slot",
-      "detail": "1.2.9002 (booted cold) -> 1.2.9005 live in pid 3025; low_storage=true GC removed []; state current=1.2.9005 previous=1.2.9002; slots on disk ['1.2.9002', '1.2.9005']"
+      "detail": "1.2.9002 (booted cold) -> 1.2.9005 live in pid 5387; low_storage=true GC removed []; state current=1.2.9005 previous=1.2.9002; slots on disk ['1.2.9002', '1.2.9005']"
     },
     {
       "step": "GC skipped when the booted slot is not kept",
-      "detail": "1.2.9005 -> 1.2.9008 live in pid 3025; state current=1.2.9008 previous=1.2.9005; {\"reason\": \"booted slot 1.2.9002 is in use\", \"kept\": \"1.2.9008, 1.2.9005\", \"event\": \"gc_skipped\"}; slots on disk ['1.2.9002', '1.2.9005', '1.2.9008'] (booted 1.2.9002 still there)"
+      "detail": "1.2.9005 -> 1.2.9008 live in pid 5387; state current=1.2.9008 previous=1.2.9005; {\"reason\": \"booted slot 1.2.9002 is in use\", \"kept\": \"1.2.9008, 1.2.9005\", \"event\": \"gc_skipped\"}; slots on disk ['1.2.9002', '1.2.9005', '1.2.9008'] (booted 1.2.9002 still there)"
     },
     {
       "step": "pre-download GC skipped too",
@@ -26,7 +26,7 @@
     },
     {
       "step": "cold start drops previous",
-      "detail": "booted 1.2.9008 (pid 4686) from its slot; pre-download GC under low storage left slots on disk ['1.2.9008'] (previous 1.2.9005 dropped as usual)"
+      "detail": "booted 1.2.9008 (pid 7489) from its slot; pre-download GC under low storage left slots on disk ['1.2.9008'] (previous 1.2.9005 dropped as usual)"
     }
   ],
   "verdict": "low-storage GC guard passes"

@@ -14,10 +14,18 @@ class TestCommands : BroadcastReceiver() {
         when (intent.action) {
             "check" -> AndySU.updater.checkAsync("test")
             "apply" -> AndySU.applyLive()
+            "restart" -> AndySU.updater.restartNow()
             "state" -> AndySU.emit("state", JSONObject().put("state", JSONObject(Core.state(AndySU.root.path))))
             "gc" -> AndySU.updater.gcAsync()
             "crashsignals" -> AndySU.setCrashSignals(intent.getStringExtra("mode"))
             "policy" -> AndySU.setApplyPolicy(intent.getStringExtra("policy"))
+            "mode" -> {
+                if (intent.hasExtra("mode")) {
+                    val value = intent.getStringExtra("mode")
+                    AndySU.updater.setMode(if (value == "null") null else value)
+                }
+                AndySU.emit("test_mode", JSONObject().put("mode", AndySU.updater.mode()))
+            }
         }
     }
 }

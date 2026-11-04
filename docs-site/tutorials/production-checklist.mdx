@@ -27,8 +27,9 @@ Get these right before users install it.
 
 - [ ] The root private key is **offline**: not in the repository, not on a laptop that syncs.
   `andysu init` adds `.andysu/` and `*.key` to `.gitignore`.
-- [ ] CI signs with a **short-lived release key** certified by the root
-  (`andysu keygen --release --days 90`), stored as `ANDYSU_SIGNING_KEY` and `ANDYSU_SIGNING_CERT`.
+- [ ] CI signs with a **short-lived release key** certified by the offline root
+  (`andysu keygen --release-from .andysu/andysu-root.key --days 90`), stored as
+  `ANDYSU_SIGNING_KEY` and `ANDYSU_SIGNING_CERT`.
 - [ ] Someone owns renewing that certificate, and re-signing manifests before they expire
   (`publish --expires-days`, default 30; refresh with `andysu sign`). Expired manifests are
   rejected, which is a protection against replay, not a bug.

@@ -102,8 +102,14 @@ object Transparent {
         val r16 = ByteArray(16).also { SecureRandom().nextBytes(it) }
         val now = System.currentTimeMillis() / 1000
         // Only the main process moves the state machine; other processes follow its choice.
-        var d = if (proc.isEmpty() || proc == ai.packageName) Core.obj(Core.launch(root.path, r16, now, true, maxAttempts))
-        else JSONObject().put("slot_dir", Core.obj(Core.state(root.path)).objOrNull("current")?.let { File(root, "slots/" + it.getString("id")).path })
+        var d = if (proc.isEmpty() || proc == ai.packageName) {
+            val applyPending = UpdateMode.shouldApplyPending(root, cfg.optString("mode", "auto"))
+            try {
+                Core.obj(Core.launch(root.path, r16, now, applyPending, maxAttempts))
+            } finally {
+                UpdateMode.consumeApplyPending(root)
+            }
+        } else JSONObject().put("slot_dir", Core.obj(Core.state(root.path)).objOrNull("current")?.let { File(root, "slots/" + it.getString("id")).path })
         launchEvent = d
         while (true) {
             val trial = d.optBoolean("in_trial")

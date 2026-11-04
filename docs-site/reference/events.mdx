@@ -43,6 +43,7 @@ always in `state.json`.
 | Event | Fields | When |
 |---|---|---|
 | `apply_policy` | `policy` | the apply policy was set at runtime |
+| `update_mode` | `mode` | the effective update mode changed; `setMode(null)` restores the configured mode |
 | `apply_decision` | `pending`, `native_live`, `handler`, `resumed` | transparent mode, `apply = "live"`: whether a live native swap is possible |
 | `restart_to_apply` | `when` (`background` or `on_background`) | the host will end the process to apply an update |
 | `suspended` | `version`, `state_bytes` | the old generation's `suspend()` returned |
