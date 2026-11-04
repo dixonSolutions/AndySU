@@ -16,6 +16,7 @@ site="$(realpath -m "$1")"
 base="${2%/}"
 version="$3"
 out="$(realpath -m "$4")"
+channel=stable
 cd "$(dirname "$0")/.."
 repo="$(pwd)"
 if [ -n "${ANDYSU_CLI:-}" ]; then cli="$ANDYSU_CLI"; else cargo build -q --release -p andysu-cli; cli="$repo/target/release/andysu"; fi
@@ -23,6 +24,22 @@ if [ -n "${ANDYSU_CLI:-}" ]; then cli="$ANDYSU_CLI"; else cargo build -q --relea
 w="$(mktemp -d)"
 trap 'rm -rf "$w"' EXIT
 mkdir -p "$site/demo" "$out"
+
+# A retried release run must be able to publish the same version again: drop this version's
+# release record and its entry in the channel manifest. The manifest sequence (client rollback
+# protection) and the other releases stay, so deltas and existing clients are unaffected.
+rm -f "$site/demo/releases/$version.json"
+if [ -f "$site/demo/$channel/update.json" ]; then
+  python3 - "$site/demo/$channel/update.json" "$version" <<'PY'
+import json, sys
+path, version = sys.argv[1], sys.argv[2]
+doc = json.load(open(path))
+doc["releases"] = [r for r in doc.get("releases", []) if r.get("id") != version]
+with open(path, "w") as f:
+    json.dump(doc, f, indent=2)
+    f.write("\n")
+PY
+fi
 
 if [ -n "${ANDYSU_ROOT_PUB:-}" ]; then cp "$ANDYSU_ROOT_PUB" "$w/root.pem"; else "$cli" pubkey --key "$ANDYSU_KEY_FILE" > "$w/root.pem"; fi
 cat > "$w/andysu.toml" <<TOML
@@ -32,7 +49,7 @@ public_key = "root.pem"
 [remote]
 type = "custom"
 base = "$base/demo"
-channel = "stable"
+channel = "$channel"
 [policy]
 mode = "auto"
 apply = "live"

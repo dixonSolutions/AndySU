@@ -183,7 +183,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ needs.version.outputs.version }}" dist/* \
+          tag="v${{ needs.version.outputs.version }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release $tag exists from an earlier attempt; replacing it"
+            gh release delete "$tag" --yes --cleanup-tag
+          fi
+          gh release create "$tag" dist/* \
             --title "AndySU ${{ needs.version.outputs.version }}" \
             --notes "Automated release of ${{ github.sha }}. Packages: $PAGES_URL (docs/REGISTRIES.md)."
 
