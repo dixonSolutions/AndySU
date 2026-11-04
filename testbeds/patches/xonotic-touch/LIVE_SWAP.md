@@ -896,5 +896,7 @@ Native libraries, Java and both `csprogs.dat`/`menu.dat` compiled; the APK is 29
 run with these live-built APKs on API 34 reached A built-in and the live swap to B (one pid, screen
 alive) but cannot complete the fail/dex steps: the live checkout does not carry the test-variant
 hook that patch 0005 adds to the testbed build. The numbered patch series remains the complete live
-swap verification. Opening the Updates dialog and exercising the payload controls on a device is
-still to do.
+swap verification. The Updates dialog was then opened on API 34 from the same live-built host
+(`menu_cmd directmenu TouchUpdates`): `docs/evidence/xonotic-updates-dialog.png` shows the AndySU
+payload section, the installed `1.2.9999` payload, an unreachable-remote error, and the
+Check payload / Apply staged controls.
