@@ -892,5 +892,9 @@ The snapshot is `testbeds/patches/xonotic-touch/live/andysu-update-ui-8afbabe.di
 Verification on 2026-11-04: the live checkout built with
 `scripts/android-build.sh --abi x86_64 --version 1.2.9999 --code 9999` after the QuakeC
 `-Werror` fix at `dialog_touch_updates.qc:270` (parenthesise `managed && !payloadAvailable`).
-Native libraries, Java and both `csprogs.dat`/`menu.dat` compiled; the APK is 29 MB. Running the APK
-on a device and exercising the dialog is still to do.
+Native libraries, Java and both `csprogs.dat`/`menu.dat` compiled; the APK is 29 MB. A `--live` bed
+run with these live-built APKs on API 34 reached A built-in and the live swap to B (one pid, screen
+alive) but cannot complete the fail/dex steps: the live checkout does not carry the test-variant
+hook that patch 0005 adds to the testbed build. The numbered patch series remains the complete live
+swap verification. Opening the Updates dialog and exercising the payload controls on a device is
+still to do.
