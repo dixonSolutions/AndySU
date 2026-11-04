@@ -1,7 +1,10 @@
 # Installing AndySU packages
 
-AndySU's default packages are published to this repository's own GitHub remote, not to public
-registries:
+AndySU packages are published to this repository's own GitHub remote and, as of 0.1.90, to
+crates.io and npmjs.com. The GitHub-hosted npm names keep the historical `@andysu` scope; the public
+npm names are unscoped. Both sets are maintained from the same release.
+
+**This repository's own remote:**
 
 - **GitHub Pages** (`https://dixonsolutions.github.io/AndySU`) serves static registries:
   `maven/`, `npm/`, `cargo/` and `pub/`. The release workflow keeps them on the `gh-pages` branch.
@@ -223,11 +226,18 @@ at the static binaries of that release.
 Optional inputs: `signing-cert`, `channel`, `version`, `rollout`, `pack-args`, `pages-branch`,
 `andysu-version`. `andysu init` writes a workflow that uses this action.
 
-## Public registries (opt-in)
+## Public registries (active)
 
-The crates.io and npmjs.com jobs use trusted publishing through GitHub OIDC. They are disabled unless
-the repository variables `PUBLISH_CRATES_IO=true` or `PUBLISH_NPMJS=true` are set, and should only be
-enabled after every package has the matching trusted-publisher configuration. Public-registry
-publishing is separate from the working GitHub Pages and Releases packages above, and uses the
-unscoped npm names listed above. See [KEYS.md](KEYS.md) for the initial publish and trust setup; do
-not add long-lived registry tokens to GitHub Actions.
+As of 2026-11-04 the crates.io and npmjs.com jobs are enabled with GitHub OIDC trusted publishing
+(`PUBLISH_CRATES_IO=true`, `PUBLISH_NPMJS=true`). Both crates and all four npm packages were
+bootstrapped at 0.1.90; the crates now require trusted publishing for new versions. Use:
+
+```sh
+cargo install andysu-cli
+npx andysu --version
+npm install andysu-react-native      # or andysu-capacitor / com.andysu.unity
+```
+
+Public-registry publishing is separate from the GitHub Pages and Releases packages above, and uses
+the unscoped npm names. See [KEYS.md](KEYS.md) for the trust setup; do not add long-lived registry
+credentials to GitHub Actions.
