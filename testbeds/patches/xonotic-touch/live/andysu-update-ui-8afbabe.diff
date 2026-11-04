@@ -1,9 +1,9 @@
 diff --git a/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUBridge.java b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUBridge.java
 new file mode 100644
-index 0000000..ce3dba9
+index 0000000..cb74983
 --- /dev/null
 +++ b/android/app/src/main/java/io/github/dixonsolutions/xonotictouch/AndySUBridge.java
-@@ -0,0 +1,139 @@
+@@ -0,0 +1,145 @@
 +package io.github.dixonsolutions.xonotictouch;
 +
 +import android.content.Context;
@@ -30,6 +30,7 @@ index 0000000..ce3dba9
 +    private final File statusFile;
 +    private final File requestFile;
 +    private String requestError = "";
++    private String lastRecord = "";
 +
 +    AndySUBridge(Context context, File baseDir) {
 +        File touch = new File(GameData.engineWriteDir(baseDir), "touch");
@@ -114,6 +115,9 @@ index 0000000..ce3dba9
 +        String record = FORMAT + "\n" + state + "\n" + installed + "\n" + nullSafe(latest)
 +                + "\n" + percent + "\n" + oneLine(message) + "\n"
 +                + ("auto".equals(mode) ? "on" : "off") + "\n" + mode + "\n";
++        if (record.equals(lastRecord) && statusFile.isFile()) {
++            return;
++        }
 +        try {
 +            File dir = statusFile.getParentFile();
 +            if (dir != null && !dir.isDirectory() && !dir.mkdirs()) return;
@@ -123,6 +127,8 @@ index 0000000..ce3dba9
 +                Log.w(TAG, "Could not replace " + statusFile);
 +                //noinspection ResultOfMethodCallIgnored
 +                tmp.delete();
++            } else {
++                lastRecord = record;
 +            }
 +        } catch (IOException | RuntimeException e) {
 +            Log.w(TAG, "Could not publish AndySU update status", e);
