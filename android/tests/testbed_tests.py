@@ -27,6 +27,7 @@ Usage: python3 android/tests/testbed_tests.py [--only xonotic|stk] [--api 34]
          (stock Xonotic APK, no AndySU: does rendering survive `vid_restart`? see LIVE_SWAP.md)
 """
 import argparse
+import atexit
 import glob
 import json
 import os
@@ -42,10 +43,6 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import device_tests as dt  # noqa: E402
-
-import io as _io
-import struct
-import zlib
 
 TB = os.path.join(dt.REPO, "testbeds", "apks")
 EVIDENCE = os.path.join(dt.REPO, "docs", "evidence")
@@ -63,6 +60,61 @@ def log(m):
 
 DATA_SRC = os.path.expanduser(os.environ.get("XONOTIC_DATA_DIR", "~/.cache/xt-perf/base/data"))
 REQUIRED_PK3 = ("-data.pk3", "-maps.pk3", "-music.pk3")
+TEMP_DIRS = []
+KEEP_TEMP_DIRS = False
+
+
+def temp_dir(prefix):
+    path = tempfile.mkdtemp(prefix=prefix)
+    TEMP_DIRS.append(path)
+    return path
+
+
+def cleanup_temp_dirs():
+    if not KEEP_TEMP_DIRS:
+        for path in reversed(TEMP_DIRS):
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def stop_process(proc, timeout=5):
+    """Stop and reap a test-owned subprocess, including any captured output pipe."""
+    if proc is None:
+        return
+    if proc.poll() is None:
+        try:
+            proc.terminate()
+        except ProcessLookupError:
+            pass
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+            except ProcessLookupError:
+                pass
+            proc.wait(timeout=timeout)
+    else:
+        proc.wait()
+    if proc.stdout and not proc.stdout.closed:
+        proc.stdout.close()
+
+
+def stop_device(d):
+    """Use the shared Device cleanup, then reap the test's logcat/emulator children."""
+    try:
+        d.stop()
+    finally:
+        stop_process(d.logcat)
+        if d.emu:
+            if d.emu.poll() is None:
+                try:
+                    d.emu.kill()
+                except ProcessLookupError:
+                    pass
+            try:
+                d.emu.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                log(f"warning: emulator runner {d.emu.pid} did not exit after kill")
 LOADER = False  # set by --apk-a/--apk-b: APKs built with patch 0002 start the engine through the loader
 ENGINE_TAGS = ["SDL:V", "app_process:D", "XonoticTouch:I", "AndySU-Event:I"]
 
@@ -97,10 +149,10 @@ def seed_xonotic(d, pkg, extra_args=""):
     for p in pk3s:
         d.adb("push", os.path.realpath(p), f"{base}/data/{os.path.basename(p)}", timeout=1200)
     log(f"seeded {len(pk3s)} pk3s ({sum(os.path.getsize(p) for p in pk3s) >> 20} MiB) in {time.time() - t0:.0f}s")
-    args = os.path.join(tempfile.mkdtemp(prefix="xonargs-"), "xonotic.args")
+    arg_dir = temp_dir("xonargs-")
+    args = os.path.join(arg_dir, "xonotic.args")
     with open(args, "w") as f:
-        # Skip the first-run dialogs (profile, touch setup, terms of service) so every start lands on the
-        # main menu: a deterministic screen for screen_alive, the same args as the README demo.
+        # Skip first-run dialogs so every start lands on the same menu for screen_alive.
         f.write("+developer 1 " + FIRST_RUN_SKIP + " " + extra_args + "\n")
     d.adb("push", args, f"{base}/xonotic.args")
     return base
@@ -114,7 +166,8 @@ class EngineLog:
         self.lines = []
         self.p = subprocess.Popen([dt.ADB, "-s", d.serial, "logcat", "-v", "brief", "-s", *ENGINE_TAGS],
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
-        threading.Thread(target=self._read, daemon=True).start()
+        self.reader = threading.Thread(target=self._read, name="andysu-engine-logcat")
+        self.reader.start()
 
     def _read(self):
         for line in self.p.stdout:
@@ -137,7 +190,10 @@ class EngineLog:
         raise dt.Fail(f"timed out waiting for {what} (/{pattern}/)\nlast engine log lines:\n" + "\n".join(self.lines[-25:]))
 
     def stop(self):
-        self.p.kill()
+        stop_process(self.p)
+        self.reader.join(timeout=5)
+        if self.reader.is_alive():
+            raise dt.Fail("engine logcat reader did not stop after its pipe closed")
 
     def save(self, name):
         os.makedirs(EVIDENCE, exist_ok=True)
@@ -175,7 +231,8 @@ def screenshot(d, name):
     p = os.path.join(EVIDENCE, name + ".png")
     import subprocess
     with open(p, "wb") as f:
-        subprocess.run([dt.ADB, "-s", d.serial, "exec-out", "screencap", "-p"], stdout=f, timeout=60)
+        subprocess.run([dt.ADB, "-s", d.serial, "exec-out", "screencap", "-p"],
+                       stdout=f, stderr=subprocess.DEVNULL, timeout=60, check=True)
     log(f"screenshot {p}")
 
 
@@ -188,14 +245,16 @@ def no_immersive_prompt(d):
 
 def screen_alive(d, what):
     """Verify the screen is actually rendering: capture frame, send key, retry up to 3 times to catch
-    screen movement. Frozen screen (like stale SDL HIDDEN event) shows detailed image but NO movement.
-    Requires: (a) non-uniform frames (std > 10), (b) pixel change >= 2% (measured 9-13% when healthy).
-    Reports measured std and change for each check. Uses raw binary screencap format (no external deps)."""
+    screen movement. A frozen frame has no pixel change. Require sampled grayscale standard deviation >=10
+    in both frames and at least 2% sampled pixels to change. Uses raw screencap bytes only."""
 
     def capture_screencap():
         """Capture raw screencap binary (not -p). Returns raw binary data."""
-        result = subprocess.run([dt.ADB, "-s", d.serial, "exec-out", "screencap"],
-                              stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60)
+        try:
+            result = subprocess.run([dt.ADB, "-s", d.serial, "exec-out", "screencap"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=60, check=True)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+            raise dt.Fail(f"screen_alive: screencap command failed: {e}") from e
         return result.stdout
 
     def parse_screencap(data):
@@ -257,6 +316,8 @@ def screen_alive(d, what):
     except Exception as e:
         raise dt.Fail(f"screen_alive: failed to parse first frame: {e}")
     std1 = sampled_stats(w, h, rgba1)
+    std2 = 0.0
+    changed_frac = 0.0
 
     # Retry up to 3 times: key, wait 1.5s, capture; pass as soon as one attempt shows >= 2% change
     UNIFORM_THRESHOLD = 10
@@ -280,6 +341,10 @@ def screen_alive(d, what):
             if attempt == max_attempts - 1:
                 raise dt.Fail(f"screen_alive: failed to parse frame on attempt {attempt+1}: {e}")
             continue
+        if (w2, h2) != (w, h):
+            changed_frac = 0.0
+            log(f"[screen] {what}: attempt {attempt+1} dimensions changed from {w}x{h} to {w2}x{h2}; retrying")
+            continue
         std2 = sampled_stats(w2, h2, rgba2)
         changed_frac = changed_pixel_fraction(w, h, rgba1, rgba2)
 
@@ -294,7 +359,11 @@ def screen_alive(d, what):
     # All attempts failed: save what is on screen now as evidence (PNG, viewable)
     p1 = os.path.join(EVIDENCE, f"screen-alive-fail-{what}.png")
     with open(p1, "wb") as f:
-        subprocess.run([dt.ADB, "-s", d.serial, "exec-out", "screencap", "-p"], stdout=f, timeout=60)
+        try:
+            subprocess.run([dt.ADB, "-s", d.serial, "exec-out", "screencap", "-p"],
+                           stdout=f, stderr=subprocess.DEVNULL, timeout=60, check=True)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+            raise dt.Fail(f"screen_alive: failed to save failure screenshot: {e}") from e
     msg = (f"screen not alive ({what}): std {std1:.1f}/{std2:.1f}, but only {changed_frac:.1%} of pixels changed "
            f"after {max_attempts} key presses (need {CHANGE_THRESHOLD:.0%}): frozen\n  saved {p1}")
     raise dt.Fail(msg)
@@ -454,7 +523,7 @@ def bed(d, name, spec, work, results):
         results.append({"bed": name, "step": "rollback",
                         "detail": f"{vb}-broken failed on start; rolled back by the crash handler; one relaunch; back on {vb}"})
     finally:
-        srv.kill()
+        stop_process(srv)
         if el:
             el.stop()
             el.save(f"{name}-engine-log.txt")
@@ -470,6 +539,7 @@ def probe_vid_restart(args):
     pkg = spec["pkg"]
     d = dt.Device(args.api, 3, existing=args.device)
     res = {"api": args.api}
+    el = None
     try:
         d.start()
         no_immersive_prompt(d)
@@ -479,7 +549,7 @@ def probe_vid_restart(args):
             d.sh("svc data disable", check=False)
         d.install(os.path.join(TB, spec["a"]))
         base = seed_xonotic(d, pkg, "+exec probe.cfg")
-        cfg = os.path.join(tempfile.mkdtemp(prefix="probe-"), "probe.cfg")
+        cfg = os.path.join(temp_dir("probe-"), "probe.cfg")
         with open(cfg, "w") as f:
             f.write('echo ANDYSU_PROBE_BEGIN\n'
                     'defer 25 "echo ANDYSU_PROBE_PRE; screenshot probe-pre.png"\n'
@@ -519,8 +589,13 @@ def probe_vid_restart(args):
         with open(os.path.join(EVIDENCE, "probe-vid-restart.json"), "w") as f:
             json.dump(res, f, indent=2)
     finally:
-        if not args.keep:
-            d.stop()
+        try:
+            if el and el.reader.is_alive():
+                el.stop()
+                el.save("probe-vid-restart-engine-log.txt")
+        finally:
+            if not args.keep:
+                stop_device(d)
 
 
 # ----------------------------------------------------------------------------- live swap probe
@@ -595,7 +670,7 @@ def live_swap_probe(args):
         raise SystemExit("--live-swap-probe needs --apk-a and --apk-b (APKs built by testbeds/patches/xonotic-touch/build.sh)")
     spec = BEDS["xonotic"]
     pkg = spec["pkg"]
-    work = tempfile.mkdtemp(prefix="liveswap-")
+    work = temp_dir("liveswap-")
     libs = {"A": extract_lib(os.path.abspath(args.apk_a), os.path.join(work, "A.so")),
             "B": extract_lib(os.path.abspath(args.apk_b), os.path.join(work, "B.so"))}
     d = dt.Device(args.api, 3, existing=args.device)
@@ -727,11 +802,13 @@ def live_swap_probe(args):
         with open(os.path.join(EVIDENCE, "live-swap-probe.json"), "w") as f:
             json.dump(res, f, indent=2)
     finally:
-        if el:
-            el.stop()
-            el.save("live-swap-engine-log.txt")
-        if not args.keep:
-            d.stop()
+        try:
+            if el:
+                el.stop()
+                el.save("live-swap-engine-log.txt")
+        finally:
+            if not args.keep:
+                stop_device(d)
 
 
 # ----------------------------------------------------------------------------- live bed (D29)
@@ -749,7 +826,7 @@ def live_bed(args):
                          "testbeds/patches/xonotic-touch/build.sh --variants \"1.2.9001 1.2.9002 1.2.9003:fail 1.2.9004:dex\"")
     pkg = BEDS["xonotic"]["pkg"]
     apk = {k: os.path.abspath(v) for k, v in {"A": args.apk_a, "B": args.apk_b, "F": args.apk_fail, "D": args.apk_dex}.items()}
-    work = tempfile.mkdtemp(prefix="livebed-")
+    work = temp_dir("livebed-")
     keys = os.path.join(work, "keys")
     os.makedirs(keys)
     dt.run([dt.ANDYSU, "keygen", "--dir", keys])
@@ -929,12 +1006,14 @@ def live_bed(args):
         with open(os.path.join(EVIDENCE, "live-bed.json"), "w") as f:
             json.dump(res, f, indent=2)
     finally:
-        srv.kill()
-        if el:
-            el.stop()
-            el.save("live-bed-engine-log.txt")
-        if not args.keep:
-            d.stop()
+        stop_process(srv)
+        try:
+            if el:
+                el.stop()
+                el.save("live-bed-engine-log.txt")
+        finally:
+            if not args.keep:
+                stop_device(d)
 
 
 # ----------------------------------------------------------------------------- live failure paths (D29, milestone 2c)
@@ -965,7 +1044,7 @@ def live_failures_bed(args):
     pkg = BEDS["xonotic"]["pkg"]
     apk = {k: os.path.abspath(v) for k, v in {"A": args.apk_a, "B": args.apk_b, "C": args.apk_c, "W": args.apk_nohealthy,
                                                "G": args.apk_crash}.items()}
-    work = tempfile.mkdtemp(prefix="livefail-")
+    work = temp_dir("livefail-")
     keys = os.path.join(work, "keys")
     os.makedirs(keys)
     dt.run([dt.ANDYSU, "keygen", "--dir", keys])
@@ -1129,12 +1208,14 @@ def live_failures_bed(args):
         with open(os.path.join(EVIDENCE, "live-failures.json"), "w") as f:
             json.dump(res, f, indent=2)
     finally:
-        srv.kill()
-        if el:
-            el.stop()
-            el.save("live-failures-engine-log.txt")
-        if not args.keep:
-            d.stop()
+        stop_process(srv)
+        try:
+            if el:
+                el.stop()
+                el.save("live-failures-engine-log.txt")
+        finally:
+            if not args.keep:
+                stop_device(d)
 
 
 # ----------------------------------------------------------------------------- low-storage GC guard (D29)
@@ -1157,7 +1238,7 @@ def low_storage_bed(args):
                          "(E is never applied; any further native-only release does)")
     pkg = BEDS["xonotic"]["pkg"]
     apk = {k: os.path.abspath(v) for k, v in {"A": args.apk_a, "B": args.apk_b, "C": args.apk_c, "D": args.apk_d, "E": args.apk_e}.items()}
-    work = tempfile.mkdtemp(prefix="lowstor-")
+    work = temp_dir("lowstor-")
     keys = os.path.join(work, "keys")
     os.makedirs(keys)
     dt.run([dt.ANDYSU, "keygen", "--dir", keys])
@@ -1385,16 +1466,18 @@ def low_storage_bed(args):
         with open(os.path.join(EVIDENCE, "low-storage.json"), "w") as f:
             json.dump(res, f, indent=2)
     finally:
-        srv.kill()
-        if el:
-            try:
-                set_free(None)
-            except Exception:
-                pass
-            el.stop()
-            el.save("low-storage-engine-log.txt")
-        if not args.keep:
-            d.stop()
+        stop_process(srv)
+        try:
+            if el:
+                try:
+                    set_free(None)
+                except Exception:
+                    pass
+                el.stop()
+                el.save("low-storage-engine-log.txt")
+        finally:
+            if not args.keep:
+                stop_device(d)
 
 
 def main():
@@ -1425,6 +1508,9 @@ def main():
     ap.add_argument("--map", help="with --live-swap-probe: start this local map first and require it to be carried over every swap")
     ap.add_argument("--probe-vid-restart", action="store_true", help="R1 probe on the stock Xonotic APK (no AndySU)")
     args = ap.parse_args()
+    global KEEP_TEMP_DIRS
+    KEEP_TEMP_DIRS = args.keep
+    atexit.register(cleanup_temp_dirs)
     dt.CONTAINER = not args.device
     if args.probe_vid_restart:
         args.api = args.api or "36"
@@ -1460,7 +1546,7 @@ def main():
         LOADER = True
         BEDS["xonotic"]["a"] = os.path.abspath(args.apk_a)  # os.path.join(TB, absolute) is the absolute path
         BEDS["xonotic"]["b"] = os.path.abspath(args.apk_b)
-    work = tempfile.mkdtemp(prefix="andysu-testbeds-")
+    work = temp_dir("andysu-testbeds-")
     dt.run(["cargo", "build", "-q", "-p", "andysu-cli"], cwd=dt.REPO)
     dt.gradle(":host-template:andysuHostTemplate")
     d = dt.Device(args.api, 3, existing=args.device)
@@ -1479,8 +1565,7 @@ def main():
                 log(f"[{name}] FAILED: {e}\n{failures[-1]['diagnostics'][-3000:]}")
     finally:
         if not args.keep:
-            d.stop()
-            shutil.rmtree(work, ignore_errors=True)
+            stop_device(d)
         else:
             log(f"kept: emulator {d.serial}, work dir {work}")
     os.makedirs(EVIDENCE, exist_ok=True)

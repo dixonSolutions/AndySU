@@ -1,6 +1,7 @@
 # Installing AndySU packages
 
-Every package is published to this repository's own GitHub remote, not to the public registries:
+AndySU's default packages are published to this repository's own GitHub remote, not to public
+registries:
 
 - **GitHub Pages** (`https://dixonsolutions.github.io/AndySU`) serves static registries:
   `maven/`, `npm/`, `cargo/` and `pub/`. The release workflow keeps them on the `gh-pages` branch.
@@ -8,27 +9,30 @@ Every package is published to this repository's own GitHub remote, not to the pu
   and Godot archives, the host template, and `SHA256SUMS` with a detached signature
   ([KEYS.md](KEYS.md)).
 
-Versions are `<major.minor>.<commits on main>` (for example `0.1.42`). Every push to `main` makes a
-release.
+Versions are `<major.minor>.<commits on main>` (for example `0.1.78`). The latest release and its
+Pages package indexes were checked on 2026-11-04; replace the example version below with the latest
+version shown on the [releases page](https://github.com/dixonSolutions/AndySU/releases).
 
-**How these snippets are tested.** CI's `packages` job publishes every package into a throwaway
-local site and installs it from there with [`scripts/verify-consumers.sh`](../scripts/verify-consumers.sh),
-using a fresh project for each ecosystem. After each release, the `verify` jobs run the same
-script against the live Pages and Release URLs. The table says what was verified where.
+**How these snippets are tested.** CI's `packages` job builds the registries on a throwaway local
+site and installs each package from a fresh consumer with
+[`scripts/verify-consumers.sh`](../scripts/verify-consumers.sh). After publishing, the `verify` jobs
+repeat those installs against the live Pages and Release URLs. On 2026-11-04 the Pages root and the
+latest npm, Cargo, Maven and pub indexes returned successfully and exposed version `0.1.78`; this
+read-only check confirms availability, while CI is the consumer-install check.
 
 | Ecosystem | Package | How | Verified |
 |---|---|---|---|
-| Gradle (plugin, AARs) | `io.github.dixonsolutions.andysu` | static Maven repo with plugin marker | local + CI |
-| Cargo | `andysu-core`, `andysu-cli` | sparse registry (static index) | local + CI |
-| npm | `@andysu/react-native`, `@andysu/capacitor`, `@andysu/cli` | static packuments, scoped registry | local + CI |
-| Unity (UPM) | `com.andysu.unity` | the npm registry as a scoped registry | local (the HTTP exchange UPM makes) + CI; Unity itself needs a licence |
-| pub (Flutter) | `andysu` | Hosted Pub Repository v2, static | CI only (no Flutter SDK on the dev machine) |
-| C / CMake | `andysu-c-<v>-linux-<arch>.tar.gz` | release asset, `find_package(AndySU CONFIG)` | local + CI |
-| Godot | `andysu-godot-<v>.zip` | release asset | local + CI |
-| Homebrew | `andysu` CLI | tap = this repository (`Formula/`) | CI (Linux and macOS) |
-| GitHub Action | `dixonSolutions/AndySU/actions/publish` | subdirectory action | `actions/publish/test.sh` in CI |
+| Gradle (plugin, AARs) | `io.github.dixonsolutions.andysu` | static Maven repo with plugin marker | CI consumer install; 0.1.78 artifacts live |
+| Cargo | `andysu-core`, `andysu-cli` | sparse registry (static index) | CI consumer install; 0.1.78 indexes live |
+| npm | `@andysu/react-native`, `@andysu/capacitor`, `@andysu/cli` | static packuments, scoped registry | CI consumer install; 0.1.78 packuments live |
+| Unity (UPM) | `com.andysu.unity` | npm protocol as a scoped registry | CI checks the exchange; Unity itself needs a licence |
+| pub (Flutter) | `andysu` | Hosted Pub Repository v2, static | CI consumer install; 0.1.78 index live |
+| C / CMake | `andysu-c-<v>-linux-<arch>.tar.gz` | release asset, `find_package(AndySU CONFIG)` | CI consumer install |
+| Godot | `andysu-godot-<v>.zip` | release asset | CI consumer install |
+| Homebrew | `andysu` CLI | tap = this repository (`Formula/`) | CI consumer install (Linux and macOS) |
+| GitHub Action | `dixonSolutions/AndySU/actions/publish` | subdirectory action | action smoke test in CI |
 
-Below, `0.1.42` stands for the version you want.
+Below, `0.1.78` is the verified current example. Check the releases page for newer versions.
 
 ## Gradle: plugin, host AAR, API, payload kit
 
@@ -60,15 +64,15 @@ Module `build.gradle.kts`:
 ```kotlin
 plugins {
     id("com.android.application")
-    id("io.github.dixonsolutions.andysu") version "0.1.42"
+    id("io.github.dixonsolutions.andysu") version "0.1.78"
 }
 
 dependencies {
     // Payload modules: the API is compileOnly (the host carries the one runtime copy).
-    compileOnly("io.github.dixonsolutions.andysu:api:0.1.42")
-    implementation("io.github.dixonsolutions.andysu:payload-kit:0.1.42")
+    compileOnly("io.github.dixonsolutions.andysu:api:0.1.78")
+    implementation("io.github.dixonsolutions.andysu:payload-kit:0.1.78")
     // Host modules:
-    // implementation("io.github.dixonsolutions.andysu:host:0.1.42")
+    // implementation("io.github.dixonsolutions.andysu:host:0.1.78")
 }
 ```
 
@@ -109,10 +113,13 @@ npm install @andysu/capacitor && npx cap sync android
 npx @andysu/cli --version             # the CLI, bundled for Linux and macOS (x64, arm64)
 ```
 
-Only the `@andysu` scope goes to our registry; everything else still comes from npmjs.com.
+Only the `@andysu` scope goes to our registry; everything else still comes from npmjs.com. When the
+optional public npmjs.com publishing is enabled, the same packages are published there under
+unscoped names: `andysu` (the CLI), `andysu-react-native`, `andysu-capacitor` and
+`com.andysu.unity`. The GitHub-hosted names stay unchanged for existing consumers.
 
 Without a registry entry, the release tarballs also work:
-`npm install https://github.com/dixonSolutions/AndySU/releases/download/v0.1.42/andysu-react-native-0.1.42.tgz`.
+`npm install https://github.com/dixonSolutions/AndySU/releases/download/v0.1.78/andysu-react-native-0.1.78.tgz`.
 
 The Android side of the React Native, Capacitor and Flutter bindings compiles against
 `io.github.dixonsolutions.andysu:api`, so the app's Gradle settings also need the Maven repo above.
@@ -131,7 +138,7 @@ The Android side of the React Native, Capacitor and Flutter bindings compiles ag
     }
   ],
   "dependencies": {
-    "com.andysu.unity": "0.1.42"
+    "com.andysu.unity": "0.1.78"
   }
 }
 ```
@@ -148,7 +155,7 @@ Unity needs a licence, so CI compiles the C# against stub `UnityEngine` types in
 dependencies:
   andysu:
     hosted: https://dixonsolutions.github.io/AndySU/pub
-    version: ^0.1.42
+    version: ^0.1.78
 ```
 
 Or `flutter pub add 'andysu:{"hosted":"https://dixonsolutions.github.io/AndySU/pub"}'`.
@@ -160,15 +167,15 @@ works too:
 ```yaml
 dependencies:
   andysu:
-    git: { url: https://github.com/dixonSolutions/AndySU, path: bindings/flutter, ref: v0.1.42 }
+    git: { url: https://github.com/dixonSolutions/AndySU, path: bindings/flutter, ref: v0.1.78 }
 ```
 
 ## C / CMake
 
 ```sh
-curl -LO https://github.com/dixonSolutions/AndySU/releases/download/v0.1.42/andysu-c-0.1.42-linux-x86_64.tar.gz
-tar xzf andysu-c-0.1.42-linux-x86_64.tar.gz
-cmake -S . -B build -DCMAKE_PREFIX_PATH=$PWD/andysu-c-0.1.42
+curl -LO https://github.com/dixonSolutions/AndySU/releases/download/v0.1.78/andysu-c-0.1.78-linux-x86_64.tar.gz
+tar xzf andysu-c-0.1.78-linux-x86_64.tar.gz
+cmake -S . -B build -DCMAKE_PREFIX_PATH=$PWD/andysu-c-0.1.78
 ```
 
 ```cmake
@@ -216,7 +223,11 @@ at the static binaries of that release.
 Optional inputs: `signing-cert`, `channel`, `version`, `rollout`, `pack-args`, `pages-branch`,
 `andysu-version`. `andysu init` writes a workflow that uses this action.
 
-## Public registries (off)
+## Public registries (opt-in)
 
-The release workflow can also publish to crates.io and npmjs.com. Those jobs stay off until the
-owner adds `CARGO_REGISTRY_TOKEN` or `NPM_TOKEN` ([KEYS.md](KEYS.md)).
+The crates.io and npmjs.com jobs use trusted publishing through GitHub OIDC. They are disabled unless
+the repository variables `PUBLISH_CRATES_IO=true` or `PUBLISH_NPMJS=true` are set, and should only be
+enabled after every package has the matching trusted-publisher configuration. Public-registry
+publishing is separate from the working GitHub Pages and Releases packages above, and uses the
+unscoped npm names listed above. See [KEYS.md](KEYS.md) for the initial publish and trust setup; do
+not add long-lived registry tokens to GitHub Actions.

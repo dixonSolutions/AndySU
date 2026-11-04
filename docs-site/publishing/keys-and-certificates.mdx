@@ -57,17 +57,18 @@ Releases of AndySU itself carry `SHA256SUMS` with a detached signature, made wit
 and checked with `andysu verify-file`:
 
 ```sh
-gh release download v0.1.62 --repo dixonSolutions/AndySU
+gh release download v0.1.78 --repo dixonSolutions/AndySU
 sha256sum -c --ignore-missing SHA256SUMS
-./andysu-x86_64-unknown-linux-musl verify-file SHA256SUMS --pub keys/andysu-ci-test-public.pem
+./andysu-x86_64-unknown-linux-musl verify-file SHA256SUMS --pub keys/andysu-release-root-public.pem
 ```
 
 A file signature covers `andysu-file-v1\0<sha256>\0<size>`, a different message from a manifest
 signature, so a file signature can never pass as a manifest signature.
 
 <Note>
-  AndySU's own releases are signed with CI **test** keys that nobody should rely on beyond this
-  project's tests. See [Keys policy](/contributing/keys-policy).
+  AndySU's own releases are signed with a certified production release key whose offline root is
+  committed at `keys/andysu-release-root-public.pem`. See [Keys
+  policy](/contributing/keys-policy).
 </Note>
 
 ## Secrets for CI
@@ -75,7 +76,7 @@ signature, so a file signature can never pass as a manifest signature.
 | Secret | Used for |
 |---|---|
 | `ANDYSU_SIGNING_KEY` | signs manifests (the publish action and your CI) |
-| `ANDYSU_SIGNING_CERT` | optional; set when the key is a certified release key |
+| `ANDYSU_SIGNING_CERT` | required when the key is a certified release key |
 
 `gh secret set ANDYSU_SIGNING_KEY < .andysu/andysu-root.key` loads the key without it passing through
-the command line.
+the command line. For a certified release key, set `ANDYSU_SIGNING_CERT` to its certificate too.

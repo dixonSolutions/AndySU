@@ -31,6 +31,22 @@ Background checks can be constrained with `network` (`any` or `unmetered`), `cha
 (the status becomes `deferred`); background jobs rely on the `JobScheduler` constraints. There are no foreground
 services and no notification permission.
 
+Host API level 3 lets an app change the effective mode for this install and persist it across process
+restarts:
+
+```kotlin
+if (host.apiLevel() >= 3) {
+    host.updates().setMode("download_only")
+    val mode = host.updates().mode()
+}
+```
+
+`setMode(null)` clears the override and returns to the host configuration. `off` cancels the periodic
+job and suppresses check-on-open and explicit `checkNow()` calls. An already-running request rechecks
+the mode before it can stage or automatically apply a release; a network request already underway
+may finish. `check_only` reports an available update without downloading or staging it. See the
+[Host API reference](/android/host-api#updateclient) for details.
+
 ## Live swaps
 
 In stub mode, a live apply is a **generation swap**:

@@ -18,9 +18,9 @@ import kotlin.concurrent.thread
 object Jobs {
     const val JOB_ID = 0x414e4459
 
-    fun schedule(ctx: Context, cfg: Config) {
+    fun schedule(ctx: Context, cfg: Config, mode: String = cfg.mode) {
         val js = ctx.getSystemService(Context.JOB_SCHEDULER_SERVICE) as JobScheduler
-        if (cfg.mode == "off") {
+        if (mode == "off") {
             js.cancel(JOB_ID)
             return
         }

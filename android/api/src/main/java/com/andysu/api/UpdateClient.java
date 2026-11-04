@@ -36,4 +36,19 @@ public interface UpdateClient {
 
     /** The policy in effect: "live", "restart" or "next_start". */
     String applyPolicy();
+
+    /**
+     * Override how much automatic updating this install performs (persisted): {@code "auto"},
+     * {@code "download_only"}, {@code "check_only"}, or {@code "off"}. A null value clears the
+     * override and returns to the mode configured in the host. {@code off} also cancels the
+     * periodic job and prevents an in-flight check from staging or automatically applying a
+     * release. Explicit {@link #applyNow()} remains available for an update already staged.
+     *
+     * <p>This method was added in Host API level 3. Check {@link HostApi#apiLevel()} before using
+     * it when supporting hosts built with older API levels.</p>
+     */
+    void setMode(String mode);
+
+    /** The effective mode: "auto", "download_only", "check_only", or "off". Host API level 3. */
+    String mode();
 }

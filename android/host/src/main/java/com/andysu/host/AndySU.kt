@@ -87,7 +87,7 @@ object AndySU {
         root = File(app.noBackupFilesDir, "andysu").apply { mkdirs() }
         updater = Updater(app, config, root)
         installCrashHandlers()
-        Jobs.schedule(app, config)
+        Jobs.schedule(app, config, updater.mode())
         emit("init", JSONObject().put("core", Core.versionString()).put("sdk", Build.VERSION.SDK_INT).put("abi", Generation.abi))
     }
 
@@ -132,7 +132,7 @@ object AndySU {
             watchCrashHandlers()
             postWatchdog(maxOf(config.watchdogMs, autoHealthy + 60_000))
         }
-        if (config.checkOnOpen && config.mode != "off") updater.checkAsync("open")
+        if (config.checkOnOpen && updater.mode() != "off") updater.checkAsync("open")
     }
 
     fun ensureBooted() {
@@ -140,13 +140,18 @@ object AndySU {
         if (booted) return
         booted = true
         boot()
-        if (config.checkOnOpen && config.mode != "off") updater.checkAsync("open")
+        if (config.checkOnOpen && updater.mode() != "off") updater.checkAsync("open")
     }
 
     private fun factoryDir(): File = Factory.ensure(app, root)
 
     private fun boot() {
-        var d = Core.obj(Core.launch(root.path, random16(), nowS(), true, config.maxBootAttempts))
+        val applyPending = UpdateMode.shouldApplyPending(root, config.mode)
+        var d = try {
+            Core.obj(Core.launch(root.path, random16(), nowS(), applyPending, config.maxBootAttempts))
+        } finally {
+            UpdateMode.consumeApplyPending(root)
+        }
         emit("launch", d)
         inTrial = d.optBoolean("in_trial")
         while (true) {
@@ -335,6 +340,7 @@ object AndySU {
     // ---------------------------------------------------------------- apply policy
 
     private val policyFile get() = File(root, "apply_policy")
+    private val modePrefs get() = app.getSharedPreferences("andysu", Context.MODE_PRIVATE)
     private var restartWhenBackgrounded = false
     internal var startedActivities = 0
 
@@ -350,9 +356,21 @@ object AndySU {
         emit("apply_policy", JSONObject().put("policy", applyPolicy()))
     }
 
+    /** Configured update mode, unless the app persisted an install-specific override (Host API 3). */
+    fun effectiveMode(): String {
+        return UpdateMode.effective(root, config.mode)
+    }
+
+    fun setMode(mode: String?) {
+        require(mode == null || mode in setOf("auto", "download_only", "check_only", "off")) { "unknown update mode $mode" }
+        UpdateMode.set(root, mode)
+        Jobs.schedule(app, config, effectiveMode())
+        emit("update_mode", JSONObject().put("mode", effectiveMode()))
+    }
+
     /** Called by the updater after staging, on the main thread. */
     internal fun onStaged(outcome: JSONObject) {
-        if (config.mode != "auto") return
+        if (effectiveMode() != "auto") return
         var policy = applyPolicy()
         if (policy == "live" && transparent) {
             // D29: native-only releases can go live if the app registered a LiveSwapHandler.

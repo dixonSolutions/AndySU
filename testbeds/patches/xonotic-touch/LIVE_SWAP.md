@@ -866,3 +866,37 @@ stuck "Loading models" plaque.
 A Haiku worker started this; its versions depended on numpy (not installed), used an unmeasured
 threshold and once dropped the change requirement altogether. The lead took it over, rewrote the
 check as above and ran every bed.
+
+## 14. AndySU update UI in the live Xonotic Touch checkout (2026-11-04)
+
+The live `~/Projects/Xonotic-Touch` checkout already has the Touch updates dialog; the testbed clone
+is older and does not, so this part is kept as a snapshot rather than a numbered patch in `build.sh`.
+The snapshot is `testbeds/patches/xonotic-touch/live/andysu-update-ui-8afbabe.diff` (base commit
+`8afbabe`, the live checkout's HEAD on 2026-11-04). It covers:
+
+- `AndySUBridge.java` (new): reads `touch/andysu-update-request.txt`, calls the host's
+  `UpdateClient` through `AndySUCompat`, and publishes `touch/andysu-update-status.txt` for QuakeC.
+- `AndySUCompat.java`: `mode()`, `setMode()`, `checkNow()`, `applyNow()` by reflection. Older hosts
+  simply lack the methods; the menu treats that as an incompatible payload API.
+- `XonoticActivity.java`: starts the AndySU bridge beside the APK updater; the menu's
+  "Update automatically" checkbox changes the host's persistent mode (`auto`/`off`) when AndySU is
+  present, and the APK updater preference otherwise.
+- `UpdateBridge.java`: reports the same auto value from the host mode, so the checkbox stays
+  consistent.
+- `touch_update_util.qh/qc` and `dialog_touch_updates.qh/qc`: an "AndySU payload" section with the
+  installed payload version, latest release, status, indeterminate progress while busy, and
+  "Check payload" / "Apply staged" buttons. The section polls the status file once per second.
+- `GameData.java`: the live base has only `.bundle-version` (no `.bundle-manifest`), so
+  `invalidateBundle()` deletes the stamp; the testbed base keeps patch 0007's two-file version.
+
+Verification on 2026-11-04: the live checkout built with
+`scripts/android-build.sh --abi x86_64 --version 1.2.9999 --code 9999` after the QuakeC
+`-Werror` fix at `dialog_touch_updates.qc:270` (parenthesise `managed && !payloadAvailable`).
+Native libraries, Java and both `csprogs.dat`/`menu.dat` compiled; the APK is 29 MB. A `--live` bed
+run with these live-built APKs on API 34 reached A built-in and the live swap to B (one pid, screen
+alive) but cannot complete the fail/dex steps: the live checkout does not carry the test-variant
+hook that patch 0005 adds to the testbed build. The numbered patch series remains the complete live
+swap verification. The Updates dialog was then opened on API 34 from the same live-built host
+(`menu_cmd directmenu TouchUpdates`): `docs/evidence/xonotic-updates-dialog.png` shows the AndySU
+payload section, the installed `1.2.9999` payload, an unreachable-remote error, and the
+Check payload / Apply staged controls.

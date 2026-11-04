@@ -34,11 +34,16 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
     override fun setListener(listener: UpdateClient.Listener?) { this.listener = listener }
     override fun setApplyPolicy(policy: String?) = AndySU.setApplyPolicy(policy)
     override fun applyPolicy(): String = AndySU.applyPolicy()
+    override fun setMode(mode: String?) = AndySU.setMode(mode)
+    override fun mode(): String = AndySU.effectiveMode()
     override fun applyNow() = main.post {
         if (status.optString("state") == "shell_update") exec.execute { ShellUpdate.install(ctx, status) }
         else if (!AndySU.applyLive()) restartNow()
     }.let { }
-    override fun restartNow() = Phoenix.relaunch(ctx, "restart requested")
+    override fun restartNow() {
+        UpdateMode.requestApplyPending(AndySU.root)
+        Phoenix.relaunch(ctx, "restart requested")
+    }
 
     fun checkAsync(trigger: String) = exec.execute { runCheck(trigger) }
     fun gcAsync() = exec.execute {
@@ -96,7 +101,7 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
     /** Blocking; runs on the updater thread or a job thread. */
     @Synchronized
     fun runCheck(trigger: String) {
-        if (cfg.mode == "off") return
+        if (mode() == "off") return
         if (trigger != "job" && !networkAllowed()) {
             setStatus("deferred", JSONObject().put("reason", "network policy ${cfg.network}"))
             return
@@ -115,9 +120,18 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
             outcome.put("not_modified", m.code == 304)
             when (outcome.getString("outcome")) {
                 "up_to_date" -> setStatus("up_to_date", outcome)
-                "shell_update" -> setStatus("shell_update", outcome)
+                "shell_update" -> {
+                    when (mode()) {
+                        "off" -> setStatus("deferred", JSONObject().put("reason", "mode off"))
+                        "check_only" -> setStatus("available", outcome)
+                        else -> setStatus("shell_update", outcome)
+                    }
+                }
                 "update" -> {
-                    if (cfg.mode == "check_only") return setStatus("available", outcome)
+                    when (mode()) {
+                        "off" -> return setStatus("deferred", JSONObject().put("reason", "mode off"))
+                        "check_only" -> return setStatus("available", outcome)
+                    }
                     if (!outcome.optBoolean("already_staged")) {
                         val need = outcome.optLong("download_bytes")
                         if (need * 2 > allocatable()) {
@@ -126,11 +140,15 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
                         }
                         setStatus("downloading", outcome)
                         download(h)
+                        when (mode()) {
+                            "off" -> return setStatus("deferred", JSONObject().put("reason", "mode off"))
+                            "check_only" -> return setStatus("available", outcome)
+                        }
                         Core.ok(Core.sessionStage(h))
                     }
                     setStatus("staged", outcome)
                     if (trigger == "recovery") Phoenix.relaunch(ctx, "recovery update staged")
-                    if (cfg.mode == "auto") main.post { AndySU.onStaged(outcome) }
+                    if (mode() == "auto") main.post { if (mode() == "auto") AndySU.onStaged(outcome) }
                 }
             }
         } catch (e: CoreException) {
@@ -146,9 +164,11 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
 
     private fun download(h: Long) {
         repeat(4) {
+            if (mode() == "off" || mode() == "check_only") return
             val plan = Core.arr(Core.sessionPlan(h))
             if (plan.length() == 0) return
             for (i in 0 until plan.length()) {
+                if (mode() == "off" || mode() == "check_only") return
                 val f = plan.getJSONObject(i)
                 if (!fetchOne(h, f)) {
                     if (f.getString("kind") == "delta") Core.ok(Core.sessionSkipDelta(h, f.getString("key")))

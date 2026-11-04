@@ -8,13 +8,14 @@ uses only `java.*` and `android.*` types, with no default methods, so it stays b
 Kotlin payloads and with hosts built years earlier. **Exactly one copy exists at runtime: the host's.**
 Compile against it with `compileOnly`.
 
-Levels are additive. Level 2 added methods and removed none. Check `HostApi.apiLevel()` before using
+Levels are additive; each level adds methods and removes none. Check `HostApi.apiLevel()` before using
 anything introduced in a later level.
 
 | Level | Adds |
 |---|---|
 | 1 | `Payload`, `HostApi`, `UpdateClient`, service and receiver handlers, `Host` |
 | 2 | `HostApi.setLiveSwapHandler`, `LiveSwapHandler`, `LiveSwapCallback` |
+| 3 | Persistent update-mode controls: `UpdateClient.setMode` and `mode` |
 
 ## Payload
 
@@ -43,7 +44,7 @@ Passed to `start()`.
 
 | Method | Meaning |
 |---|---|
-| `int apiLevel()` | Host API level of this host (1, or 2 for hosts offering live swap handlers). |
+| `int apiLevel()` | Host API level implemented by this host (level 2 adds live-swap handlers; level 3 adds runtime update-mode control). |
 | `Context context()` | The application context. |
 | `Activity activity()` | The resumed or most recently created stub activity, or null. |
 | `File slotDir()` | Absolute path of this generation's slot. Code files are read-only. |
@@ -74,6 +75,21 @@ are listed in [Status and errors](/reference/status-and-errors).
 | `setListener(Listener)` | `Listener.onStatus(String statusJson)` is called on the main thread. Null removes it. |
 | `setApplyPolicy(String)` | `"live"`, `"restart"`, `"next_start"` or null for the configured policy. Persisted. |
 | `String applyPolicy()` | The policy in effect. |
+| `setMode(String)` | Level 3. Persist an override: `"auto"`, `"download_only"`, `"check_only"`, `"off"`, or null to restore the configured mode. |
+| `String mode()` | Level 3. Return the effective mode. |
+
+`off` cancels the periodic job and suppresses check-on-open and explicit `checkNow()` calls. A check
+already in progress re-reads the mode before download, staging and automatic apply; an individual
+network request already underway may finish. `check_only` reports an available release without
+downloading or staging it. `download_only` stages it but does not apply it automatically. An explicit
+`applyNow()` can still apply a release that is already staged.
+
+```kotlin
+if (host.apiLevel() >= 3) {
+    host.updates().setMode("download_only") // persists across process restarts
+    val current = host.updates().mode()
+}
+```
 
 ```kotlin
 host.updates().setListener { json ->
@@ -121,7 +137,8 @@ native` or `kind: content` outside `dex/`, no dex file was removed, and the desc
 state. See [Apply policies](/concepts/apply-policies#live-native-swaps-in-transparent-mode).
 
 To accept payloads with `host_api_min = 2`, declare `host_api = 2` in `andysu.toml` and use a level-2
-host AAR.
+host AAR. Payloads that call the runtime mode methods must require `host_api_min = 3` and use a
+level-3 host AAR.
 
 ## Service and receiver handlers
 

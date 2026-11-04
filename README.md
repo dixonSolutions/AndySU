@@ -68,15 +68,19 @@ Apply policy, in `andysu.toml` and changeable at runtime:
 
 | `apply` | Behaviour |
 |---|---|
-| `live` (default) | swap in-process while the app runs; content-only releases apply hot (stub mode) |
+| `live` (default) | swap in-process while the app runs; hot content updates apply in stub mode. Transparent apps need a Host API 2 `LiveSwapHandler` for native-only live swaps; otherwise `live_fallback` applies. |
 | `restart` | relaunch once to apply (`restart_when = "now"`), or end the process when the user leaves (`"background"`) |
 | `next_start` | stage only; the next cold start applies it |
+
+Host API level 3 also lets a payload override the fetch mode for this install with
+`host.updates().setMode("auto" | "download_only" | "check_only" | "off")`; pass `null` to restore
+the configured mode. The override persists across process restarts.
 
 ## Getting started
 
 ```sh
 brew tap dixonsolutions/andysu https://github.com/dixonSolutions/AndySU && brew install andysu
-#   or: cargo install andysu-cli --registry andysu   /   npx @andysu/cli   (docs/REGISTRIES.md)
+#   or: cargo install andysu-cli --registry andysu   /   npx andysu   (docs/REGISTRIES.md)
 
 andysu init --app com.example.app --repo you/app-updates   # keys, andysu.toml, CI workflow
 gh secret set ANDYSU_SIGNING_KEY < .andysu/andysu-root.key # then keep the key offline
@@ -130,9 +134,9 @@ andysu split app-release.apk --out out --transparent \
 **Gradle (Kotlin/Java):** implement `com.andysu.api.Payload` and let the plugin build both halves.
 
 ```kotlin
-plugins { id("io.github.dixonsolutions.andysu") version "0.1.42" }
+plugins { id("io.github.dixonsolutions.andysu") version "0.1.78" }
 andysu { role.set("payload"); entryClass.set("com.example.Main") }
-dependencies { compileOnly("io.github.dixonsolutions.andysu:api:0.1.42") }
+dependencies { compileOnly("io.github.dixonsolutions.andysu:api:0.1.78") }
 ```
 
 ```kotlin

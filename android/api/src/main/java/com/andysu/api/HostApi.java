@@ -13,9 +13,9 @@ import java.io.File;
  */
 public interface HostApi {
     /**
-     * Host API level implemented by this host: 1, or 2 for hosts that offer
-     * {@link #setLiveSwapHandler}. Levels are additive; check {@code apiLevel() >= 2} before
-     * calling anything introduced in level 2.
+     * Host API level implemented by this host: 1, 2 for hosts that offer {@link #setLiveSwapHandler},
+     * or 3 for hosts that also offer {@link UpdateClient#setMode(String)}. Levels are additive;
+     * check the level before calling methods introduced in a later level.
      */
     int apiLevel();
 

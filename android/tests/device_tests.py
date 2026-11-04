@@ -986,6 +986,79 @@ def scenarios(d, b, r, results):
     ok("background-trial", f"9.3 trial: HOME right after the swap, away {WATCHDOG_MS * 2 // 1000} s (watchdog_ms {WATCHDOG_MS}); "
                            f"watchdog paused with {paused['remaining_ms']} ms left, resumed with {resumed['remaining_ms']} ms, committed, no rollback")
 
+    # Host API level 3: update mode is a persisted per-install override. check_only never downloads
+    # or stages; download_only stages but never applies; off cancels checks/jobs, including check-on-open.
+    d.broadcast("mode", mode="check_only")
+    d.event("update_mode", mode="check_only")
+    r.publish("9.4")
+    d.broadcast("check")
+    d.status("available")
+    st = d.state()
+    if st.get("pending") or (st.get("current") or {}).get("id") != "9.3":
+        raise Fail(f"check_only downloaded or staged 9.4: {st}")
+
+    # Verify both the setting and check-on-open behavior survive a process restart.
+    d.force_stop()
+    mode_since = len(d.events)
+    d.launch()
+    d.event("launch")
+    d.payload("9.3")
+    d.status("available")
+    d.broadcast("mode")
+    mode_event = d.event("test_mode", mode="check_only")
+    if not mode_event:
+        raise Fail("check_only override did not survive process restart")
+
+    d.broadcast("mode", mode="download_only")
+    d.event("update_mode", mode="download_only")
+    d.broadcast("check")
+    d.status("staged")
+    time.sleep(2 * SLOW)
+    if any(e.get("event") in ("live_swapped", "relaunch") for e in d.events[mode_since:]):
+        raise Fail("download_only automatically applied 9.4")
+    d.force_stop()
+    d.launch()
+    cold = d.event("launch")
+    if cold.get("in_trial"):
+        raise Fail(f"download_only cold boot promoted 9.4: {cold}")
+    d.payload("9.3")
+    st = d.state()
+    if (st.get("pending") or {}).get("id") != "9.4" or (st.get("current") or {}).get("id") != "9.3":
+        raise Fail(f"download_only should leave 9.4 pending across a cold boot: {st}")
+
+    d.broadcast("mode", mode="off")
+    d.event("update_mode", mode="off")
+    d.force_stop()
+    off_since = len(d.events)
+    d.launch()
+    cold = d.event("launch")
+    if cold.get("in_trial"):
+        raise Fail(f"off mode cold boot promoted 9.4: {cold}")
+    d.payload("9.3")
+    time.sleep(2 * SLOW)
+    if any(e.get("event") == "update_status" and e.get("status", {}).get("state") == "checking"
+           for e in d.events[off_since:]):
+        raise Fail("off mode still checked on app open")
+    d.broadcast("mode")
+    d.event("test_mode", mode="off")
+
+    # An explicit restart still applies the pending id once while off; the marker is consumed by
+    # the main-process launch and cannot promote a different later release.
+    d.broadcast("restart")
+    d.event("relaunch", reason="restart requested")
+    cold = d.event("launch")
+    if not cold.get("in_trial"):
+        raise Fail(f"explicit restart did not promote pending 9.4: {cold}")
+    d.payload("9.4")
+    d.event("committed", version="9.4")
+
+    # Clearing the override restores the configured auto mode.
+    d.broadcast("mode", mode="null")
+    d.event("update_mode", mode="auto")
+    d.broadcast("mode")
+    d.event("test_mode", mode="auto")
+    ok("update-mode", "check_only reports without staging; download_only stages and preserves pending on cold boot; off persists and suppresses check-on-open/cold promotion; explicit restart applies once; clearing restores auto")
+
     # no dialogs
     bad_focus = [f for f in d.focus_log if any(x in f.lower() for x in
                  ["packageinstaller", "permissioncontroller", "grantpermissions", "application not responding",
@@ -1059,7 +1132,7 @@ def main():
     for v, beh in [("0.9", "ok"), ("1.0", "ok"), ("2.0", "throw_start"), ("3.0", "crash_native"),
                    ("4.0", "crash_java"), ("5.0", "never_healthy"), ("6.0", "exit_on_start"),
                    ("9.0", "own_handler_crash"), ("9.1", "own_handler_thread"), ("9.2", "handled_segv"),
-                   ("9.3", "healthy_after_resume")]:
+                   ("9.3", "healthy_after_resume"), ("9.4", "ok")]:
         b.payload(v, beh)
     b.payload("7.0", "ok", blob_kb=20000)
     b.payload("7.5", "ok", blob_kb=6000)

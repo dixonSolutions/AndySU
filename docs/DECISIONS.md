@@ -307,3 +307,41 @@ Trade-off: a release that never comes to the foreground stays in TRIAL, not roll
 watchdog. Boot-attempt counting still bounds cold starts (each launch of a TRIAL slot counts), and
 a crash still rolls back at once. The test bed also presses BACK when that Settings screen is in
 front, to return to the game.
+
+## D32. Update mode is a Host API level 3 runtime override (2026-11-04)
+Apps need a persistent "update automatically" switch that also covers background work. `andysu.toml`
+already had `mode`, but a payload could only call `checkNow()`/`applyNow()`; it could not persist a
+per-install choice, and changing it at runtime would not re-schedule `JobScheduler`.
+
+Host API level 3 adds `UpdateClient.setMode(String)` and `mode()`. The value is `auto`,
+`download_only`, `check_only`, `off` or `null` (clear the override). The host stores it in
+`noBackupFilesDir/andysu/update_mode` so it is readable before class loading in transparent mode.
+The write is a synced temporary file followed by a rename, with the old file removed first: some
+Android images refused `AtomicFile`'s rename over an existing file and silently lost the override
+(seen once in CI on API 34). A crash in the short delete window leaves no file, so the configured
+mode applies. The host re-runs `Jobs.schedule` with the effective mode. `off` also cancels periodic
+work and prevents an
+in-flight check from staging or automatically applying; `check_only` reports `available` without
+downloading; `download_only` stages without applying. `applyNow()` still works for an already staged
+release, and an explicit `restartNow()` promotes the pending release once through a one-shot
+`apply_pending` marker. The default remains the configured `auto`, so automatic updates are on out of
+the box. Device scenario `update-mode` on API 34 covers persistence across a process restart,
+check-on-open suppression, cold-boot promotion rules, the explicit restart, and clearing the
+override. Verified by the lead with `cargo test --workspace`, clippy, `:host:assembleRelease`, and
+`device_tests --api 34 --container` (22/22).
+
+## D33. Public registries use OIDC, and npmjs.com gets unscoped names (2026-11-04)
+Long-lived npm/crates.io tokens in Actions are avoidable now that both registries support trusted
+publishing. The release workflow gates the optional `crates-io` and `npmjs` jobs behind repository
+variables (`PUBLISH_CRATES_IO`, `PUBLISH_NPMJS`), grants only `id-token: write`, and publishes after
+the GitHub Pages/Releases consumer verification passes. crates.io still needs one manual initial
+publish per crate before trust can be configured.
+
+The `@andysu` npm scope is not available to the owner's account. The GitHub Pages registry keeps the
+historical `@andysu/*` names for existing consumers; the public npmjs.com packages are unscoped:
+`andysu` (CLI), `andysu-react-native`, `andysu-capacitor`, plus `com.andysu.unity`. The release
+tarballs keep their scoped names and `scripts/npm-public-name.sh` maps them during the public
+publish. The production release key is certified by the offline root; the root public key is
+committed at `keys/andysu-release-root-public.pem`, and the release and demo channels both sign with
+the certified release key. The Android demo APK still uses the CI test keystore until the owner
+supplies a release keystore.
