@@ -414,10 +414,11 @@ with three rollback layers. Two feasibility probes ran:
       window id, set `vid_hidden`.
     - The beds missed it because they only counted `engine_frames`, and
       `docs/evidence/live-swap-final.png` actually shows the stuck screen.
-    - Fixed for every swap build. The APKs used by earlier `--live*` runs predate the fix, and the
-      beds do not yet assert that frames reach the screen.
-  - **Still not covered:** real devices, a rollback whose unpack fails (no way to provoke it), and
-    an on-screen check in the live beds.
+    - Fixed for every swap build. Since 2026-11-04 the beds also check that frames reach the screen
+      (`screen_alive`, LIVE_SWAP.md section 13). The check is proven on a build without 0009,
+      where it fails exactly at the live swap. A Haiku worker started it; the lead took it over and
+      ran all three beds on API 36 with rebuilt APKs.
+  - **Still not covered:** real devices, and a rollback whose unpack fails (no way to provoke it).
 
 ## Step 8 — bindings (2026-11-02)
 | Binding | What | Verified locally |
