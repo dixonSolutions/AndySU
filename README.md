@@ -44,7 +44,9 @@ Status: [docs/PROGRESS.md](docs/PROGRESS.md). Design: [docs/BRIEF.md](docs/BRIEF
 **Try it:** every release on GitHub carries `andysu-demo-compose-<version>.apk`, a Compose app
 whose payload is published to a demo channel on this repository's Pages. Install it once
 (Android 6+, sideloaded) and it updates itself live to each newer release, with no prompt
-and no permission. The demo is signed with the CI *test* keys ([docs/KEYS.md](docs/KEYS.md)).
+and no permission. Use 0.1.90 or later: earlier demo APKs trust the old test root, so they refuse
+the channel and stay on their built-in version. The channel is signed with the certified release
+key and the APK with the CI test keystore ([docs/KEYS.md](docs/KEYS.md)).
 
 ## How it works
 
@@ -152,6 +154,7 @@ class Main : PayloadAdapter() {
 import * as AndySU from '@andysu/react-native';
 AndySU.onStatus(s => s.state === 'staged' && AndySU.applyNow());
 AndySU.setApplyPolicy('restart');
+AndySU.setUpdateMode('download_only');   // host API level 3+; null returns to the configured mode
 ```
 
 **Capacitor / Cordova**
@@ -172,6 +175,7 @@ AndySU.statusChanges.listen((s) { if (s['state'] == 'staged') AndySU.applyNow();
 
 ```csharp
 AndySU.Updates.SetApplyPolicy(AndySU.ApplyPolicy.NextStart);
+AndySU.Updates.SetUpdateMode(AndySU.UpdateMode.DownloadOnly);   // host API level 3+
 if (AndySU.Updates.IsPresent) AndySU.Updates.CheckNow();
 ```
 
@@ -179,6 +183,7 @@ if (AndySU.Updates.IsPresent) AndySU.Updates.CheckNow();
 
 ```gdscript
 AndySU.set_apply_policy("restart")
+AndySU.set_update_mode("download_only")   # host API level 3+; "" returns to the configured mode
 AndySU.check_now()
 ```
 

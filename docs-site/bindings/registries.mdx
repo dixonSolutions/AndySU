@@ -3,8 +3,8 @@ title: "Package registries"
 description: "Install every AndySU package from the project's own GitHub remote."
 ---
 
-AndySU's default packages are published to this repository's own GitHub remote, not to public
-registries:
+AndySU's default packages are published to this repository's own GitHub remote, and since 0.1.90
+also to crates.io and npmjs.com (see the Optional public registries section below):
 
 - **GitHub Pages** (`https://dixonsolutions.github.io/AndySU`) serves static registries: `maven/`,
   `npm/`, `cargo/` and `pub/`. The release workflow keeps them on the `gh-pages` branch.
@@ -56,10 +56,9 @@ andysu-core = { version = "0.1", registry = "andysu" }
 npx @andysu/cli --version     # the CLI, bundled for Linux and macOS (x64, arm64)
 ```
 
-Only the `@andysu` scope goes to this registry; everything else still comes from npmjs.com. When
-the optional public npmjs.com publishing is enabled, the same packages are published there under
-unscoped names: `andysu` (the CLI), `andysu-react-native`, `andysu-capacitor` and
-`com.andysu.unity`. Release tarballs also work:
+Only the `@andysu` scope goes to this registry; everything else still comes from npmjs.com. The
+same packages are also published on npmjs.com under unscoped names: `andysu` (the CLI),
+`andysu-react-native`, `andysu-capacitor` and `com.andysu.unity`. Release tarballs also work:
 `npm install https://github.com/dixonSolutions/AndySU/releases/download/v0.1.78/andysu-react-native-0.1.78.tgz`.
 
 ## Homebrew

@@ -27,7 +27,19 @@ chooses to publish with.
 
 The old `andysu-ci-test-*` keys remain in `~/.config/andysu/keys/` and
 `keys/andysu-ci-test-public.pem` for reproducing historical releases, but CI no longer signs with
-them.
+them. Demo APKs up to 0.1.81 embed that old root, so they refuse the channel and stay on their
+built-in version. That cannot change: their root is frozen, and the signature envelope carries one
+certificate. Demo APKs from 0.1.90 on trust the production root.
+
+### What expires, and when
+
+| What | Lifetime | What keeps it valid |
+|---|---|---|
+| Demo channel manifest | 30 days from signing | every release, and the weekly `resign-demo` workflow when under 14 days are left |
+| Release key certificate | until 2027-02-02 | **the owner**: certify a new release key from the offline root, then re-run `scripts/setup-secrets.sh` |
+
+`resign-demo` fails when the certificate has fewer than 30 days left, so the first warning arrives
+in early January 2027. After 2027-02-02, releases and channel signatures stop verifying.
 
 ## Setting the secrets
 

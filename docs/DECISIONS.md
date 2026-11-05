@@ -345,3 +345,15 @@ publish. The production release key is certified by the offline root; the root p
 committed at `keys/andysu-release-root-public.pem`, and the release and demo channels both sign with
 the certified release key. The Android demo APK still uses the CI test keystore until the owner
 supplies a release keystore.
+
+## D34. The demo channel is re-signed on a schedule, outside the release queue (2026-11-05)
+Clients reject an expired manifest, the demo channel's signature lasts 30 days, and until now only a
+release signed it. `resign-demo.yml` runs weekly and re-signs when under 14 days are left. Re-signing
+raises `sequence` and changes no release, so clients accept it and download nothing.
+
+It does not share the `release` concurrency group: GitHub keeps one pending run per group, so a
+scheduled run could cancel a queued release. A release force-pushes `gh-pages` from its own copy, and
+both could issue the same `sequence` with different bytes, which clients refuse as `sequence_reuse`.
+So the job builds the CLI first, then skips if a release is active and otherwise signs and pushes
+within seconds. It pushes without force, so it loses any race it does enter, and the 14-day margin
+leaves room for the next week's run.

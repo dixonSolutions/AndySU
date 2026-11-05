@@ -6,6 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const ch = MethodChannel('andysu');
   final calls = <String>[];
+  var modeAnswer = 'download_only';
 
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(ch, (c) async {
@@ -15,6 +16,8 @@ void main() {
           return '{"present":true,"apiLevel":1,"version":"2.0","isFactory":false,"slotDir":"/s"}';
         case 'status':
           return '{"state":"staged","release":"2.1"}';
+        case 'updateMode':
+          return modeAnswer;
       }
       return null;
     });
@@ -27,5 +30,15 @@ void main() {
     await AndySU.checkNow();
     expect(calls, contains('setApplyPolicy:next_start'));
     expect(calls, contains('checkNow:null'));
+  });
+
+  test('update mode', () async {
+    await AndySU.setUpdateMode(UpdateMode.checkOnly);
+    await AndySU.setUpdateMode(null);
+    expect(calls, contains('setUpdateMode:check_only'));
+    expect(calls, contains('setUpdateMode:null'));
+    expect(await AndySU.updateMode(), UpdateMode.downloadOnly);
+    modeAnswer = ''; // the plugin answers "" on a host older than API level 3
+    expect(await AndySU.updateMode(), isNull);
   });
 }

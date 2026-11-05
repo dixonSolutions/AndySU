@@ -168,6 +168,8 @@ jobs:
         run: flutter pub get && flutter test
       - name: Unity (compiles against stub UnityEngine types; Unity itself needs a licence)
         run: dotnet build bindings/unity/Tests/Compile/Compile.csproj
+      - name: Godot (the addon on the real engine, headless)
+        run: sh bindings/godot/tests/ci.sh
       - name: C/CMake (install, then build and run a consumer)
         run: sh bindings/c/test.sh
       - name: Android libraries of the bindings
@@ -210,6 +212,10 @@ jobs:
           curl -sf http://127.0.0.1:8765/index.html >/dev/null
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
           scripts/verify-consumers.sh http://127.0.0.1:8765 "$version" dist/release cargo npm upm maven pub c godot
+      - name: Publishing to npmjs.com (dry run) and re-signing a channel
+        run: |
+          scripts/test-publish-npmjs.sh
+          scripts/test-resign-channel.sh
 
   fuzz-smoke:
     runs-on: ubuntu-latest

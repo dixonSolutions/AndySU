@@ -1,0 +1,88 @@
+# Clients reject an expired manifest, and the demo channel's signature lasts 30 days. Releases sign
+# it, so this only has work to do when no release has shipped for a while.
+#
+# Not in the release concurrency group: GitHub keeps one pending run per group, so a scheduled run
+# could cancel a queued release. A release force-pushes gh-pages from its own copy, so this skips
+# while one is active and tries again next week, well before the 14-day margin runs out.
+name: resign-demo
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Re-sign even if the manifest has plenty of time left
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: resign-demo
+  cancel-in-progress: false
+
+env:
+  PAGES_URL: https://dixonsolutions.github.io/AndySU
+
+jobs:
+  resign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release -p andysu-cli
+      - name: Re-sign the demo channel if it is close to expiry
+        id: sign
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANDYSU_DEMO_SIGNING_KEY: ${{ secrets.ANDYSU_DEMO_SIGNING_KEY }}
+          ANDYSU_DEMO_SIGNING_CERT: ${{ secrets.ANDYSU_DEMO_SIGNING_CERT }}
+          MIN_DAYS: ${{ inputs.force && '31' || '14' }}
+        run: |
+          active=$(gh run list --workflow release.yml --limit 20 --json status --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$active" != 0 ]; then
+            echo "::notice::a release is active; it signs the channel itself"
+            exit 0
+          fi
+          git clone -q --depth 1 --branch gh-pages "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}" site
+          umask 077
+          printf '%s\n' "$ANDYSU_DEMO_SIGNING_KEY" > "$RUNNER_TEMP/demo.key"
+          printf '%s\n' "$ANDYSU_DEMO_SIGNING_CERT" > "$RUNNER_TEMP/demo.cert.json"
+          ANDYSU_KEY_FILE="$RUNNER_TEMP/demo.key" ANDYSU_CERT_FILE="$RUNNER_TEMP/demo.cert.json" \
+            scripts/resign-channel.sh site/demo stable keys/andysu-release-root-public.pem
+          rm -f "$RUNNER_TEMP"/demo.*
+          cd site
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add demo/stable
+          git commit -q -m "Demo channel: refresh the signature"
+          git push -q origin gh-pages
+          sha256sum demo/stable/update.json | cut -d' ' -f1 > "$RUNNER_TEMP/pushed"
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+      - name: The live channel verifies like a client would
+        if: steps.sign.outputs.pushed == 'true'
+        run: |
+          want=$(cat "$RUNNER_TEMP/pushed")
+          for i in $(seq 1 60); do
+            [ "$(curl -sf "$PAGES_URL/demo/stable/update.json" | sha256sum | cut -d' ' -f1)" = "$want" ] && break
+            [ "$i" -lt 60 ] || { echo "::error::Pages did not serve the new manifest within 10 minutes"; exit 1; }
+            sleep 10
+          done
+          target/release/andysu verify "$PAGES_URL/demo/stable/update.json" --pub keys/andysu-release-root-public.pem --blobs
+      - name: The release key's certificate is not about to run out
+        env:
+          ANDYSU_DEMO_SIGNING_CERT: ${{ secrets.ANDYSU_DEMO_SIGNING_CERT }}
+        run: |
+          python3 - <<'PY'
+          import datetime, json, os, sys
+          until = json.loads(os.environ["ANDYSU_DEMO_SIGNING_CERT"])["not_after"].replace("Z", "+00:00")
+          left = (datetime.datetime.fromisoformat(until) - datetime.datetime.now(datetime.timezone.utc)).days
+          print(f"certificate valid for {left} more days")
+          if left < 30:
+              print(f"::error::the release key certificate expires in {left} days; certify a new one (docs/KEYS.md)")
+              sys.exit(1)
+          PY

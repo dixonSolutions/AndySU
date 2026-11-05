@@ -31,6 +31,7 @@ import * as AndySU from '@andysu/react-native';
 const off = AndySU.onStatus(s => { if (s.state === 'staged') AndySU.applyNow(); });
 AndySU.checkNow();
 AndySU.setApplyPolicy('restart');   // 'live' | 'restart' | 'next_start' | null
+AndySU.setUpdateMode('download_only');   // 'auto' | 'download_only' | 'check_only' | 'off' | null
 ```
 
 | Function | Meaning |
@@ -39,6 +40,7 @@ AndySU.setApplyPolicy('restart');   // 'live' | 'restart' | 'next_start' | null
 | `status()` | current status; `{state: 'idle'}` without a host |
 | `checkNow()`, `applyNow()`, `restartNow()` | as in the [Host API](/android/host-api#updateclient) |
 | `setApplyPolicy(policy)`, `applyPolicy()` | override the policy; read the effective one |
+| `setUpdateMode(mode)`, `updateMode()` | `'auto'`, `'download_only'`, `'check_only'`, `'off'` or null for the configured mode; read the effective one (null on a host older than API level 3, where the setter does nothing) |
 | `markHealthy()` | commit this payload generation |
 | `onStatus(cb)` | listener; returns an unsubscribe function |
 

@@ -11,5 +11,7 @@ const { AndySU } = require('../dist/index.js');
   if (registered.name !== 'AndySU') throw new Error('plugin name');
   if ((await AndySU.info()).present !== false) throw new Error('web info');
   if ((await AndySU.applyPolicy()).policy !== 'live') throw new Error('policy');
+  await AndySU.setUpdateMode({ mode: 'off' }); // no-op on the web fallback
+  if ((await AndySU.updateMode()).mode !== null) throw new Error('web updateMode');
   console.log('capacitor binding smoke test ok');
 })().catch((e) => { console.error(e); process.exit(1); });

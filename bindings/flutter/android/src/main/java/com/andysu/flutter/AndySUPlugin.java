@@ -64,6 +64,15 @@ public class AndySUPlugin implements FlutterPlugin, MethodChannel.MethodCallHand
                 case "setApplyPolicy":
                     if (h != null) h.updates().setApplyPolicy((String) call.arguments);
                     break;
+                // Update mode needs Host API level 3; older hosts lack the methods, so check first.
+                case "setUpdateMode":
+                    if (h != null && h.apiLevel() >= 3) h.updates().setMode((String) call.arguments);
+                    break;
+                case "updateMode": {
+                    String m = (h != null && h.apiLevel() >= 3) ? h.updates().mode() : null;
+                    r.success(m == null ? "" : m);
+                    return;
+                }
                 default:
                     r.notImplemented();
                     return;

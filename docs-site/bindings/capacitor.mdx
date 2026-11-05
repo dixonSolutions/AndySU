@@ -28,6 +28,7 @@ import { AndySU } from '@andysu/capacitor';
 
 await AndySU.checkNow();
 await AndySU.setApplyPolicy({ policy: 'restart' });   // 'live' | 'restart' | 'next_start' | null
+await AndySU.setUpdateMode({ mode: 'download_only' });   // 'auto' | 'download_only' | 'check_only' | 'off' | null
 const handle = await AndySU.addListener('status', s => console.log(s.state, s.release));
 ```
 
@@ -37,6 +38,7 @@ const handle = await AndySU.addListener('status', s => console.log(s.state, s.re
 | `status()` | `{state, release?, ...}` |
 | `checkNow()`, `applyNow()`, `restartNow()`, `markHealthy()` | `Promise<void>` |
 | `setApplyPolicy({ policy })`, `applyPolicy()` | override; read `{policy}` |
+| `setUpdateMode({ mode })`, `updateMode()` | `'auto'`, `'download_only'`, `'check_only'`, `'off'` or null for the configured mode; read `{mode}` (null on a host older than API level 3, where the setter does nothing) |
 | `addListener('status', cb)` | listener handle |
 
 On platforms without AndySU (web, iOS) every call resolves with neutral values.

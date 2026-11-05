@@ -1,6 +1,7 @@
 #!/bin/sh
 # The demo channel: the Compose sample, published on every release, so that a demo APK installed
-# from any release live-updates to each newer one (no permission, no prompt).
+# from 0.1.90 or later live-updates to each newer one (no permission, no prompt). Earlier APKs trust
+# the old test root (docs/KEYS.md).
 #
 #   scripts/demo.sh <site-dir> <base-url> <version> <out-dir>
 #

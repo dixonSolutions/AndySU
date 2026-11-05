@@ -35,7 +35,7 @@ read-only check confirms availability, while CI is the consumer-install check.
 | Homebrew | `andysu` CLI | tap = this repository (`Formula/`) | CI consumer install (Linux and macOS) |
 | GitHub Action | `dixonSolutions/AndySU/actions/publish` | subdirectory action | action smoke test in CI |
 
-Below, `0.1.78` is the verified current example. Check the releases page for newer versions.
+Below, `0.1.78` is an example version; use the newest release.
 
 ## Gradle: plugin, host AAR, API, payload kit
 
@@ -116,10 +116,10 @@ npm install @andysu/capacitor && npx cap sync android
 npx @andysu/cli --version             # the CLI, bundled for Linux and macOS (x64, arm64)
 ```
 
-Only the `@andysu` scope goes to our registry; everything else still comes from npmjs.com. When the
-optional public npmjs.com publishing is enabled, the same packages are published there under
-unscoped names: `andysu` (the CLI), `andysu-react-native`, `andysu-capacitor` and
-`com.andysu.unity`. The GitHub-hosted names stay unchanged for existing consumers.
+Only the `@andysu` scope goes to our registry; everything else still comes from npmjs.com. The same
+packages are also published on npmjs.com under unscoped names: `andysu` (the CLI),
+`andysu-react-native`, `andysu-capacitor` and `com.andysu.unity`. The GitHub-hosted names stay
+unchanged for existing consumers.
 
 Without a registry entry, the release tarballs also work:
 `npm install https://github.com/dixonSolutions/AndySU/releases/download/v0.1.78/andysu-react-native-0.1.78.tgz`.
