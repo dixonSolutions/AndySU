@@ -419,18 +419,4 @@ jobs:
       - name: Verify installation from the public npm registry in a fresh consumer
         env:
           V: ${{ needs.version.outputs.version }}
-        run: |
-          work="$(mktemp -d)"
-          trap 'rm -rf "$work"' EXIT
-          cd "$work"
-          npm init -y >/dev/null
-          for i in $(seq 1 12); do
-            if npm install --no-audit --no-fund --registry=https://registry.npmjs.org \
-              "andysu-react-native@$V" "andysu-capacitor@$V" "andysu@$V" "com.andysu.unity@$V"; then
-              break
-            fi
-            [ "$i" -lt 12 ] || exit 1
-            sleep 10
-          done
-          node -e 'for(const p of ["andysu-react-native","andysu-capacitor"]) require.resolve(p); const u=require("./node_modules/com.andysu.unity/package.json"); if(u.version!==process.env.V) throw Error(`Unity package version ${u.version}`);'
-          ./node_modules/.bin/andysu --version | grep -F "$V"
+        run: scripts/verify-npmjs.sh "$V"
