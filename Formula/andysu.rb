@@ -4,28 +4,28 @@
 class Andysu < Formula
   desc "Complete, permission-free self-updates for apps outside the stores"
   homepage "https://github.com/dixonSolutions/AndySU"
-  version "0.1.98"
+  version "0.1.106"
   license "Apache-2.0"
 
   on_macos do
     on_arm do
-      url "https://github.com/dixonSolutions/AndySU/releases/download/v0.1.98/andysu-aarch64-apple-darwin"
-      sha256 "e456572fe170f38737c7d56d22e7a26d9fd9683971a9d198786d9931cc4c9705"
+      url "https://github.com/dixonSolutions/AndySU/releases/download/v0.1.106/andysu-aarch64-apple-darwin"
+      sha256 "00ad785eff0cccb3d53b9fff2ae717c3ab6e3dfa54dde53e4a9e24888edbf420"
     end
     on_intel do
-      url "https://github.com/dixonSolutions/AndySU/releases/download/v0.1.98/andysu-x86_64-apple-darwin"
-      sha256 "8567db400c5ca2d284556e1a84c868fe45eb50e76d8c545717c5e271f512ccc1"
+      url "https://github.com/dixonSolutions/AndySU/releases/download/v0.1.106/andysu-x86_64-apple-darwin"
+      sha256 "69a48c32a3f4875359c7ac02947581b46c5cc7f05e88f3e1be2dd25293d2908c"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/dixonSolutions/AndySU/releases/download/v0.1.98/andysu-aarch64-unknown-linux-musl"
-      sha256 "dc7ab066d64ec5159fe2818b4dbe33a2a75c1217c7a88bd0835e882023b03455"
+      url "https://github.com/dixonSolutions/AndySU/releases/download/v0.1.106/andysu-aarch64-unknown-linux-musl"
+      sha256 "1dfa5933c04c00b7cf2b077d30ee596062b91f44a648ecc5cd20f9cac00c3025"
     end
     on_intel do
-      url "https://github.com/dixonSolutions/AndySU/releases/download/v0.1.98/andysu-x86_64-unknown-linux-musl"
-      sha256 "bbfebd1ab0e1f4664a7679d1c27e82a0036f86fe8cea57338a659d8e3061b224"
+      url "https://github.com/dixonSolutions/AndySU/releases/download/v0.1.106/andysu-x86_64-unknown-linux-musl"
+      sha256 "1d4d34a7da92308ea9b3a932507a9b18c8e6fb55ee7421cfd7ecb952b7274e2e"
     end
   end
 
