@@ -21,6 +21,7 @@ Export the Android build, then split the APK with `andysu split --transparent`.
 
 ```gdscript
 AndySU.set_apply_policy("restart")
+AndySU.set_update_mode("download_only")
 AndySU.check_now()
 
 func _ready():
@@ -39,6 +40,7 @@ func _on_status(s: Dictionary):
 | `check_now()`, `apply_now()`, `restart_now()` | as in the [Host API](/android/host-api#updateclient) |
 | `mark_healthy()` | commit this payload (otherwise the host does it after a while) |
 | `set_apply_policy(policy)` | `"live"`, `"restart"`, `"next_start"`, or `""` for the configured policy |
+| `set_update_mode(mode)`, `update_mode()` | `"auto"`, `"download_only"`, `"check_only"`, `"off"`, or `""` for the configured mode; read the effective one (`""` on a host older than API level 3, where the setter does nothing) |
 | signal `status_changed(status: Dictionary)` | status changes |
 
 On platforms without AndySU every call is a no-op.

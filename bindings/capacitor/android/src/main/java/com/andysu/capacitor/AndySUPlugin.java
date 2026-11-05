@@ -9,6 +9,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
 import org.json.JSONException;
+import org.json.JSONObject;
 
 /** Capacitor bridge to the AndySU host (com.andysu.api.Host). */
 @CapacitorPlugin(name = "AndySU")
@@ -75,6 +76,28 @@ public class AndySUPlugin extends Plugin {
     public void applyPolicy(PluginCall call) {
         JSObject o = new JSObject();
         o.put("policy", host() == null ? "live" : host().updates().applyPolicy());
+        call.resolve(o);
+    }
+
+    // Update mode needs Host API level 3; older hosts lack the methods, so check first.
+    private static boolean hasUpdateMode(HostApi h) {
+        return h != null && h.apiLevel() >= 3;
+    }
+
+    @PluginMethod
+    public void setUpdateMode(PluginCall call) {
+        HostApi h = host();
+        if (hasUpdateMode(h)) h.updates().setMode(call.getString("mode"));
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void updateMode(PluginCall call) {
+        HostApi h = host();
+        String m = hasUpdateMode(h) ? h.updates().mode() : null;
+        JSObject o = new JSObject();
+        // JSONObject.put(key, null) would drop the key; NULL keeps an explicit null in the result.
+        o.put("mode", m == null ? JSONObject.NULL : m);
         call.resolve(o);
     }
 

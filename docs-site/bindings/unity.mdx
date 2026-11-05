@@ -43,6 +43,7 @@ Unity's runtime (Mono) uses `SIGSEGV` in normal operation, so keep the default `
 
 ```csharp
 AndySU.Updates.SetApplyPolicy(AndySU.ApplyPolicy.NextStart);
+AndySU.Updates.SetUpdateMode(AndySU.UpdateMode.DownloadOnly);
 if (AndySU.Updates.IsPresent) AndySU.Updates.CheckNow();
 ```
 
@@ -54,5 +55,7 @@ if (AndySU.Updates.IsPresent) AndySU.Updates.CheckNow();
 | `Updates.CheckNow()`, `ApplyNow()`, `RestartNow()` | as in the [Host API](/android/host-api#updateclient) |
 | `Updates.MarkHealthy()` | commit this payload |
 | `Updates.SetApplyPolicy(ApplyPolicy?)` | `Live`, `Restart`, `NextStart`, or null |
+| `Updates.SetUpdateMode(UpdateMode?)` | `Auto`, `DownloadOnly`, `CheckOnly`, `Off`, or null for the configured mode. Does nothing on a host older than API level 3 |
+| `Updates.GetUpdateMode()` | the effective `UpdateMode?`; null without a host or on a host older than API level 3 |
 
 It talks to `com.andysu.api.Host` over JNI on Android; elsewhere every call returns neutral values.

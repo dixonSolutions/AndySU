@@ -71,6 +71,24 @@ public class AndySUGodotPlugin extends GodotPlugin {
         if (host() != null) host().updates().setApplyPolicy(policy == null || policy.isEmpty() ? null : policy);
     }
 
+    // Update mode needs Host API level 3; older hosts lack the methods, so check first.
+    private static boolean hasUpdateMode() {
+        HostApi h = host();
+        return h != null && h.apiLevel() >= 3;
+    }
+
+    @UsedByGodot
+    public void set_update_mode(String mode) {
+        if (hasUpdateMode()) host().updates().setMode(mode == null || mode.isEmpty() ? null : mode);
+    }
+
+    @UsedByGodot
+    public String update_mode() {
+        if (!hasUpdateMode()) return "";
+        String m = host().updates().mode();
+        return m == null ? "" : m;
+    }
+
     @UsedByGodot
     public void listen() {
         if (host() != null) host().updates().setListener(json -> emitSignal("status_changed", json));

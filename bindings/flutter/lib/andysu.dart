@@ -9,6 +9,8 @@ import 'package:flutter/services.dart';
 
 enum ApplyPolicy { live, restart, nextStart }
 
+enum UpdateMode { auto, downloadOnly, checkOnly, off }
+
 class AndySU {
   static const MethodChannel _ch = MethodChannel('andysu');
   static const EventChannel _ev = EventChannel('andysu/status');
@@ -53,6 +55,32 @@ class AndySU {
         ApplyPolicy.nextStart => 'next_start',
         null => null,
       });
+
+  /// How much automatic updating this install performs; null returns to the mode configured in the
+  /// host. Needs Host API level 3: does nothing on an older host.
+  static Future<void> setUpdateMode(UpdateMode? m) => _call('setUpdateMode', switch (m) {
+        UpdateMode.auto => 'auto',
+        UpdateMode.downloadOnly => 'download_only',
+        UpdateMode.checkOnly => 'check_only',
+        UpdateMode.off => 'off',
+        null => null,
+      });
+
+  /// The effective update mode; null without a host or on a host older than API level 3.
+  static Future<UpdateMode?> updateMode() async {
+    try {
+      final s = await _ch.invokeMethod<String>('updateMode');
+      return switch (s) {
+        'auto' => UpdateMode.auto,
+        'download_only' => UpdateMode.downloadOnly,
+        'check_only' => UpdateMode.checkOnly,
+        'off' => UpdateMode.off,
+        _ => null,
+      };
+    } on MissingPluginException {
+      return null;
+    }
+  }
 
   static Stream<Map<String, dynamic>> get statusChanges =>
       _ev.receiveBroadcastStream().map((s) => jsonDecode(s as String) as Map<String, dynamic>);

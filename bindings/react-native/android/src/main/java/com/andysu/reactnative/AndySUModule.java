@@ -72,6 +72,20 @@ public class AndySUModule extends ReactContextBaseJavaModule {
         p.resolve(h == null ? "live" : h.updates().applyPolicy());
     }
 
+    // Update mode needs Host API level 3; older hosts lack the methods, so check first.
+    @ReactMethod
+    public void setUpdateMode(String mode) {
+        HostApi h = Host.current();
+        if (h != null && h.apiLevel() >= 3) h.updates().setMode(mode);
+    }
+
+    @ReactMethod
+    public void updateMode(Promise p) {
+        HostApi h = Host.current();
+        String m = (h != null && h.apiLevel() >= 3) ? h.updates().mode() : null;
+        p.resolve(m == null ? "" : m);
+    }
+
     @ReactMethod
     public void markHealthy() {
         HostApi h = Host.current();

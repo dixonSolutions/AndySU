@@ -36,3 +36,12 @@ func mark_healthy() -> void:
 ## "live", "restart", "next_start", or "" for the configured policy.
 func set_apply_policy(policy: String) -> void:
 	if _p: _p.set_apply_policy(policy)
+
+## "auto", "download_only", "check_only", "off", or "" for the mode configured in the host. Needs
+## Host API level 3; does nothing on an older host.
+func set_update_mode(mode: String) -> void:
+	if _p: _p.set_update_mode(mode)
+
+## The effective update mode, or "" without a host or on a host older than API level 3.
+func update_mode() -> String:
+	return _p.update_mode() if _p else ""

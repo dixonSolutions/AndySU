@@ -44,6 +44,7 @@ AndySU.statusChanges.listen((s) {
 });
 await AndySU.checkNow();
 await AndySU.setApplyPolicy(ApplyPolicy.restart);   // live, restart, nextStart, or null
+await AndySU.setUpdateMode(UpdateMode.downloadOnly);   // auto, downloadOnly, checkOnly, off, or null
 ```
 
 | Call | Returns |
@@ -52,6 +53,8 @@ await AndySU.setApplyPolicy(ApplyPolicy.restart);   // live, restart, nextStart,
 | `AndySU.status()` | status map, `{state: idle}` without a host |
 | `AndySU.checkNow()`, `applyNow()`, `restartNow()`, `markHealthy()` | `Future<void>` |
 | `AndySU.setApplyPolicy(ApplyPolicy? p)` | `Future<void>` |
+| `AndySU.setUpdateMode(UpdateMode? m)` | `Future<void>`; `auto`, `downloadOnly`, `checkOnly`, `off`, or null. A no-op on a host older than API level 3 |
+| `AndySU.updateMode()` | `Future<UpdateMode?>`; null without a host or on a host older than API level 3 |
 | `AndySU.statusChanges` | `Stream<Map<String, dynamic>>` |
 
 Status states are listed in [Status and errors](/reference/status-and-errors).

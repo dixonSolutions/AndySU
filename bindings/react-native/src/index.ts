@@ -66,6 +66,24 @@ export async function applyPolicy(): Promise<ApplyPolicy> {
   return native.applyPolicy();
 }
 
+export type UpdateMode = 'auto' | 'download_only' | 'check_only' | 'off';
+
+/**
+ * How much automatic updating this install performs: 'auto', 'download_only', 'check_only' or
+ * 'off'. Pass null to return to the mode configured in the host. Needs Host API level 3; on an
+ * older host this does nothing.
+ */
+export function setUpdateMode(mode: UpdateMode | null): void {
+  native?.setUpdateMode(mode);
+}
+
+/** The effective update mode, or null when the host is absent or older than API level 3. */
+export async function updateMode(): Promise<UpdateMode | null> {
+  if (!native) return null;
+  const m: string = await native.updateMode();
+  return m ? (m as UpdateMode) : null;
+}
+
 /** Commit this payload generation (call once the app is known to work). */
 export function markHealthy(): void {
   native?.markHealthy();
