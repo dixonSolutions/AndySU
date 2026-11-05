@@ -357,3 +357,13 @@ both could issue the same `sequence` with different bytes, which clients refuse 
 So the job builds the CLI first, then skips if a release is active and otherwise signs and pushes
 within seconds. It pushes without force, so it loses any race it does enter, and the 14-day margin
 leaves room for the next week's run.
+
+## D35. No BlissOS VM; emulators get their own memory limit (2026-11-06)
+The owner ruled out the BlissOS VM on 2026-11-05 because it keeps shutting the computer off, so it is
+no longer a test path. Its past results stay in PROGRESS as history. The machine's unclean stop on
+2026-11-05 at about 17:40 has no established cause: the journal for that boot shows no OOM, panic, MCE,
+NVMe error or Bliss/libvirt entry, so it is not recorded against Bliss.
+
+`scripts/heavy.sh` never capped emulators. `podman run` places the container in its own `libpod`
+scope, outside the `systemd-run` scope, so `run.sh` now sets `--memory=8g --memory-swap=8g` itself.
+CI remains the emulator coverage across API levels. Waydroid is under assessment and not installed.
