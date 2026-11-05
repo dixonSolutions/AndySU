@@ -38,7 +38,7 @@ flowchart TD
 | `verify` | consumer verification: a fresh project installs the package from the live Pages and Release URLs, one matrix entry each for `cargo`, `npm`, `upm`, `maven`, `pub`, `c` and `godot` |
 | `verify-homebrew` | `brew tap` and `brew install` on Linux and macOS, and checks `andysu --version` |
 | `verify-signature` | downloads the release, checks `sha256sum -c` and the `SHA256SUMS` signature against `keys/andysu-release-root-public.pem`, and verifies the live demo channel with `andysu verify --blobs` |
-| `crates-io`, `npmjs` | optional GitHub OIDC publishing after `verify`; disabled unless `PUBLISH_CRATES_IO=true` or `PUBLISH_NPMJS=true` is set after trusted publisher setup |
+| `crates-io`, `npmjs` | optional GitHub OIDC publishing after `verify`; each runs while `PUBLISH_CRATES_IO` or `PUBLISH_NPMJS` is `true`, as both are now |
 
 ## What gets published where
 
@@ -66,11 +66,11 @@ key's certificate has fewer than 30 days left.
 ## Public registries
 
 Our GitHub Pages and Releases are the default. The crates.io and npmjs.com jobs use short-lived OIDC
-credentials and stay off until the repository variables `PUBLISH_CRATES_IO` and `PUBLISH_NPMJS` are
-enabled after trust setup. crates.io requires both crates to be published once before its trusted
-publisher can be configured. npm requires bootstrap publication and a first OIDC release within two
-days of configuring trust. Verify package ownership before enabling either job; see
-[Keys policy](/contributing/keys-policy).
+credentials. Both repository variables, `PUBLISH_CRATES_IO` and `PUBLISH_NPMJS`, have been enabled
+since 2026-11-04; setting either to `false` turns that job off. crates.io requires both crates to be
+published once before its trusted publisher can be configured. npm requires bootstrap publication
+and a first OIDC release within two days of configuring trust. To add a new package, verify its
+ownership and configure its trusted publisher first; see [Keys policy](/contributing/keys-policy).
 
 ## When a release fails
 

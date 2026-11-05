@@ -113,5 +113,6 @@ re-sign on a schedule with `andysu sign`, which refreshes the expiry. See
 ## How AndySU itself does it
 
 AndySU's own release workflow publishes a demo channel on every merge to `main`: it builds the
-Compose sample, packs it against all earlier releases (deltas), signs with a CI test key and pushes
-the site to GitHub Pages. See [Release pipeline](/contributing/release-pipeline).
+Compose sample, packs it against all earlier releases (deltas), signs with the certified production
+release key (`ANDYSU_DEMO_SIGNING_KEY`) and pushes the site to GitHub Pages. See
+[Release pipeline](/contributing/release-pipeline).
