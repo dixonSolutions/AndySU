@@ -31,6 +31,10 @@ func load_addon() -> Node:
 	return node
 
 func _initialize() -> void:
+	# The root enters the tree after this returns, and the addon finds the plugin in _ready.
+	run.call_deferred()
+
+func run() -> void:
 	var a := load_addon()
 	expect("present without the plugin", a.is_present(), false)
 	expect("version without the plugin", a.version(), "")
@@ -42,7 +46,7 @@ func _initialize() -> void:
 	a.mark_healthy()
 	a.set_apply_policy("live")
 	a.set_update_mode("off")
-	a.queue_free()
+	a.free()
 
 	var fake := FakePlugin.new()
 	Engine.register_singleton("AndySU", fake)
@@ -66,7 +70,8 @@ func _initialize() -> void:
 	expect("status signal", seen, [{"state": "downloading"}])
 
 	Engine.unregister_singleton("AndySU")
-	b.queue_free()
+	b.free()
+	fake.free()
 	if failures == 0:
 		print("andysu godot binding: ok")
 	quit(1 if failures > 0 else 0)
