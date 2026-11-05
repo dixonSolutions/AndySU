@@ -23,6 +23,8 @@ count=0
 
 for archive in "$@"; do
   [[ -f "$archive" ]] || { echo "missing npm tarball: $archive" >&2; exit 1; }
+  # npm reads "dist/x.tgz" as the GitHub repository dist/x.tgz, so always hand it an absolute path.
+  archive="$(realpath "$archive")"
   metadata="$(tar -xzOf "$archive" package/package.json)"
   name="$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.name)' "$metadata")"
   package_version="$(node -e 'const p=JSON.parse(process.argv[1]); process.stdout.write(p.version)' "$metadata")"
