@@ -41,6 +41,11 @@ not established: that boot's journal shows no OOM, panic, MCE, NVMe error or Bli
 - **`resign-demo` first live run (42106487506):** green, but not forced, and sequence stayed 20, so
   a real re-sign and push has still not run live. Certificate valid for 88 more days.
 - **Emulator memory:** containers were never covered by the `heavy.sh` cap; see D35.
+- **Test beds re-run by the lead (real apps, capped emulator, peak 6.4 GB):** Xonotic on API 36:
+  `--live`, `--live-failures` and `--low-storage` pass with `screen_alive` at all 10 check points.
+  The same `--live` bed without patch 0009 fails at the live swap (`0.0% of pixels changed: frozen`).
+  SuperTuxKart on API 34: built-in, next-start update and rollback pass, but **its bed has no
+  `screen_alive` check**, so a frozen screen there would go unseen.
 - **Lost:** the clean-room script a Luna worker wrote lived in `/tmp/luna` and went with the crash.
 
 ## Environment (2026-11-02)
