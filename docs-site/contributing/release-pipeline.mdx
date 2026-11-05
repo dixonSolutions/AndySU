@@ -55,7 +55,13 @@ flowchart TD
 Each release publishes the Compose sample's payload to `<Pages>/demo/stable/update.json`, signed with
 `ANDYSU_DEMO_SIGNING_KEY` (the same certified production release key), with deltas against earlier
 demo releases. The demo APK attached to each release is a host with that version built in, signed
-with the CI test keystore. An APK built with the current root live-updates to every later release.
+with the CI test keystore. An APK built with the current root (0.1.90 or later) live-updates to every
+later release. APKs up to 0.1.81 trust the old test root and refuse the channel, so they stay on their
+built-in version.
+
+The channel's signature lasts 30 days. The weekly `resign-demo` workflow re-signs it when fewer than
+14 days are left, so it stays valid when no release ships. That workflow also fails when the release
+key's certificate has fewer than 30 days left.
 
 ## Public registries
 
