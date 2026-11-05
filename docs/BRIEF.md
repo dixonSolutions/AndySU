@@ -370,11 +370,9 @@ Rules:
   - more images through `cmdline-tools/latest/bin/sdkmanager`;
   - `/dev/kvm` is usable, so run emulators headless with `-no-window`;
   - adb is also at `~/.local/opt/platform-tools/adb`.
-- BlissOS VM `xtbliss` (GNOME Boxes, libvirt session):
-  `timeout 60 flatpak run --command=virsh org.gnome.Boxes -c qemu:///session start xtbliss`, then
-  adb at `127.0.0.1:5555`. It belongs to the Xonotic work, so you may use it for testing but leave
-  it as you found it. **Never** install anything on `127.0.0.1:5605` (`lindroids-lab-b15`, another
-  project's VM).
+- **Do not start the BlissOS VM `xtbliss` or any other BlissOS VM** (owner, 2026-11-05: it keeps
+  shutting the computer off). It is not a test path any more; see D35. **Never** install anything on
+  `127.0.0.1:5605` (`lindroids-lab-b15`, another project's VM).
 - **GitHub repo:** on 2026-11-03 the owner authorised you to create `dixonSolutions/AndySU` (public).
   Don't create any other repository without asking.
 - GitHub CLI: authenticated as `dixonSolutions` with `repo` and `workflow` scopes. Store the test

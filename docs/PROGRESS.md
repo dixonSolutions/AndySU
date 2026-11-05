@@ -25,6 +25,29 @@ local.
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
 | 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated. Developer docs site in `docs-site/` (Mintlify, 47 pages: tutorials, guides, reference, how we work; the six tutorials were written by the lead from the sources, and an untrue claim that Capacitor web assets update hot in transparent mode was fixed in the docs and in `andysu init`), written by a worker (Sonnet), passing `mint validate` and `mint broken-links`; spot-checked by the lead against the CLI and registries. Deployed by Mintlify from `main` (`docs-site/`) at https://andysu.mintlify.site, which is also the repo's website link. Mintlify's GitHub App can reach only `lindroids` and `AndySU`; its OAuth grant was revoked after linking, as the owner asked |
 
+## Release 0.1.106 and the crash of 2026-11-05 (2026-11-06)
+The machine stopped uncleanly at about 17:40 on 2026-11-05 with this release in flight. The cause is
+not established: that boot's journal shows no OOM, panic, MCE, NVMe error or Bliss/libvirt entry.
+- **Release run 41978874133:** failed only in `npmjs`, in the step after publishing. npm served the
+  packages after the 2-minute verify window (`andysu-capacitor`: `npm publish` returned 06:53:58,
+  registry time 06:57:05). Re-running the job went green on attempt 3, with nothing republished.
+  `scripts/verify-npmjs.sh` now waits up to 20 minutes with an empty cache per attempt, tested by
+  `scripts/test-publish-npmjs.sh` and against the real registry.
+- **Fresh consumer, public npm:** all four packages install at 0.1.106; `andysu --version` agrees.
+- **Live update from the published APK (API 36, container):** the v0.1.98 demo APK swapped live to
+  0.1.106 from the real Pages channel, committed and showed "Payload version 0.1.106"
+  (`docs/evidence/demo-live-0.1.98-to-0.1.106.png`). APK hash and `versionName` unchanged; no
+  installer or permission window in the focus log. Emulator peak 4.5 GB.
+- **`resign-demo` first live run (42106487506):** green, but not forced, and sequence stayed 20, so
+  a real re-sign and push has still not run live. Certificate valid for 88 more days.
+- **Emulator memory:** containers were never covered by the `heavy.sh` cap; see D35.
+- **Test beds re-run by the lead (real apps, capped emulator, peak 6.4 GB):** Xonotic on API 36:
+  `--live`, `--live-failures` and `--low-storage` pass with `screen_alive` at all 10 check points.
+  The same `--live` bed without patch 0009 fails at the live swap (`0.0% of pixels changed: frozen`).
+  SuperTuxKart on API 34: built-in, next-start update and rollback pass, but **its bed has no
+  `screen_alive` check**, so a frozen screen there would go unseen.
+- **Lost:** the clean-room script a Luna worker wrote lived in `/tmp/luna` and went with the crash.
+
 ## Environment (2026-11-02)
 - rustup stable 1.99.1 in `~/.cargo` with aarch64/armv7/x86_64/i686 Android targets, cargo-ndk 4.1.2,
   nightly (for cargo-fuzz 0.13.2), cbindgen 0.29.4.

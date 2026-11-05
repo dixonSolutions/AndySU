@@ -57,9 +57,12 @@ On the owner's machine every emulator build segfaults after a few seconds to two
 binary runs fine inside an Ubuntu 24.04 container with `/dev/kvm` passed through and the SDK mounted
 read-only (`android/tests/emulator/run.sh`). `--container` uses it.
 
+`run.sh` limits the container to 8 GB with no swap. It needs its own limit because podman puts the
+container in its own cgroup, outside the scope that `scripts/heavy.sh` caps.
+
 ### Shared devices
 
-With `--device` on a device that someone else uses (the BlissOS VM, say):
+With `--device` on a device that someone else uses:
 
 - the tests do not turn the network off;
 - they restore logcat buffer sizes and animation scales;
@@ -113,8 +116,7 @@ checks that it boots its built-in version, finds the second, swaps it in live an
 
 ## What is not covered
 
-- Physical phones. The device suite passed on emulators and on a BlissOS VM (Android 13).
-- The Xonotic beds on the BlissOS VM, because the owner's own Xonotic Touch there has the same
-  package name.
+- Physical phones. The device suite passes on emulators, and passed once on a BlissOS VM (Android 13)
+  that is no longer used for testing.
 - A Xonotic rollback whose data unpack fails (there is no way to provoke it).
 - Flutter's tests locally (CI only), and the Godot and Unity runtimes.

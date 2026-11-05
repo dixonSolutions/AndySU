@@ -34,3 +34,35 @@ done
 [[ "$(wc -l < "$w/calls")" == 2 ]] || { echo "expected 2 publishes:" >&2; cat "$w/calls" >&2; exit 1; }
 grep -q 'com.andysu.unity' "$w/calls" || { echo "the Unity package was not published" >&2; exit 1; }
 echo "publish-npmjs: ok"
+
+# verify-npmjs.sh against a registry that serves the release on the third try. Each try must start
+# with an empty cache, or npm answers from its stale copy of the package document.
+cat > "$w/npm-late" <<STUB
+#!/bin/sh
+case "\$1" in
+  install)
+    while [ \$# -gt 0 ]; do [ "\$1" = --cache ] && cache="\$2"; shift; done
+    [ -z "\$(ls -A "\$cache")" ] || { echo "stale cache" >&2; exit 3; }
+    touch "\$cache/document"
+    echo x >> "$w/tries"
+    [ "\$(wc -l < "$w/tries")" -ge "\${SERVE_AT:-3}" ] || { echo "npm error code ETARGET" >&2; exit 1; }
+    mkdir -p node_modules/.bin
+    for p in andysu-react-native andysu-capacitor com.andysu.unity; do
+      mkdir -p "node_modules/\$p"
+      echo '{"name":"'\$p'","version":"$version","main":"i.js"}' > "node_modules/\$p/package.json"
+      touch "node_modules/\$p/i.js"
+    done
+    printf '#!/bin/sh\necho $version\n' > node_modules/.bin/andysu
+    chmod +x node_modules/.bin/andysu ;;
+  *) exec "$real_npm" "\$@" ;;
+esac
+STUB
+chmod +x "$w/npm-late"
+NPM_BIN="$w/npm-late" VERIFY_DELAY=0 "$repo/scripts/verify-npmjs.sh" "$version"
+[[ "$(wc -l < "$w/tries")" == 3 ]] || { echo "expected 3 tries" >&2; exit 1; }
+rm "$w/tries"
+if SERVE_AT=9 NPM_BIN="$w/npm-late" VERIFY_ATTEMPTS=2 VERIFY_DELAY=0 "$repo/scripts/verify-npmjs.sh" "$version" 2>/dev/null; then
+  echo "verify-npmjs passed a version npm never served" >&2
+  exit 1
+fi
+echo "verify-npmjs: ok"
