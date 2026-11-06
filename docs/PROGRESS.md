@@ -55,6 +55,13 @@ not established: that boot's journal shows no OOM, panic, MCE, NVMe error or Bli
   on the real channel: data kept, status up to date, auto mode on. The raw events showed the fresh
   install live-swapping to its own version, because the built-in release has no sequence. The host
   now passes `factory_id`, and the core treats that release as up to date.
+- **Xonotic Touch 1.2.112, over the air:** the published 1.2.111 live APK updated itself to 1.2.112 on
+  the real channel, in process and untouched; the screen kept drawing, a saved setting survived, and
+  a fresh 1.2.112 install no longer swaps to itself. `resign-live` re-signed all three channels.
+- **SuperTuxKart Touch:** CI-built APK on API 36: host over plain, automatic next-start update, player
+  profile kept. STK saves `players.xml` only on a clean exit, so tests must not force-stop it.
+- **Tauri:** the published dYT 0.1.11 APK ran under a transparent host and committed an update. The
+  payload differed only by version, so changed web content is still unproven.
 - **Lost:** the clean-room script a Luna worker wrote lived in `/tmp/luna` and went with the crash.
 
 ## Environment (2026-11-02)

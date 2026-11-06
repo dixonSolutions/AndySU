@@ -45,6 +45,13 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
         Phoenix.relaunch(ctx, "restart requested")
     }
 
+    /** A live swap commits in this process: without this, the status would keep saying "staged". */
+    fun committed(release: String) {
+        if (status.optString("state") == "staged" && status.optString("release") == release) {
+            setStatus("up_to_date", JSONObject().put("release", release))
+        }
+    }
+
     fun checkAsync(trigger: String) = exec.execute { runCheck(trigger) }
     fun gcAsync() = exec.execute {
         try {
