@@ -38,6 +38,10 @@ pub struct Config {
     /// Read-only slot directories usable as delta bases (e.g. the payload built into the host).
     #[serde(default)]
     pub base_dirs: Vec<String>,
+    /// The release built into the host, when that is what runs. It has no sequence, so without this
+    /// a fresh install takes the channel's copy of the same release for an update.
+    #[serde(default)]
+    pub factory_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -195,6 +199,12 @@ impl Session {
                     size: sh.size,
                     urls: self.resolve_all(&sh.urls, None)?,
                 })
+            }
+            Selection::Release { release, .. }
+                if st.current.is_none() && self.cfg.factory_id.as_deref() == Some(release.id.as_str()) =>
+            {
+                self.target = None;
+                Ok(CheckOutcome::UpToDate { sequence: m.sequence })
             }
             Selection::Release { release, abi } => {
                 let release = release.clone();

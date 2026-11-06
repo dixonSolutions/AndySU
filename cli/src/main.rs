@@ -494,6 +494,7 @@ fn client(root: &Path, cmd: ClientCmd) -> R<()> {
                 device: andysu_core::select::Device { host_api, shell_version: 0, api_level, abis: abi },
                 low_storage: false,
                 base_dirs: vec![],
+                factory_id: None,
             };
             let store = core(andysu_core::store::Store::open(root))?;
             serde_json::to_value(core(andysu_core::transport::update_once(
