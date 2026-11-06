@@ -234,6 +234,7 @@ object AndySU {
             emit("committed", JSONObject().put("version", generation?.version ?: Transparent.version).put("result", r)
                 .put("state", Core.obj(Core.state(root.path))))
             liveSwap = null
+            updater.committed(generation?.version ?: Transparent.version)
             updater.gcAsync()
         }
     }
