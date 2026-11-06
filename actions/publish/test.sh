@@ -113,7 +113,7 @@ echo "ok github: 3 releases as release assets, manifest on the latest release, c
 # GitHub loads action.yml itself and nothing above does: an unquoted colon once made the action
 # impossible to use while this script passed.
 if command -v ruby >/dev/null; then
-  ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$(dirname "$0")/action.yml" || { echo "action.yml is not valid YAML"; exit 1; }
+  ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$repo_root/actions/publish/action.yml" || { echo "action.yml is not valid YAML"; exit 1; }
   echo "ok action.yml parses"
 elif [ -n "${CI:-}" ]; then
   echo "ruby is needed to check action.yml"; exit 1
