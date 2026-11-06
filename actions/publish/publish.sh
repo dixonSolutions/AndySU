@@ -88,7 +88,14 @@ github)
   "$cli" pack "$INPUT_PAYLOAD" --site "$site" --channel "$channel" --id "$version" --base-url "$base" "${pack_args[@]}"
   "$cli" publish --site "$site" --channel "$channel" --release "$version" "${sign[@]}" "${rollout[@]}"
   assets=()
-  while IFS= read -r f; do assets+=("$f"); done < <(find "$site/blobs" "$site/deltas" -type f 2>/dev/null)
+  # Release assets are a flat list and files are named by their hash, so identical patches from two
+  # bases share a name: upload each name once.
+  declare -A seen=()
+  while IFS= read -r f; do
+    [ -z "${seen[${f##*/}]:-}" ] || continue
+    seen[${f##*/}]=1
+    assets+=("$f")
+  done < <(find "$site/blobs" "$site/deltas" -type f 2>/dev/null)
   manifest=("$site/$channel/update.json" "$site/$channel/update.json.sig")
   if [ "$channel" = stable ]; then
     gh release create "$tag" --repo "$repo" --latest --title "$version" \

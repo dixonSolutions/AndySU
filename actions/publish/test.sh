@@ -85,12 +85,26 @@ case "$sub" in
   view) [ -d "$d" ] ;;
   create|upload)
     mkdir -p "$d"
+    # Release assets are a flat list: GitHub refuses a second asset of the same name.
+    dup="$(for f in "${files[@]}"; do basename "$f"; done | sort | uniq -d | head -1)"
+    [ -z "$dup" ] || { echo "HTTP 404: duplicate asset $dup" >&2; exit 1; }
     for f in "${files[@]}"; do cp "$f" "$d/$(basename "$f")"; done
     if $latest; then rm -rf "$GH_ROOT/$repo/releases/latest"; mkdir -p "$GH_ROOT/$repo/releases/latest"; cp -r "$d" "$GH_ROOT/$repo/releases/latest/download"; fi ;;
 esac
 GH
 chmod +x "$t/bin/gh"
 p="$(port)"
+# Two bases can give byte-identical patches: same name, different folders. Xonotic Touch 1.2.113 hit
+# this with an unchanged library, so plant such a twin after every pack.
+cat > "$t/bin/andysu-twin" <<TWIN
+#!/bin/bash
+"$cli" "\$@" || exit
+[ "\$1" = pack ] || exit 0
+site="\$(while [ \$# -gt 0 ]; do [ "\$1" = --site ] && echo "\$2"; shift; done)"
+f="\$(find "\$site/deltas" -type f 2>/dev/null | head -1)"
+[ -z "\$f" ] || { mkdir -p "\$site/deltas/twin"; cp "\$f" "\$site/deltas/twin/"; }
+TWIN
+chmod +x "$t/bin/andysu-twin"
 "$cli" serve "$gh_root" --addr "127.0.0.1:$p" >/dev/null 2>&1 &
 pids+=($!)
 sleep 0.3
@@ -98,7 +112,8 @@ printf 'app = "%s"\nhost_api = 1\npublic_key = "k.pem"\n[remote]\ntype = "github
   "$APP" > "$t/github/andysu.toml"
 cp "$t/keys/andysu-public.pem" "$t/github/k.pem"
 for v in 1.0 2.0 3.0; do
-  PATH="$t/bin:$PATH" GH_ROOT="$gh_root" ANDYSU_GITHUB_URL="http://127.0.0.1:$p" run_action github "$v" >/dev/null
+  PATH="$t/bin:$PATH" GH_ROOT="$gh_root" ANDYSU_GITHUB_URL="http://127.0.0.1:$p" cli="$t/bin/andysu-twin" \
+    run_action github "$v" >/dev/null
 done
 latest="$gh_root/owner/app/releases/latest/download/update.json"
 releases="$(python3 -c "import json; print([r['id'] for r in json.load(open('$latest'))['releases']])")"
