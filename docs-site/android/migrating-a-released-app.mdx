@@ -1,0 +1,84 @@
+---
+title: "Migrate a released app"
+description: "Add a transparent host without leaving existing installs behind."
+---
+
+Use this guide if your app already ships as a plain APK and has its own APK updater. Follow the
+[transparent mode recipe](/android/transparent-mode) to build the host and payloads.
+
+## Move installed users to the host
+
+1. Keep shipping the plain APK. Use the transparent host on Android 11 (API 30) and later: payload
+   assets need API 30. If your app supports older Android versions, dropping the plain APK would leave
+   those devices behind. Transparent payloads without assets can run on API 28 and later; check your
+   app's requirements before relying on that path.
+2. Give the host APK a name that installed clients' APK updaters cannot match. Release a plain APK
+   whose updater prefers that host on API 30 and later, while still selecting the plain APK on older
+   devices. Existing installs then move in two steps: first the plain update, then the host. Test the
+   matching rules against the updater versions already in users' hands.
+3. Sign the host with the same app signing key as the plain APK. Android will otherwise refuse to
+   install it over the existing app. Keep the same application ID too.
+4. In the new app, make the in-app APK updater stand down when
+   [`Host.current()`](/android/host-api#hostcurrent) returns a host. The host's `versionName` is
+   frozen, so the old updater would offer an APK install on every release. Keep the old updater for
+   plain builds. Make sure the host API can be checked safely in a plain build too.
+
+## Configure and publish
+
+- Set `host_api = 3` in `andysu.toml` and use a level-3 host AAR for `UpdateClient.setMode`. The
+  host uses the smaller of `host_api` and the level implemented by its AAR. Payloads using the mode
+  methods must also require `host_api_min = 3`.
+- Set `[policy] watchdog_ms` from a slow device's healthy startup time, with room to spare. The
+  default is 10000 ms. For example, a game loading data at startup rolled good updates back at 10 s
+  and was stable at 45 s. Measure your own app: a timeout that is too short rolls back good releases.
+- Make the published payload release ID equal the version built into the host. The host uses that
+  identity to recognize its factory payload; a mismatch can make it update to its own version. By
+  default `andysu pack` uses the payload version as the release ID. See the
+  [CLI reference](/reference/cli#pack).
+- Use one channel per ABI when shipping separate ABI APKs. Each host follows one channel, so this
+  keeps it on releases built for its ABI. Set `[remote] channel` for each host and publish each
+  payload to its matching channel.
+- Channel manifests expire after 30 days by default. Schedule a weekly re-sign when releases are
+  infrequent, so clients do not reject an expired manifest. Also renew the release key certificate
+  before it expires. See [Rollouts and channels](/publishing/rollouts-and-channels) and
+  [Keys and certificates](/publishing/keys-and-certificates).
+- Keep the AndySU publish job separate from existing release jobs, so a publish failure cannot block
+  them. Pin the AndySU version used by the job so a tool update cannot change the build unexpectedly.
+
+## Update screen
+
+Show the running payload version from `HostApi.version()`, not the frozen `versionName`. Hide
+controls and details that do not apply to the current build or state. Leave the plain build's screen
+unchanged.
+
+Handle `idle`, `checking`, `up_to_date`, `downloading`, `staged`, `applying`, `shell_update`, `error`,
+`deferred` and `available`. Do not show "up to date" for `idle` or `error`: neither confirms a
+successful check. The current updater does not set `applying`, but clients should handle it. See
+[Status and errors](/reference/status-and-errors).
+
+Keep `shell_update` actionable. Once the old updater stands down, this is the path to replace the
+host when a release needs a newer one. The host needs install permission and user approval; see
+[Permissions and components](/android/permissions#tier-c-updating-the-host-itself).
+
+## Tauri
+
+In a Tauri Android app, the web UI is embedded in the app's native library, not in assets. A web
+change is therefore a native update. Without a live-swap handler it applies on the next start. A real
+Tauri app was tested on an emulator: it booted under the host and updated between two real releases, a
+14 MB native library change. The UI and the app's native engine both worked after the update.
+
+Android's WebView installs its own crash handlers, and the host reports `crash_handler_replaced`. A
+native crash during a trial is then caught by the watchdog, not at once. `crash_signals = "host"`
+puts the host first and is the likely setting for Tauri, but it has not been tested yet.
+
+## Test the migration
+
+- Install the host over the plain APK and confirm settings survive. If the app saves on exit, quit
+  cleanly first.
+- Check both updater steps and the API 30 boundary, including an older device that keeps the plain APK.
+- Publish an update, start it and confirm it commits. Check that the screen really changes, not just
+  that events report an update.
+- Check each status, including an error and a host update, and test each ABI channel.
+
+The repository's real-app migration tests ran on Android emulators, not phones. Test your own app on
+phones as well, especially slow devices and devices with saved user data.

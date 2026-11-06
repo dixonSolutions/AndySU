@@ -377,6 +377,48 @@ def screen_alive(d, what):
     raise dt.Fail(msg)
 
 
+def stk_menu_alive(d, what):
+    """SuperTuxKart's counterpart of screen_alive: its menu does not move on its own and ignores the
+    console key, so tap Options and require most of the screen to change. It first answers the
+    first-run dialogs, which the game asks again after a force-stop: it saves players.xml on a clean
+    exit only."""
+    def frame():
+        raw = subprocess.run([dt.ADB, "-s", d.serial, "exec-out", "screencap"], stdout=subprocess.PIPE,
+                             timeout=60).stdout
+        w, h = struct.unpack("<II", raw[:8])
+        return w, h, raw[len(raw) - w * h * 4:]
+
+    def dialog():  # the light panel covers a spot of the menu that is otherwise dark
+        w, h, px = frame()
+        i = (int(h * 0.278) * w + int(w * 0.292)) * 4
+        return min(px[i], px[i + 1], px[i + 2]) > 170
+
+    w, h, _ = frame()
+    tap = lambda x, y: d.sh(f"input tap {int(w * x)} {int(h * y)}", check=False)
+    end = time.time() + 60
+    while not dialog() and time.time() < end:
+        time.sleep(3)
+    for x, y in [(0.367, 0.739), (0.4075, 0.665)] * 4:  # the No buttons of the two dialogs
+        if not dialog():
+            time.sleep(5)
+            if not dialog():
+                break
+        tap(x, y)
+        time.sleep(4)
+    _, _, before = frame()
+    tap(0.625, 0.944)
+    time.sleep(4)
+    _, _, after = frame()
+    idx = range(0, min(len(before), len(after)) - 4, 4 * 97)
+    changed = sum(1 for i in idx if sum(abs(before[i + c] - after[i + c]) for c in range(3)) > 20) / len(idx)
+    if changed < 0.05:
+        screenshot(d, f"screen-alive-fail-{what}")
+        raise dt.Fail(f"menu not alive ({what}): {changed:.1%} of the screen changed after tapping Options")
+    log(f"[screen] {what}: alive ({changed:.1%} changed after tapping Options)")
+    d.sh("input keyevent KEYCODE_BACK", check=False)
+    time.sleep(2)
+
+
 def install_granted(d, apk):
     """Install with runtime permissions granted: Xonotic Touch asks for notifications on first run, and
     the dialog would otherwise sit over the game and take the key presses."""
@@ -487,6 +529,8 @@ def bed(d, name, spec, work, results):
             engine_note = "; engine ran (SDL_main from the payload's libmain.so, init banner, GL renderer)"
         time.sleep(15)
         screenshot(d, f"{name}-1-builtin-{va}")
+        if name == "stk":
+            stk_menu_alive(d, "stk-builtin")
         results.append({"bed": name, "step": "builtin", "detail": f"{va} runs from the payload built into the host APK" + engine_note})
         st = d.status("staged", timeout=900)
         log(f"[{name}] {vb} staged: {st['status'].get('download_bytes')} bytes")
@@ -501,6 +545,8 @@ def bed(d, name, spec, work, results):
         wait_committed(d, name)
         time.sleep(10)
         screenshot(d, f"{name}-2-updated-{vb}")
+        if name == "stk":
+            stk_menu_alive(d, "stk-updated")
         host_ver = installed_version()
         results.append({"bed": name, "step": "update",
                         "detail": f"{vb} applied on next start and committed; installed APK still versionName {host_ver}"
@@ -533,6 +579,8 @@ def bed(d, name, spec, work, results):
             raise dt.Fail(f"expected exactly one relaunch after the broken start, saw {relaunches}")
         time.sleep(10)
         screenshot(d, f"{name}-3-rolled-back-{vb}")
+        if name == "stk":
+            stk_menu_alive(d, "stk-rolled-back")
         st = d.state() if False else None
         results.append({"bed": name, "step": "rollback",
                         "detail": f"{vb}-broken failed on start; rolled back by the crash handler; one relaunch; back on {vb}"})

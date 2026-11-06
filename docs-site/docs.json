@@ -58,6 +58,7 @@
               "android/host-config",
               "android/host-api",
               "android/transparent-mode",
+              "android/migrating-a-released-app",
               "android/native-libraries",
               "android/permissions"
             ]
