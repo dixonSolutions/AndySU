@@ -1,0 +1,90 @@
+{
+  "id": "1.2.9102",
+  "sequence": 1,
+  "requires": {
+    "host_api_min": 1,
+    "abis": [
+      "x86_64"
+    ]
+  },
+  "mandatory": false,
+  "components": [
+    {
+      "name": "andysu-payload.json",
+      "kind": "content",
+      "apply": "restart",
+      "path": "andysu-payload.json",
+      "sha256": "cb8efcec49ef9ad69461079d93c2c578910791225ac32753cf30e99a2fca1d65",
+      "size": 1042
+    },
+    {
+      "name": "assets.xonotic-slim-data.zip",
+      "kind": "content",
+      "apply": "restart",
+      "path": "assets/xonotic-slim-data.zip",
+      "sha256": "b2979b9c28b47cc19f86dcab0027363e646abdc332c9df66a62df16949b0546b",
+      "size": 26198298
+    },
+    {
+      "name": "dex.classes.dex",
+      "kind": "dex",
+      "apply": "restart",
+      "path": "dex/classes.dex",
+      "sha256": "912e8bb19dff08164a2a63e6a4f135f68d21cf7270707b4abd5c22f967acb90f",
+      "size": 154004
+    },
+    {
+      "name": "dex.resources.jar",
+      "kind": "content",
+      "apply": "restart",
+      "path": "dex/resources.jar",
+      "sha256": "baa89cfe177b34f9ff9c0d9ac8459cd3c4214390f3b8e776c8e0573a6b1cc5ed",
+      "size": 478
+    },
+    {
+      "name": "lib.x86_64.libSDL2.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "x86_64",
+      "path": "lib/x86_64/libSDL2.so",
+      "sha256": "8dc21bdab77c931c512ddd30d5964233a50a6774ec5fe9ada20d488f45c81e0e",
+      "size": 1613960
+    },
+    {
+      "name": "lib.x86_64.libandysu_xonotic_loader.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "x86_64",
+      "path": "lib/x86_64/libandysu_xonotic_loader.so",
+      "sha256": "d970b66edad1fa2f2eaa6059f749d330f84850d1a203d7747c5a00f32e8a17f4",
+      "size": 19144
+    },
+    {
+      "name": "lib.x86_64.libcurl.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "x86_64",
+      "path": "lib/x86_64/libcurl.so",
+      "sha256": "9221d8875eff05310701acc01ddc3fee719f223b81a3cb098e1a7f13b1514c19",
+      "size": 1538248
+    },
+    {
+      "name": "lib.x86_64.libmain.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "x86_64",
+      "path": "lib/x86_64/libmain.so",
+      "sha256": "9fa2a73d65b3b9dfa6c639cc80f56f8d072c9085fd9d32a61f8dfc4c8d8e3246",
+      "size": 5895232
+    },
+    {
+      "name": "lib.x86_64.libpng16.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "x86_64",
+      "path": "lib/x86_64/libpng16.so",
+      "sha256": "f49aff3e22249f5333ee7344b2be4d97a5431c0a8d58dbdc2e18962f2e1f4c94",
+      "size": 253544
+    }
+  ]
+}

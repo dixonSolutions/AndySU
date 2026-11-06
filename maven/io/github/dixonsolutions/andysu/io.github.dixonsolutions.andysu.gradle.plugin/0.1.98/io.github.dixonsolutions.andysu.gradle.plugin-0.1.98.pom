@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>io.github.dixonsolutions.andysu</groupId>
+  <artifactId>io.github.dixonsolutions.andysu.gradle.plugin</artifactId>
+  <version>0.1.98</version>
+  <packaging>pom</packaging>
+  <name>AndySU</name>
+  <description>Splits an Android app into a frozen host APK and a self-updating payload</description>
+  <dependencies>
+    <dependency>
+      <groupId>io.github.dixonsolutions.andysu</groupId>
+      <artifactId>andysu-gradle-plugin</artifactId>
+      <version>0.1.98</version>
+    </dependency>
+  </dependencies>
+</project>

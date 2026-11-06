@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "app": "io.github.dixonsolutions.xonotictouch",
+  "version": "1.2.9102",
+  "host_api_min": 1,
+  "entry": {
+    "transparent": true
+  },
+  "dex": [
+    "dex/classes.dex",
+    "dex/resources.jar"
+  ],
+  "needs": {
+    "permissions": [
+      "android.permission.INTERNET",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.REQUEST_INSTALL_PACKAGES",
+      "android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION"
+    ],
+    "activities": 2,
+    "services": 0,
+    "receivers": 0,
+    "providers": 0
+  },
+  "native": {
+    "x86_64": [
+      {
+        "name": "libSDL2",
+        "path": "lib/x86_64/libSDL2.so"
+      },
+      {
+        "name": "libandysu_xonotic_loader",
+        "path": "lib/x86_64/libandysu_xonotic_loader.so"
+      },
+      {
+        "name": "libcurl",
+        "path": "lib/x86_64/libcurl.so"
+      },
+      {
+        "name": "libmain",
+        "path": "lib/x86_64/libmain.so"
+      },
+      {
+        "name": "libpng16",
+        "path": "lib/x86_64/libpng16.so"
+      }
+    ]
+  }
+}

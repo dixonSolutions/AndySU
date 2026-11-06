@@ -1,0 +1,1033 @@
+{
+ "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+ "dist-tags": {
+  "latest": "0.1.130"
+ },
+ "license": "Apache-2.0",
+ "name": "@andysu/capacitor",
+ "repository": {
+  "directory": "bindings/capacitor",
+  "type": "git",
+  "url": "https://github.com/dixonSolutions/AndySU"
+ },
+ "time": {
+  "0.1.106": "2026-11-05T06:48:03.000Z",
+  "0.1.112": "2026-11-05T21:42:15.000Z",
+  "0.1.117": "2026-11-06T01:21:41.000Z",
+  "0.1.120": "2026-11-06T02:33:20.000Z",
+  "0.1.124": "2026-11-06T05:35:16.000Z",
+  "0.1.127": "2026-11-06T06:22:52.000Z",
+  "0.1.13": "2026-11-02T21:41:46.000Z",
+  "0.1.130": "2026-11-06T09:38:27.000Z",
+  "0.1.15": "2026-11-02T22:10:29.000Z",
+  "0.1.17": "2026-11-02T22:38:43.000Z",
+  "0.1.25": "2026-11-02T22:56:20.000Z",
+  "0.1.33": "2026-11-02T23:37:54.000Z",
+  "0.1.36": "2026-11-03T00:06:26.000Z",
+  "0.1.41": "2026-11-03T01:57:19.000Z",
+  "0.1.44": "2026-11-03T02:40:42.000Z",
+  "0.1.46": "2026-11-03T02:58:48.000Z",
+  "0.1.49": "2026-11-03T03:54:18.000Z",
+  "0.1.53": "2026-11-03T04:49:58.000Z",
+  "0.1.56": "2026-11-03T05:09:01.000Z",
+  "0.1.58": "2026-11-03T05:28:45.000Z",
+  "0.1.62": "2026-11-03T05:48:41.000Z",
+  "0.1.65": "2026-11-03T07:12:39.000Z",
+  "0.1.68": "2026-11-03T20:50:37.000Z",
+  "0.1.71": "2026-11-03T21:43:46.000Z",
+  "0.1.78": "2026-11-03T22:21:30.000Z",
+  "0.1.81": "2026-11-04T07:25:25.000Z",
+  "0.1.90": "2026-11-04T08:56:03.000Z",
+  "0.1.96": "2026-11-04T09:53:45.000Z",
+  "0.1.98": "2026-11-04T22:44:33.000Z",
+  "modified": "2026-11-06T09:38:27.000Z"
+ },
+ "versions": {
+  "0.1.106": {
+   "_id": "@andysu/capacitor@0.1.106",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-etxAy0WfNK/xLuLFgJF73QlyI9xiP5CkTMJpUydaZ4onXmPZyjQolO1+z5yld+kX7HAMZezbokRLYKqR+P8fvg==",
+    "shasum": "ec128708ba239e0d5f3103b7f83f6f14ab8b16b3",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.106.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.106"
+  },
+  "0.1.112": {
+   "_id": "@andysu/capacitor@0.1.112",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-S/JRKyXvkWF4lIvl81hoHNyhxgbLVghUfD1QPWMRwID0SFEPRMur7k97OemDAR+8Z08RWWzEJhfmv9roWp25Tw==",
+    "shasum": "66e67354065332e727d61978febc2d1c5406d1dc",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.112.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.112"
+  },
+  "0.1.117": {
+   "_id": "@andysu/capacitor@0.1.117",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-09BS6Bi+9Aw+DiHgC/TXhWsslKYuquCXZuucc6Aw/Aw+fKJLOTLd9EpQU2p8G5KBwLWbQd1HoqCCUkwc6709Ig==",
+    "shasum": "01fb8eccd4aa35218d7de563161687b2ee1895e4",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.117.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.117"
+  },
+  "0.1.120": {
+   "_id": "@andysu/capacitor@0.1.120",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-x18OZIXczKMuipqR9OCxLX5xjJ8wIX1SZ3UCGTdvE98pVYe6cw2o25gaX1Be00GF6nxDTgXEJqeI5agKuaK4QA==",
+    "shasum": "4cc1c749d56d211c8745a83dd841fbbd5c3bd664",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.120.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.120"
+  },
+  "0.1.124": {
+   "_id": "@andysu/capacitor@0.1.124",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-hjVnR3Ut10aoEbrM7lWTIcXdZyRQ/ZeokejRYOxmQ2eW8IcrlT7eNjElGYy7kBOrRz3XXZ6lXT+1VWT/J3IFYQ==",
+    "shasum": "d70554c3974359db465666e4524222fcc11fd35a",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.124.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.124"
+  },
+  "0.1.127": {
+   "_id": "@andysu/capacitor@0.1.127",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-tQBTJnkDUCZpZsKeKi8ISqfB2G0SJGo+FwkD5+TyjTjgNu1YWsx06Qz17HWzy4Nuv/N2cGR690Ow/eCOt35Rgg==",
+    "shasum": "7848d82694d67301bb9430061a29e8779ee8d674",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.127.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.127"
+  },
+  "0.1.13": {
+   "_id": "@andysu/capacitor@0.1.13",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-ejkEygHFH42nlsrVv5lu0KzZLX9K/HVRjPHJ+VsNjB0UKie6FzZB2zRfooFichYFpBVJrcuwLf81ylirvjvN7A==",
+    "shasum": "6374cd8b69841dfc47b34fc9aca01b799a6c47b0",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.13.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.13"
+  },
+  "0.1.130": {
+   "_id": "@andysu/capacitor@0.1.130",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-kikzPngtWaBcoVylPOp5NHgnI0XnjB9wVK0S8K4GTtVqCa49zLrcaXfsxpTP13PFkNpVx40nphu2USu9oWqjxQ==",
+    "shasum": "dccd5478d541136684b2a21de3b6966f91258900",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.130.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.130"
+  },
+  "0.1.15": {
+   "_id": "@andysu/capacitor@0.1.15",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-2baWZM/xakdbKvOcMA9FsD6rbpAs6ucsl769uT1QA6EMDVQJLksJMAKvRPdGoD9LS/K5uhlVYoCfNMpJZVeRHg==",
+    "shasum": "60e676e7204cc776e01e1129c40109bf4b994d7e",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.15.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.15"
+  },
+  "0.1.17": {
+   "_id": "@andysu/capacitor@0.1.17",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-fS7epBejdaiPYaBw72pF70p8OEvQAeg02U88iRS9ya0YV6l6CFOlr4RTvoQXOtbabQe1rwuYO+teyIW05oQ3tA==",
+    "shasum": "323a1575a8cf41b03ffb77dd42a4396308ef2ff7",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.17.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.17"
+  },
+  "0.1.25": {
+   "_id": "@andysu/capacitor@0.1.25",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-CkYxcom1F9/GkRnAZTQVpwuu+HaHNTAq+FfiMvBpvNAF25PaG2z7qo+mgkMet4L85FbL8Hwt8g7ok2iHPMM4fQ==",
+    "shasum": "930e8d52ffb34964f0ea28f44e1b2308737e5f2d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.25.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.25"
+  },
+  "0.1.33": {
+   "_id": "@andysu/capacitor@0.1.33",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-Vzc9erELWpOOyvmBafHVXBsdnVXqLjFklDUIOOH3HWBK3PGtOE1SFZfRxFovSLYsigij5tWlIWQb23KbWQ/oyQ==",
+    "shasum": "966a35ba9096c11b945b9a34975b3666d8c94654",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.33.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.33"
+  },
+  "0.1.36": {
+   "_id": "@andysu/capacitor@0.1.36",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-xY0bM5NhJmN6wyalmQC6+o7guzKzA4dsrI7Omn+19qxU7phL/1rqsR5tog+/UHdv5dpZWATUFPf4E/llf+qx1w==",
+    "shasum": "d90087266cb4fb213b0db5ea3e998a76eefe40c0",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.36.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.36"
+  },
+  "0.1.41": {
+   "_id": "@andysu/capacitor@0.1.41",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-Yvq2edw8Jx0ddwBShTmYsYNpwlQ1gEKDt5mvQjoFy1EAUovvUcLGXHjUV81IOFaA6rHUQS/C3kP/ALEGJTn62Q==",
+    "shasum": "517bdda64eb3d076a8b063ce8201d8125d5c9d66",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.41.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.41"
+  },
+  "0.1.44": {
+   "_id": "@andysu/capacitor@0.1.44",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-OIiJW7J981lzLhSUYNnL+XdGtJHaCFNtnZQjYdeUzSRcxSkIhMJ1PTHSNVs3R5hTEHzFn2IvUKzrvQkIDqrGmA==",
+    "shasum": "c6aa211abc8041d6ea4369a6f168efc454ff57b4",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.44.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.44"
+  },
+  "0.1.46": {
+   "_id": "@andysu/capacitor@0.1.46",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-UNqBYldKFGIZljHy6fDryAQI52kAgoM9QwgEU88csMx50OL5JbfpjDU5o2Y44xQiBRWbkwEYgjOVmSm+jUPiHw==",
+    "shasum": "cab2ff9fea1444ff5bbe1723f80791beb0969dfc",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.46.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.46"
+  },
+  "0.1.49": {
+   "_id": "@andysu/capacitor@0.1.49",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-yrGG782zcj30hFT/95EZiwJj7szEFOdkTyo+hEnql1jo5b9BcZ0+SZkNAeSx/IcUGL1yRcdU6BauoQDFCod6Uw==",
+    "shasum": "0df38afdfb217646b62463edf2e884cc016736b2",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.49.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.49"
+  },
+  "0.1.53": {
+   "_id": "@andysu/capacitor@0.1.53",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-4S1f1Kaljg2mA7DinptZigk8sCdBG9rwYFjkAcjnhw3uGQm1YI/Oq1VXNEBkzjBeXQQoIuBEUQLo+PRgCRxg9A==",
+    "shasum": "3ab14b65322975f222063c5b485b3bd3360aa862",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.53.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.53"
+  },
+  "0.1.56": {
+   "_id": "@andysu/capacitor@0.1.56",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-/6WbGcMRFfQofZ2Sk+Lxsn9kaV9MYVsZD7jjsBUDVppc+Tbf+6BvJZMPEqYSn7YA5Xp2H53rtFfkqk0/f+WSfw==",
+    "shasum": "329c3c76147d6fc5dc7d553079ff5888e8a926d3",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.56.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.56"
+  },
+  "0.1.58": {
+   "_id": "@andysu/capacitor@0.1.58",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-+HbnS2ha+c8x3d8TUfj5miFv3L4/b5M16kchGDmgbQeLIZd7gOuAFWJt7R2QQIU7mwahU6edXO++3zpcKb037g==",
+    "shasum": "9984c216ce1af0e945b6c786f424c959f24f7ab9",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.58.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.58"
+  },
+  "0.1.62": {
+   "_id": "@andysu/capacitor@0.1.62",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-svVdgHjH/oglpHZHuC/myb5J3LuRGlmd14p0iwHz4owpcHm2xcYVb/4eeZxVf6oJqcvwOLfK4OXxUQbTtdIPGA==",
+    "shasum": "aae3f4eb5380c39a3a4c97c3b24ea75dcfc53cf9",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.62.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.62"
+  },
+  "0.1.65": {
+   "_id": "@andysu/capacitor@0.1.65",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-UoqKZFiah3YjcayrILk99zLBMIe/c6PDQTFjhU9s39URYg1LbGK0xdYOg+Caz1600dy3PkuKHS6ud2AWwzpTkw==",
+    "shasum": "755a3576af7cd21adde02afb9045dfa629ab8bd8",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.65.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.65"
+  },
+  "0.1.68": {
+   "_id": "@andysu/capacitor@0.1.68",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-gNxPxi+SkI76xK2ERQJ13PqjdlErYyXe1r+T4Rbt65mE412u+ugyBBtlaSKAKby8fMPwkVWOAtdqdjHsA/d30w==",
+    "shasum": "d2e4dd3e65373dccb15a4adc4a9c9839112be28d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.68.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.68"
+  },
+  "0.1.71": {
+   "_id": "@andysu/capacitor@0.1.71",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-/df3xIBWqkOXxQ9pIqXI9PrzF87G3cpkj8/XibQQ+T0NEXg4hAJ/rc8IzQC6raC73EmxgjIS8gG12XrjLiF63w==",
+    "shasum": "ca8cd969d0d2abd39a27665a0e945c81200edba2",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.71.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.71"
+  },
+  "0.1.78": {
+   "_id": "@andysu/capacitor@0.1.78",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-bCwfzhLaHf+V0yk64N2Ff2gVdhtXynLq8o0H7kMvAUILC1RGGAQDX9YPnIkK0x+Xy87Xey5FjD04hoYD3foaNg==",
+    "shasum": "0f8a57484e16201b5dc6c68c93e214879cbb1e69",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.78.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.78"
+  },
+  "0.1.81": {
+   "_id": "@andysu/capacitor@0.1.81",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-L34vi6xtUX/ad15Ht+SdSmXxJY5ZGjJhH68gkhwicm+02v0MApSiEEN9vvKz63Cl+O9bTBtVfI+QeWoZW2JxkA==",
+    "shasum": "9a3f37d6410f8c82c04684438438bc5ddf326528",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.81.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.81"
+  },
+  "0.1.90": {
+   "_id": "@andysu/capacitor@0.1.90",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-06irGKiwO4WzzanO+yS8ow5KSGu2IL+ogamPyoBOlthmS8ofdBVMXBx400pcTZo6p4kJzaQAWSFMeIEXWnYrNw==",
+    "shasum": "7885aac429140e7e4b3117cacf8787231fea437f",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.90.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.90"
+  },
+  "0.1.96": {
+   "_id": "@andysu/capacitor@0.1.96",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-h6j9GwkaMX8heYNAYoRosXmi5MiNcTlygg9PbxPRVbuzV7rCtRWG8wMH0oYL9TH09vSuMsAI1s04Fa3Jej46EQ==",
+    "shasum": "ae4ca19d0eccc787927da52d49f9645b4374e13c",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.96.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.96"
+  },
+  "0.1.98": {
+   "_id": "@andysu/capacitor@0.1.98",
+   "capacitor": {
+    "android": {
+     "src": "android"
+    }
+   },
+   "description": "AndySU self-updates for Capacitor and Cordova apps on Android; web assets update hot",
+   "dist": {
+    "integrity": "sha512-gi6hcUohiU7EP5vMSbVCUMlF8nnbtwr+8JpJ9+xyTr60u9e3CNLO/9Y1tXjIetJcSxPzSJs0lsTXVL8IkZW5Pg==",
+    "shasum": "1e55a4073be9e354f4c3c217523a4b12c2902f7b",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-capacitor-0.1.98.tgz"
+   },
+   "files": [
+    "dist",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "dist/index.js",
+   "name": "@andysu/capacitor",
+   "peerDependencies": {
+    "@capacitor/core": ">=5"
+   },
+   "repository": {
+    "directory": "bindings/capacitor",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "dist/index.d.ts",
+   "version": "0.1.98"
+  }
+ }
+}

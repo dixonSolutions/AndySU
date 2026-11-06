@@ -1,0 +1,919 @@
+{
+ "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+ "displayName": "AndySU",
+ "dist-tags": {
+  "latest": "0.1.130"
+ },
+ "license": "Apache-2.0",
+ "name": "com.andysu.unity",
+ "repository": {
+  "directory": "bindings/unity",
+  "type": "git",
+  "url": "https://github.com/dixonSolutions/AndySU"
+ },
+ "time": {
+  "0.1.106": "2026-11-05T06:48:04.000Z",
+  "0.1.112": "2026-11-05T21:42:15.000Z",
+  "0.1.117": "2026-11-06T01:21:41.000Z",
+  "0.1.120": "2026-11-06T02:33:20.000Z",
+  "0.1.124": "2026-11-06T05:35:16.000Z",
+  "0.1.127": "2026-11-06T06:22:52.000Z",
+  "0.1.13": "2026-11-02T21:41:46.000Z",
+  "0.1.130": "2026-11-06T09:38:28.000Z",
+  "0.1.15": "2026-11-02T22:10:29.000Z",
+  "0.1.17": "2026-11-02T22:38:43.000Z",
+  "0.1.25": "2026-11-02T22:56:20.000Z",
+  "0.1.33": "2026-11-02T23:37:54.000Z",
+  "0.1.36": "2026-11-03T00:06:26.000Z",
+  "0.1.41": "2026-11-03T01:57:19.000Z",
+  "0.1.44": "2026-11-03T02:40:42.000Z",
+  "0.1.46": "2026-11-03T02:58:48.000Z",
+  "0.1.49": "2026-11-03T03:54:18.000Z",
+  "0.1.53": "2026-11-03T04:49:58.000Z",
+  "0.1.56": "2026-11-03T05:09:01.000Z",
+  "0.1.58": "2026-11-03T05:28:45.000Z",
+  "0.1.62": "2026-11-03T05:48:41.000Z",
+  "0.1.65": "2026-11-03T07:12:39.000Z",
+  "0.1.68": "2026-11-03T20:50:37.000Z",
+  "0.1.71": "2026-11-03T21:43:46.000Z",
+  "0.1.78": "2026-11-03T22:21:30.000Z",
+  "0.1.81": "2026-11-04T07:25:25.000Z",
+  "0.1.90": "2026-11-04T08:56:03.000Z",
+  "0.1.96": "2026-11-04T09:53:45.000Z",
+  "0.1.98": "2026-11-04T22:44:33.000Z",
+  "modified": "2026-11-06T09:38:28.000Z"
+ },
+ "unity": "2021.3",
+ "versions": {
+  "0.1.106": {
+   "_id": "com.andysu.unity@0.1.106",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-iQhVNIxF6+mddVkdtwDEE1fMStjr5QC09NbCzwxleuPu55l7ACUck8ooajcHZt0sHiSAUIdsTWNKG4MIPci6uQ==",
+    "shasum": "203013c15ea158cf06308e215617b1d41593737d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.106.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.106"
+  },
+  "0.1.112": {
+   "_id": "com.andysu.unity@0.1.112",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-vlzUqDzvfN0KJIF0gO8MaG/9vRq/MXzx/4LHiojOrfKy1C8DldkUBfHqoPjKr04cyVb57ts2xARbUZ14Lx+9PQ==",
+    "shasum": "0ddeacece609c056e6e73fa6c4e380d4a399eeba",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.112.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.112"
+  },
+  "0.1.117": {
+   "_id": "com.andysu.unity@0.1.117",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-QM1C6HpeoBxmIkaw/hgSa4y1/Ljr0K8oKkolat0FYKuHCfu+HEcb6PWDwrobmDhPD5eFcBmxEqJ4ysIRnxe+dg==",
+    "shasum": "03825ed35e824771c31c14360dfec9a2fee43486",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.117.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.117"
+  },
+  "0.1.120": {
+   "_id": "com.andysu.unity@0.1.120",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-KZRkFQUM+i+7DCvMYeGm3vcqxjiYj1DRisK0wj82wWrR2RTBMe9swEzG5gMRw84mSarQgaHHR21ZBGHDOEYjew==",
+    "shasum": "502acc3f5d51489914e28bf5c2bdee2934fd936e",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.120.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.120"
+  },
+  "0.1.124": {
+   "_id": "com.andysu.unity@0.1.124",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-RbM/+rQHYdVvt+CUctwE6ObOvMBhUvUYXmbrtqtrEtQGGPEosR/IT2OzPC7W/j6EEo5codiYIEV+kpiqA4GDcA==",
+    "shasum": "bb1f7ecda5fda9f3468db558ce4c5fbf437c30e7",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.124.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.124"
+  },
+  "0.1.127": {
+   "_id": "com.andysu.unity@0.1.127",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-WDPQ/Jc3qo/i3kau2k0dEn+ed1xacb2dCCFQHjNJl/O5XckjPPnMGEmW+XVLMyxYGfYJhXvfw40Exs5RwaG5yA==",
+    "shasum": "60a9a1045ba6d725f1b2cbd2f80b598b6cea6a06",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.127.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.127"
+  },
+  "0.1.13": {
+   "_id": "com.andysu.unity@0.1.13",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-vqLB8kfjqaE+e6eMOzy4Ywkg46VG3wKrsaJYJS9Ye2jRqMjE+FpmZ3KHyeLGR0HDfHWg09LAwOj9HA2SGGtDDA==",
+    "shasum": "14473ce7c1ad3d64dfedf0c95b32bf1e9fd06f94",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.13.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.13"
+  },
+  "0.1.130": {
+   "_id": "com.andysu.unity@0.1.130",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-xUAZXdKKwPvSEaGbLZivcZTpUqTpkLNLIkSrWotQuucAhccMv2K20XdyhwfeYO9ZGuBMQSwgUVqWER9bYe5UWA==",
+    "shasum": "280bcfac08535e5cd28f2bd51c38954d1803745d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.130.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.130"
+  },
+  "0.1.15": {
+   "_id": "com.andysu.unity@0.1.15",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-I5Rn54/SD947+vJANBC0wTy4DxYwppH2RRH6PSlSautGlxeNZYo1bzAhaOM+jzHsYM61u0cZVrQqQfPJNq7kUA==",
+    "shasum": "bb737bbf191c37f0e5b44ea4742b7a2dbe55f32c",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.15.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.15"
+  },
+  "0.1.17": {
+   "_id": "com.andysu.unity@0.1.17",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-Jc0aMBluDDz2peSD35DxrzmJzcnecVzSxoBlZSa9H+IHCxk2oAejGey/eK1PtjLRWY7Mk/V5OTJKbze5S5aAHw==",
+    "shasum": "d22850e977ea0872a148b8dbbd082eea43fd8b3d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.17.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.17"
+  },
+  "0.1.25": {
+   "_id": "com.andysu.unity@0.1.25",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-4/HOlduxvLDI4unlrTlH7l417k6zGk6eUAsYCjlnJA7aNkUacsqMpnvIl0D9oS2ZnHcubEXZFiAVjsVDth1WIQ==",
+    "shasum": "07286845f8e0361050a4fb14214d8c8f9651fe6d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.25.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.25"
+  },
+  "0.1.33": {
+   "_id": "com.andysu.unity@0.1.33",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-qMQfDzV/PSwa/7coCkbbbb8pyHLMM++n4pkrf6amK27+VjxvnE179tormTEIzBL2sd2DsNX7ompkIpL2ZPZgYA==",
+    "shasum": "7083d51779f01b45e99c1e710474dcc317f2469c",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.33.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.33"
+  },
+  "0.1.36": {
+   "_id": "com.andysu.unity@0.1.36",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-kCJF7nfcICDrwg9Xf2NfmPRlNOyqqxdXDaRJSie912gAdB2UCK3mgx7j8ibgVcXschy3c2oapohliMY8yMe5HA==",
+    "shasum": "43295b15d4a9cb3e2c7a35454604c0606acf700d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.36.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.36"
+  },
+  "0.1.41": {
+   "_id": "com.andysu.unity@0.1.41",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-kCagUHu2Vbq5l5NROXMNWB96L6uyu3bEMbogD8cXVhlEFx8/ma2sj7xVN+ZbwKHNn06GekTaS2nRNIHinsrW6A==",
+    "shasum": "d7094645b6ef92275bf86a78364b5aaca92e1d9a",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.41.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.41"
+  },
+  "0.1.44": {
+   "_id": "com.andysu.unity@0.1.44",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-Sr64/9BDf6Sx4B+3ooGcrOF6mn1s74aQ4kyh4UNZnLi1+0r1vvO6+Y4CGtj603LIc111+CJ/99vg1BQGFA9ZBQ==",
+    "shasum": "65fbc90ffc55f34303d52a9b68a8897a770f15fb",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.44.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.44"
+  },
+  "0.1.46": {
+   "_id": "com.andysu.unity@0.1.46",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-V6NPsJCr2svk+NUN/kzPjiHvD0AoQjeCP72l5TicTFvv49sYPFZn0UwEHDp4Lsy+fcEOsAySFMo9A9k6G/zF+A==",
+    "shasum": "3b8e7b4c685e0a98e9805827b4143269da8afe0a",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.46.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.46"
+  },
+  "0.1.49": {
+   "_id": "com.andysu.unity@0.1.49",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-KBlq4SOzi9sdxYkV2EQeftDomt9fmH+kYzzjSIaK5T3IBxx6HslqctjNIcDyiHTCOtJp8uGv0DMd8lrDJLu6Bw==",
+    "shasum": "13bc4a0557afb1d6b1610ad9814a3933c762ec3a",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.49.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.49"
+  },
+  "0.1.53": {
+   "_id": "com.andysu.unity@0.1.53",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-s9USR28eNOK8LkPytMwXWfA+o2oGwejDGeSM0iX20lDf8os9DmbPRdhPXkELDUbckjwkjVwqil2634U/WDK0xw==",
+    "shasum": "fb5bac1b6e5cbe51cc2a89e83dfc363f46f54610",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.53.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.53"
+  },
+  "0.1.56": {
+   "_id": "com.andysu.unity@0.1.56",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-QNYIod9bfX6MzigzPqsKcot0EH8j8Y/2dPgX+puGz4E2yLwSb1JBH6cd9a3JMntrqUPasW4o4yOlURHfu+tB1g==",
+    "shasum": "ab285caecb4871e923866a97129dfa330758d95b",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.56.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.56"
+  },
+  "0.1.58": {
+   "_id": "com.andysu.unity@0.1.58",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-sSo8Nm2JGnUP9R3z8tfr3pni0NArFj/1WzAzQLdf5CErnAlilzQrqE1prxM1QtxrpoU7c3AxnE0xa2xbOIe96g==",
+    "shasum": "6019cec73cb9e218817bd63c11ef1a01b8c60afc",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.58.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.58"
+  },
+  "0.1.62": {
+   "_id": "com.andysu.unity@0.1.62",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-Z21LDTeusyiEfJSmqKt7O+mMhzSJpqHjWd2oDoxHB7Mw9CifiDkQSSiqA8Y1GIh5YlBhfhdaeUzsEVpyxfYXjQ==",
+    "shasum": "90da8e60fdf28641154e32f050e13b0f4fd8c311",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.62.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.62"
+  },
+  "0.1.65": {
+   "_id": "com.andysu.unity@0.1.65",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-DhBvIwfhLEpGfCfA2gLEsto0Vs5DLkYRtEyZv/SH69xkMHdA3C1+KQwB704I7Ow06A0Bkr4o7zKSsrkeiEBg+Q==",
+    "shasum": "93b1260ac47876050e9b85fb9db1582a07ac8f5b",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.65.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.65"
+  },
+  "0.1.68": {
+   "_id": "com.andysu.unity@0.1.68",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-IH2YGuNbpGxlCA1lANljPW2UDLAWI5sYqSYBtV2PUb+pufIIH0b1zCfvvZl3y0QmNoFByqLKBugDGGlVrV5cYQ==",
+    "shasum": "30c87f729389a7743d8ace041f0111632692b04d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.68.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.68"
+  },
+  "0.1.71": {
+   "_id": "com.andysu.unity@0.1.71",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-pwRfzFToomiqwAxwHaP23LhE+JWapSJC1ZelN6hnvcTT3tJT9s3TIffiYH7NOWhWdDz1zdZ8gIO9UNxvcqVZaA==",
+    "shasum": "0501e02a3f8494d80d3fc3df49812961bdb92d44",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.71.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.71"
+  },
+  "0.1.78": {
+   "_id": "com.andysu.unity@0.1.78",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-owtgGkN3QzAa5CffjMtlGm9PyMbomptpbH7d+mtO/Yg0n4A00bCKytdUABi+VpRmSYTe0gPhx+knp5OFxkPk1A==",
+    "shasum": "480277730ab382f4767d076bf53179668f752ebd",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.78.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.78"
+  },
+  "0.1.81": {
+   "_id": "com.andysu.unity@0.1.81",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-lN0iyxH5Gp29IqAeZvZ6kkAFDzSYlu+p5eJVKTWDVFxelyh5ng9JmoGhn1uonjCCM3MQG3T3fS7ZQ3TaeAvKDA==",
+    "shasum": "d8fa7b713a9654d19c20def0de020fde0141c834",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.81.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.81"
+  },
+  "0.1.90": {
+   "_id": "com.andysu.unity@0.1.90",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-cFP6f5GPpAlcqR1K923/sLuQ1Hh92jkQlKV8lrrLGlUyAnDobb4+IIw0vTCsH/Mxl53wc49pX6ywEHs1/Fcl6w==",
+    "shasum": "d24c2ac5625b90a5db0d952ecb7743f8e1957f73",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.90.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.90"
+  },
+  "0.1.96": {
+   "_id": "com.andysu.unity@0.1.96",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-vynTnAxYJD3IVxKZLzqIkwDAAMboso7uY71XCOoWH71HOXwpNadWbDviLFfBluMd2HeUalDR24peS21ezwtVsQ==",
+    "shasum": "34d2438448b542c43e9e096495bc5fc3a163c4a4",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.96.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.96"
+  },
+  "0.1.98": {
+   "_id": "com.andysu.unity@0.1.98",
+   "author": {
+    "name": "dixonSolutions",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "description": "Self-updates for Unity games on Android outside the stores: status, check, apply, apply policy.",
+   "displayName": "AndySU",
+   "dist": {
+    "integrity": "sha512-P4zbZLk5YAqu/sugzkFGE5ajur3n6w600GUEbG1nd8eXk0fSJzEXPo5MPysnP0wlxCHg3OdvwIDF2PTGX5CSSQ==",
+    "shasum": "d8e8bffd3faf523c7f8c28aa75847db7f5e599c9",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/com.andysu.unity-0.1.98.tgz"
+   },
+   "files": [
+    "Runtime",
+    "package.json.meta",
+    "README.md",
+    "README.md.meta",
+    "Runtime.meta"
+   ],
+   "license": "Apache-2.0",
+   "name": "com.andysu.unity",
+   "repository": {
+    "directory": "bindings/unity",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "unity": "2021.3",
+   "version": "0.1.98"
+  }
+ }
+}

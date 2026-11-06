@@ -1,0 +1,1085 @@
+{
+ "latest": {
+  "archive_sha256": "b5f2d9f0519b5d4d5acc2291e64c7f189c8a3c08f3b2b568952b2fa7dc3d4163",
+  "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.130.tar.gz",
+  "published": "2026-11-06T09:38:28.000Z",
+  "pubspec": {
+   "dependencies": {
+    "flutter": {
+     "sdk": "flutter"
+    }
+   },
+   "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+   "dev_dependencies": {
+    "flutter_test": {
+     "sdk": "flutter"
+    }
+   },
+   "environment": {
+    "flutter": ">=3.22.0",
+    "sdk": ">=3.4.0 <4.0.0"
+   },
+   "flutter": {
+    "plugin": {
+     "platforms": {
+      "android": {
+       "package": "com.andysu.flutter",
+       "pluginClass": "AndySUPlugin"
+      }
+     }
+    }
+   },
+   "name": "andysu",
+   "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+   "version": "0.1.130"
+  },
+  "version": "0.1.130"
+ },
+ "name": "andysu",
+ "versions": [
+  {
+   "archive_sha256": "10eb97926144656f5dfa46149b0a4b050102a080455a7ed6b95c3e27677d94fb",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.13.tar.gz",
+   "published": "2026-11-02T21:41:46.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.13"
+   },
+   "version": "0.1.13"
+  },
+  {
+   "archive_sha256": "574733b03fbb340ebd71c2c785629aa35031fe14c1da83475455f99df7bcf3a7",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.15.tar.gz",
+   "published": "2026-11-02T22:10:29.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.15"
+   },
+   "version": "0.1.15"
+  },
+  {
+   "archive_sha256": "f4c8bcd34efd893baafc9c944f86a6b2053ee944e009a4acb44a1d2f0875effe",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.17.tar.gz",
+   "published": "2026-11-02T22:38:43.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.17"
+   },
+   "version": "0.1.17"
+  },
+  {
+   "archive_sha256": "b97f4810fd80197e041465e37e4746164a917166c80c9e99ab9aa733be7aaa1f",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.25.tar.gz",
+   "published": "2026-11-02T22:56:20.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.25"
+   },
+   "version": "0.1.25"
+  },
+  {
+   "archive_sha256": "df6b80c57faa963ed5e7affe56d4befbad4647baff71e5f94309cc541fe0755f",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.33.tar.gz",
+   "published": "2026-11-02T23:37:54.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.33"
+   },
+   "version": "0.1.33"
+  },
+  {
+   "archive_sha256": "357e0ab13878cb4d6fee5f2dfb1cb20db236dd81cca92c196fba5a1e9928e145",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.36.tar.gz",
+   "published": "2026-11-03T00:06:26.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.36"
+   },
+   "version": "0.1.36"
+  },
+  {
+   "archive_sha256": "fb6f5e697b89643a70f3f0e78d39a8844199c727dc70647fb9dbc9388113da03",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.41.tar.gz",
+   "published": "2026-11-03T01:57:19.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.41"
+   },
+   "version": "0.1.41"
+  },
+  {
+   "archive_sha256": "6b589df1e116f175e7b8a57a434c713812a68567e40661981c084869c5b94984",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.44.tar.gz",
+   "published": "2026-11-03T02:40:42.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.44"
+   },
+   "version": "0.1.44"
+  },
+  {
+   "archive_sha256": "b44cbd61c85f034e831ba73f44a4eb2b5a31ada07b27d83006aa94291abddae0",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.46.tar.gz",
+   "published": "2026-11-03T02:58:48.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.46"
+   },
+   "version": "0.1.46"
+  },
+  {
+   "archive_sha256": "a38a5750a639de8aa72aced13c8ac6e966228fc6130ae9e06a38b49aabeb1e43",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.49.tar.gz",
+   "published": "2026-11-03T03:54:18.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.49"
+   },
+   "version": "0.1.49"
+  },
+  {
+   "archive_sha256": "fe5bc8c3c3000b12879d9277c59d06dac4bd6dd897ddd709b56b5859bdaef52f",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.53.tar.gz",
+   "published": "2026-11-03T04:49:59.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.53"
+   },
+   "version": "0.1.53"
+  },
+  {
+   "archive_sha256": "8b2cff620d1e1d22528024fe9faf7592d6fe8ba70d2be202f6f080f3a1243d0b",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.56.tar.gz",
+   "published": "2026-11-03T05:09:01.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.56"
+   },
+   "version": "0.1.56"
+  },
+  {
+   "archive_sha256": "a5ba715bcfde60ecd07b089e883c9c8a9fd46bdfa71220a4311f3d1d985c3f9d",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.58.tar.gz",
+   "published": "2026-11-03T05:28:45.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.58"
+   },
+   "version": "0.1.58"
+  },
+  {
+   "archive_sha256": "c869f1da04d03d12537449b47de034e783da746e60a3b3206718ea87ee7fe76b",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.62.tar.gz",
+   "published": "2026-11-03T05:48:41.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.62"
+   },
+   "version": "0.1.62"
+  },
+  {
+   "archive_sha256": "a8b1ab869c86af5cb1a6b30c4f8d4ae6c22884bb4ab2c27ea66907886319fea7",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.65.tar.gz",
+   "published": "2026-11-03T07:12:39.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.65"
+   },
+   "version": "0.1.65"
+  },
+  {
+   "archive_sha256": "4f4bd305cdf6dfd3a23d163c237a4cfa3bf53dba898d456245f73b3411ec183e",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.68.tar.gz",
+   "published": "2026-11-03T20:50:37.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.68"
+   },
+   "version": "0.1.68"
+  },
+  {
+   "archive_sha256": "68bb1ce4e7d7ece080fbf5a3494c9ca5e15fdc7fe24313bba5e2358c8b78993f",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.71.tar.gz",
+   "published": "2026-11-03T21:43:46.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.71"
+   },
+   "version": "0.1.71"
+  },
+  {
+   "archive_sha256": "679b87dc9b4d4903fdbef3ced8786ce427f5ef5ecf1433ac7ab429df10b39e0f",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.78.tar.gz",
+   "published": "2026-11-03T22:21:30.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.78"
+   },
+   "version": "0.1.78"
+  },
+  {
+   "archive_sha256": "db392d69a17ffa93ec51aeb71e1f136da328d6f390617fe1356b5b7e40045c3d",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.81.tar.gz",
+   "published": "2026-11-04T07:25:25.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.81"
+   },
+   "version": "0.1.81"
+  },
+  {
+   "archive_sha256": "a6c8fffb9dfc5d4eb5d4258bd15d386a701a493f5a961797962ca65a76103712",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.90.tar.gz",
+   "published": "2026-11-04T08:56:03.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.90"
+   },
+   "version": "0.1.90"
+  },
+  {
+   "archive_sha256": "047a2bbdbaa09b7fb2a1e21ff21e2530a25f6ce3c790e62b7b4e1fb3454af47c",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.96.tar.gz",
+   "published": "2026-11-04T09:53:45.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.96"
+   },
+   "version": "0.1.96"
+  },
+  {
+   "archive_sha256": "ed5ad06f26d8743a68aff713b174e33aa1edac44e5094804627547c55206d3bb",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.98.tar.gz",
+   "published": "2026-11-04T22:44:33.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.98"
+   },
+   "version": "0.1.98"
+  },
+  {
+   "archive_sha256": "62ee696e3afe3ae8a34d35b5353f9df958241b31dcff7e8174eb09e4396bd8f7",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.106.tar.gz",
+   "published": "2026-11-05T06:48:04.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.106"
+   },
+   "version": "0.1.106"
+  },
+  {
+   "archive_sha256": "08f01046fc1ad037d242878a3b86255d4db79eed47c3d07a4c94de1390147d23",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.112.tar.gz",
+   "published": "2026-11-05T21:42:15.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.112"
+   },
+   "version": "0.1.112"
+  },
+  {
+   "archive_sha256": "ac7a2c26d46246e31e15d039d03691d06c2f55113769e484d4a8db0eb597b2cc",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.117.tar.gz",
+   "published": "2026-11-06T01:21:41.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.117"
+   },
+   "version": "0.1.117"
+  },
+  {
+   "archive_sha256": "8cf4f84280984ae91a0d579eaa3f28bea10f598348f0c1a56c1df46c3ad25f4d",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.120.tar.gz",
+   "published": "2026-11-06T02:33:20.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.120"
+   },
+   "version": "0.1.120"
+  },
+  {
+   "archive_sha256": "2c8aa1e1fe14daa9cdfc45fa3594b42243eab675330040470b402bd9a5b72a79",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.124.tar.gz",
+   "published": "2026-11-06T05:35:16.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.124"
+   },
+   "version": "0.1.124"
+  },
+  {
+   "archive_sha256": "008ef2b5b2aad83659bbbc90502d40652950c108c44e3de960aae7d592e90ea0",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.127.tar.gz",
+   "published": "2026-11-06T06:22:52.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.127"
+   },
+   "version": "0.1.127"
+  },
+  {
+   "archive_sha256": "b5f2d9f0519b5d4d5acc2291e64c7f189c8a3c08f3b2b568952b2fa7dc3d4163",
+   "archive_url": "https://dixonsolutions.github.io/AndySU/pub/packages/andysu/versions/0.1.130.tar.gz",
+   "published": "2026-11-06T09:38:28.000Z",
+   "pubspec": {
+    "dependencies": {
+     "flutter": {
+      "sdk": "flutter"
+     }
+    },
+    "description": "AndySU self-updates for Flutter apps on Android (status, check, apply, apply policy).",
+    "dev_dependencies": {
+     "flutter_test": {
+      "sdk": "flutter"
+     }
+    },
+    "environment": {
+     "flutter": ">=3.22.0",
+     "sdk": ">=3.4.0 <4.0.0"
+    },
+    "flutter": {
+     "plugin": {
+      "platforms": {
+       "android": {
+        "package": "com.andysu.flutter",
+        "pluginClass": "AndySUPlugin"
+       }
+      }
+     }
+    },
+    "name": "andysu",
+    "repository": "https://github.com/dixonSolutions/AndySU/tree/main/bindings/flutter",
+    "version": "0.1.130"
+   },
+   "version": "0.1.130"
+  }
+ ]
+}
