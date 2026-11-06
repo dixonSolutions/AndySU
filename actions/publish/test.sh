@@ -109,3 +109,12 @@ n1="$(ls "$gh_root/owner/app/releases/download/andysu-1.0" | wc -l)"
 [ "$n3" -lt "$((n1 + 4))" ] || { echo "github: release 3.0 re-uploaded unchanged blobs ($n3 assets)" >&2; exit 1; }
 client_update github "http://127.0.0.1:$p/owner/app/releases/latest/download/update.json" | grep -q '"staged": "3.0"'
 echo "ok github: 3 releases as release assets, manifest on the latest release, client staged 3.0"
+
+# GitHub loads action.yml itself and nothing above does: an unquoted colon once made the action
+# impossible to use while this script passed.
+if command -v ruby >/dev/null; then
+  ruby -ryaml -e 'YAML.load_file(ARGV[0])' "$repo_root/actions/publish/action.yml" || { echo "action.yml is not valid YAML"; exit 1; }
+  echo "ok action.yml parses"
+elif [ -n "${CI:-}" ]; then
+  echo "ruby is needed to check action.yml"; exit 1
+fi

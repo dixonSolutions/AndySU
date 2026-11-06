@@ -318,9 +318,17 @@ def screen_alive(d, what):
     std1 = sampled_stats(w, h, rgba1)
     std2 = 0.0
     changed_frac = 0.0
+    UNIFORM_THRESHOLD = 10
+
+    # A cold start can still be fading in. Take the reference once there is a picture: a frame from
+    # the fade cannot pass the checks below, however much the screen then changes.
+    settle = time.time() + 10
+    while std1 < UNIFORM_THRESHOLD and time.time() < settle:
+        time.sleep(1)
+        w, h, rgba1 = parse_screencap(capture_screencap())
+        std1 = sampled_stats(w, h, rgba1)
 
     # Retry up to 3 times: key, wait 1.5s, capture; pass as soon as one attempt shows >= 2% change
-    UNIFORM_THRESHOLD = 10
     CHANGE_THRESHOLD = 0.02  # 2%: between measured 9-13% (healthy) and ~0% (frozen)
     max_attempts = 3
 
@@ -367,6 +375,12 @@ def screen_alive(d, what):
     msg = (f"screen not alive ({what}): std {std1:.1f}/{std2:.1f}, but only {changed_frac:.1%} of pixels changed "
            f"after {max_attempts} key presses (need {CHANGE_THRESHOLD:.0%}): frozen\n  saved {p1}")
     raise dt.Fail(msg)
+
+
+def install_granted(d, apk):
+    """Install with runtime permissions granted: Xonotic Touch asks for notifications on first run, and
+    the dialog would otherwise sit over the game and take the key presses."""
+    d.adb("install", "-r", "-t", "-g", apk, timeout=300)
 
 
 def wait_committed(d, name, timeout=240):
@@ -443,7 +457,7 @@ def bed(d, name, spec, work, results):
         if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
             d.sh("svc wifi disable", check=False)
             d.sh("svc data disable", check=False)
-        d.install(ra["host"]["apk"])
+        install_granted(d, ra["host"]["apk"])
         if name == "xonotic":
             # Before the remote is reachable (no adb reverse yet): the seeding launch must not
             # stage the update, or the next launch would already run B.
@@ -683,7 +697,7 @@ def live_swap_probe(args):
         if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
             d.sh("svc wifi disable", check=False)
             d.sh("svc data disable", check=False)
-        d.install(os.path.abspath(args.apk_a))
+        install_granted(d, os.path.abspath(args.apk_a))
         base = seed_xonotic(d, pkg, "+exec probe.cfg" if args.map else "")
         d.sh(f"touch {base}/andysu-swap-hook")  # the loader's TEST HOOK thread only starts with this flag file
         if args.map:
@@ -901,7 +915,7 @@ def live_bed(args):
         if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
             d.sh("svc wifi disable", check=False)
             d.sh("svc data disable", check=False)
-        d.install(ra["host"]["apk"])
+        install_granted(d, ra["host"]["apk"])
         seed_xonotic(d, pkg)
         d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
         el = EngineLog(d)
@@ -1117,7 +1131,7 @@ def live_failures_bed(args):
         if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
             d.sh("svc wifi disable", check=False)
             d.sh("svc data disable", check=False)
-        d.install(ra["host"]["apk"])
+        install_granted(d, ra["host"]["apk"])
         seed_xonotic(d, pkg)
         d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
         el = EngineLog(d)
@@ -1359,7 +1373,7 @@ def low_storage_bed(args):
         if not d.existing:  # a shared device (--device) keeps its network: adb may run over it
             d.sh("svc wifi disable", check=False)
             d.sh("svc data disable", check=False)
-        d.install(ra["host"]["apk"])
+        install_granted(d, ra["host"]["apk"])
         seed_xonotic(d, pkg)
         d.adb("reverse", f"tcp:{port}", f"tcp:{port}")
         el = EngineLog(d)

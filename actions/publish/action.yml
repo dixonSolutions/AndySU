@@ -17,10 +17,10 @@ inputs:
     description: Root certificate (JSON) when signing-key is a certified release key
     default: ""
   version:
-    description: Release id (default: the payload's version)
+    description: "Release id (default: the payload's version)"
     default: ""
   channel:
-    description: Channel (default: the one in andysu.toml)
+    description: "Channel (default: the one in andysu.toml)"
     default: ""
   pack-args:
     description: Extra arguments for `andysu pack` (e.g. --hot assets/ --archive assets/data --no-rename)

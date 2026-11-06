@@ -46,6 +46,11 @@ not established: that boot's journal shows no OOM, panic, MCE, NVMe error or Bli
   The same `--live` bed without patch 0009 fails at the live swap (`0.0% of pixels changed: frozen`).
   SuperTuxKart on API 34: built-in, next-start update and rollback pass, but **its bed has no
   `screen_alive` check**, so a frozen screen there would go unseen.
+- **v0.1.112 (run 42112862459):** 33/33 jobs; npm verify passed on attempt 4 after 3 early misses.
+  A forced `resign-demo` (42116489375) took the demo channel from sequence 21 to 22, the first real
+  re-sign live; all blobs verified.
+- **Publish action:** first real use (Xonotic Touch) showed `actions/publish/action.yml` was invalid
+  YAML (unquoted colons), so it could never load. `test.sh` never read that file; it does now.
 - **Lost:** the clean-room script a Luna worker wrote lived in `/tmp/luna` and went with the crash.
 
 ## Environment (2026-11-02)
