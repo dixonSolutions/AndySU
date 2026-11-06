@@ -51,6 +51,7 @@ class Config(val json: JSONObject) {
     fun coreConfig(root: java.io.File): String = JSONObject()
         .put("base_dirs", JSONArray(java.io.File(root, "factory").listFiles()
             ?.filter { java.io.File(it, "andysu-slot.json").isFile }?.map { it.path } ?: emptyList<String>()))
+        .put("factory_id", if (Transparent.active && Transparent.isFactory) Transparent.version else JSONObject.NULL)
         .put("app", app)
         .put("channel", channel)
         .put("roots", JSONArray(roots))

@@ -136,6 +136,7 @@ pub fn config() -> Config {
         device: Device { host_api: 1, shell_version: 1, api_level: 34, abis: vec!["x86_64".into()] },
         low_storage: false,
         base_dirs: vec![],
+        factory_id: None,
     }
 }
 

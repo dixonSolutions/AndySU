@@ -6,7 +6,8 @@ use common::*;
 use std::fs;
 
 use andysu_core::manifest::{Apply, Kind, PatchFormat};
-use andysu_core::session::CheckOutcome;
+use andysu_core::session::{CheckOutcome, Session};
+use andysu_core::store::Store;
 use andysu_core::{sig, Error};
 
 fn files(v: &str) -> Vec<File<'static>> {
@@ -180,6 +181,25 @@ fn certified_release_key() {
     let dev = tempfile::tempdir().unwrap();
     let mut sess = session(dev.path());
     assert!(matches!(sess.check(&remote.manifest_url(), &b, &s, None, NOW + 11), Err(Error::BadCert(_))));
+}
+
+#[test]
+fn built_in_release_is_not_an_update_of_itself() {
+    let remote = Remote::new();
+    let dev = tempfile::tempdir().unwrap();
+    let mut cfg = config();
+    cfg.factory_id = Some("1.0".into());
+    let new = || Session::new(Store::open(dev.path()).unwrap(), cfg.clone(), [7; 16]).unwrap();
+
+    let r1 = remote.release("1.0", 1, &files("1.0"));
+    let (b, s) = remote.publish(&Remote::manifest(1, vec![r1.clone()]));
+    let out = new().check(&remote.manifest_url(), &b, &s, None, NOW).unwrap();
+    assert!(matches!(out, CheckOutcome::UpToDate { .. }), "{out:?}");
+
+    let r2 = remote.release("2.0", 2, &files("2.0"));
+    let (b, s) = remote.publish(&Remote::manifest(2, vec![r1, r2]));
+    let out = new().check(&remote.manifest_url(), &b, &s, None, NOW).unwrap();
+    assert!(matches!(out, CheckOutcome::Update { .. }), "a newer release still installs: {out:?}");
 }
 
 #[test]

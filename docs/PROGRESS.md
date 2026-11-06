@@ -51,6 +51,10 @@ not established: that boot's journal shows no OOM, panic, MCE, NVMe error or Bli
   re-sign live; all blobs verified.
 - **Publish action:** first real use (Xonotic Touch) showed `actions/publish/action.yml` was invalid
   YAML (unquoted colons), so it could never load. `test.sh` never read that file; it does now.
+- **First Xonotic Touch live release (1.2.111):** the real plain APK, then the real live APK over it
+  on the real channel: data kept, status up to date, auto mode on. The raw events showed the fresh
+  install live-swapping to its own version, because the built-in release has no sequence. The host
+  now passes `factory_id`, and the core treats that release as up to date.
 - **Lost:** the clean-room script a Luna worker wrote lived in `/tmp/luna` and went with the crash.
 
 ## Environment (2026-11-02)
