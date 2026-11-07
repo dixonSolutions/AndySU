@@ -16,9 +16,12 @@ Use this guide if your app already ships as a plain APK and has its own APK upda
    whose updater prefers that host on API 30 and later, while still selecting the plain APK on older
    devices. Existing installs then move in two steps: first the plain update, then the host. Test the
    matching rules against the updater versions already in users' hands.
-3. Sign the host with the same app signing key as the plain APK. Android will otherwise refuse to
+3. Give the host a version code at least as high as what is installed. Android refuses a downgrade,
+   and from the package installer that can read "This app isn't compatible with the latest version of
+   Android", which says nothing about versions. A device on plain 1.2.113 refused host 1.2.112 this way.
+4. Sign the host with the same app signing key as the plain APK. Android will otherwise refuse to
    install it over the existing app. Keep the same application ID too.
-4. In the new app, make the in-app APK updater stand down when
+5. In the new app, make the in-app APK updater stand down when
    [`Host.current()`](/android/host-api#hostcurrent) returns a host. The host's `versionName` is
    frozen, so the old updater would offer an APK install on every release. Keep the old updater for
    plain builds. Make sure the host API can be checked safely in a plain build too.
@@ -29,8 +32,10 @@ Use this guide if your app already ships as a plain APK and has its own APK upda
   host uses the smaller of `host_api` and the level implemented by its AAR. Payloads using the mode
   methods must also require `host_api_min = 3`.
 - Set `[policy] watchdog_ms` from a slow device's healthy startup time, with room to spare. The
-  default is 10000 ms. For example, a game loading data at startup rolled good updates back at 10 s
-  and was stable at 45 s. Measure your own app: a timeout that is too short rolls back good releases.
+  default is 10000 ms. For example, a game rolled good updates back at 10 s, and at 45 s still missed
+  it once on a heavily loaded emulator. It now uses 120 s and reports healthy sooner. A rolled-back
+  release is marked bad and not retried, and crashes are caught at once, so a long deadline costs
+  little. `watchdog_ms` is frozen in the host; when the payload reports healthy is not.
 - Make the published payload release ID equal the version built into the host. The host uses that
   identity to recognize its factory payload; a mismatch can make it update to its own version. By
   default `andysu pack` uses the payload version as the release ID. See the
@@ -70,6 +75,12 @@ Tauri app was tested on an emulator: it booted under the host and updated betwee
 Android's WebView installs its own crash handlers, and the host reports `crash_handler_replaced`. A
 native crash during a trial is then caught by the watchdog, not at once. `crash_signals = "host"`
 puts the host first and is the likely setting for Tauri, but it has not been tested yet.
+
+## Assets the full game data can override
+
+If an app downloads data after install, that data can outrank a file you ship under the same name,
+so a test without it will not show the problem. Use a name only your app ships for anything you
+replace.
 
 ## Test the migration
 
