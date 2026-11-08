@@ -72,9 +72,10 @@ change is therefore a native update. Without a live-swap handler it applies on t
 Tauri app was tested on an emulator: it booted under the host and updated between two real releases, a
 14 MB native library change. The UI and the app's native engine both worked after the update.
 
-Android's WebView installs its own crash handlers, and the host reports `crash_handler_replaced`. A
-native crash during a trial is then caught by the watchdog, not at once. `crash_signals = "host"`
-puts the host first and is the likely setting for Tauri, but it has not been tested yet.
+Android's WebView installs its own crash handlers, and the host reports `crash_handler_replaced`.
+Keep the default `crash_signals = "payload"` for Tauri apps. One app tested this way already
+aborted on exit, from its own Rust code and on plain builds too. With `"host"` that abort could
+roll back a good update that was opened and closed before it reported healthy.
 
 ## Assets the full game data can override
 
