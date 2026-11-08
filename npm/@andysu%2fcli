@@ -1,0 +1,1098 @@
+{
+ "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+ "dist-tags": {
+  "latest": "0.1.135"
+ },
+ "license": "Apache-2.0",
+ "name": "@andysu/cli",
+ "repository": {
+  "directory": "cli/npm",
+  "type": "git",
+  "url": "https://github.com/dixonSolutions/AndySU"
+ },
+ "time": {
+  "0.1.106": "2026-11-05T06:48:04.000Z",
+  "0.1.112": "2026-11-05T21:42:15.000Z",
+  "0.1.117": "2026-11-06T01:21:41.000Z",
+  "0.1.120": "2026-11-06T02:33:20.000Z",
+  "0.1.124": "2026-11-06T05:35:16.000Z",
+  "0.1.127": "2026-11-06T06:22:52.000Z",
+  "0.1.13": "2026-11-02T21:41:46.000Z",
+  "0.1.130": "2026-11-06T09:38:28.000Z",
+  "0.1.135": "2026-11-08T22:09:07.000Z",
+  "0.1.15": "2026-11-02T22:10:29.000Z",
+  "0.1.17": "2026-11-02T22:38:43.000Z",
+  "0.1.25": "2026-11-02T22:56:20.000Z",
+  "0.1.33": "2026-11-02T23:37:54.000Z",
+  "0.1.36": "2026-11-03T00:06:26.000Z",
+  "0.1.41": "2026-11-03T01:57:19.000Z",
+  "0.1.44": "2026-11-03T02:40:42.000Z",
+  "0.1.46": "2026-11-03T02:58:48.000Z",
+  "0.1.49": "2026-11-03T03:54:18.000Z",
+  "0.1.53": "2026-11-03T04:49:58.000Z",
+  "0.1.56": "2026-11-03T05:09:01.000Z",
+  "0.1.58": "2026-11-03T05:28:45.000Z",
+  "0.1.62": "2026-11-03T05:48:41.000Z",
+  "0.1.65": "2026-11-03T07:12:39.000Z",
+  "0.1.68": "2026-11-03T20:50:37.000Z",
+  "0.1.71": "2026-11-03T21:43:46.000Z",
+  "0.1.78": "2026-11-03T22:21:30.000Z",
+  "0.1.81": "2026-11-04T07:25:25.000Z",
+  "0.1.90": "2026-11-04T08:56:03.000Z",
+  "0.1.96": "2026-11-04T09:53:45.000Z",
+  "0.1.98": "2026-11-04T22:44:33.000Z",
+  "modified": "2026-11-08T22:09:07.000Z"
+ },
+ "versions": {
+  "0.1.106": {
+   "_id": "@andysu/cli@0.1.106",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-5fKJEwftXL2eqFkFQQK/VPYcVou+ErJIIX8DhP2SksersuSBbft07Lih9AfjyJGX4aNEAbPTCLYXz5qqYRL5FQ==",
+    "shasum": "5acea8a86a1f00691a6610077b4fb21bbe749ffd",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.106.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.106"
+  },
+  "0.1.112": {
+   "_id": "@andysu/cli@0.1.112",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-0L8y0p36EmCk+A1lJqyp2t6Ypv1gkrT/tGZNJ7Fw9PbkqN2h4hH2DZ7TTZtoH47UOEpYJOxdzAFFsEA7gjuYig==",
+    "shasum": "cb2459eebee548b9b506f1dd3c664f98399dabc8",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.112.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.112"
+  },
+  "0.1.117": {
+   "_id": "@andysu/cli@0.1.117",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-jzqiSeewft2pdNFgNtYUPrw7F2nTVUIG7ncrz/X7qQAh+RnrnF7PmO7XxhC0s/DUMkIALgAwTTLUTDczc9cy5A==",
+    "shasum": "012289b681a9b48c65b67b70ce8f3d76e5ddff9d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.117.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.117"
+  },
+  "0.1.120": {
+   "_id": "@andysu/cli@0.1.120",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-/ytwjnOpT8WEY+QzlHJNm7uzGRud8xNK7iNZ36lf1+flQzZxXuiVD8TwubYhEXWMUdIXqfsCrMmwJk7U655bVQ==",
+    "shasum": "91a7300a04a69e9e3e9f7fb811d1c9fe09fd903b",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.120.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.120"
+  },
+  "0.1.124": {
+   "_id": "@andysu/cli@0.1.124",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-QgeT+W2JwGoChnM0gAgQjokdcbNfnfeevV21SVJAimE019DuKVb469/4SDH2i1nNck7wRoqYWre7CX7auCdutg==",
+    "shasum": "486349899ea88751ca383a153327dacca9f4266b",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.124.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.124"
+  },
+  "0.1.127": {
+   "_id": "@andysu/cli@0.1.127",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-PGrLM5ULxjmemSLwe2zONflQ99Wl4ZKcroVO1aWMdoSCmyvbQhxO8ZcFfAAlN+C0M2ij4vXwXOEUViVm2rYYow==",
+    "shasum": "a4908f7c5a348d526def5288f01558a8edc8b6e9",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.127.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.127"
+  },
+  "0.1.13": {
+   "_id": "@andysu/cli@0.1.13",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-3UuGSkHpsI7cP0cuRqzooqAc6dwlXOPh0mt5dPJGlzYpMYMneJDdEud9ATUaFpBWxg987JKV5I6kvGGex/CYsw==",
+    "shasum": "548272df0af1b986e9be5c8dcac70c9eb5452321",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.13.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.13"
+  },
+  "0.1.130": {
+   "_id": "@andysu/cli@0.1.130",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-OP6vi+EkC9iUxo+lz/jdEZ4XJPGJYFDT+2MU29SK9ZXQqjTbRKOqEwrZ9eDY5m57JR70kBnxFvlekGQmS6rbYA==",
+    "shasum": "671561db02b0ea14a44c5ec6973885445879a1ce",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.130.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.130"
+  },
+  "0.1.135": {
+   "_id": "@andysu/cli@0.1.135",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-v9MksAHVhBlr2oHDnPHdROEmeqmwLE/3PF/UirjDwtxpAzO5wHxuzJ+zvcP92Je0flNbB0fW+b5wAGOLhcHczA==",
+    "shasum": "6ccdd5fed8d5cc8f4110f21c7d760b21a2c18df0",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.135.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.135"
+  },
+  "0.1.15": {
+   "_id": "@andysu/cli@0.1.15",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-7dzTMtTkClNvSNHP/6aEks6W3Oo/mnjjConioa6ZDvZ9xSdwVYXiqmVYQmYDdqh+x1mEKS/noo3XdMyw3nOcLQ==",
+    "shasum": "948686b3bd6f6bc26a5f61c6c0dcaecf52fa1452",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.15.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.15"
+  },
+  "0.1.17": {
+   "_id": "@andysu/cli@0.1.17",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-GtkK9w4xIQlKG5v3s0be3Ni7/hHBAamyzfJoENss3ZVjsm8wLLA/hmKG0gHMH42nysV/5z8upUcroyqp/b7VDQ==",
+    "shasum": "62fba461b620257fdc300fe358e8301569767f84",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.17.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.17"
+  },
+  "0.1.25": {
+   "_id": "@andysu/cli@0.1.25",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-bCDwukTylJXtqPj/2O+zao8bHZlmx4vW9iQtEHo/NHILDCxgnwUSIMm9nZczjn2CfWTQ8acT8htlupJrwhLivQ==",
+    "shasum": "9bf998339d962e952ca1b7b359cf1f924971bf08",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.25.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.25"
+  },
+  "0.1.33": {
+   "_id": "@andysu/cli@0.1.33",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-Edkn7oVsNSNck8asXEES51YlDTujGHkmm/dnjrVuf6fnCrF0iynY+OZOpnuwRdzMhm92J1zuyvdmlyQ3FvHXPA==",
+    "shasum": "89039845df30ecd15681ab35ae1b908ef67ce773",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.33.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.33"
+  },
+  "0.1.36": {
+   "_id": "@andysu/cli@0.1.36",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-tOBgZ0PGmrXaCu6HDV/mloJcVhdTo4OCpG3bjcxXxTe9k5a8BBiym5j/3OF6sXOPnbZkdeW99mRS0tijf9f9dQ==",
+    "shasum": "004ded2bb3d78398400f485304262df2af336883",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.36.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.36"
+  },
+  "0.1.41": {
+   "_id": "@andysu/cli@0.1.41",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-c7TqkizD+uS2EDQ4RAjt20Jfr8sTk0Yx8eNZ43iwWVaHYMN6bTeHJbBmd2zDCvBhpu1Gq7Ne4Yv8HQrVjXzSgw==",
+    "shasum": "42a93bad14ba6cab09c2138cbb0845270a896b1d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.41.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.41"
+  },
+  "0.1.44": {
+   "_id": "@andysu/cli@0.1.44",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-M1GpgEPVPugXNif46lCfOZtdnEhLHAUcZFiD9U9dI+85k7Kp5SQS5pNeOd56JfF+7tQb5gfa9WxokLXjGOXjBA==",
+    "shasum": "bee74d2991b99e277196dc01b74bfc4781138923",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.44.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.44"
+  },
+  "0.1.46": {
+   "_id": "@andysu/cli@0.1.46",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-G05+3iLIDSokfxvvbA37P3z7IHU/wIhTem84mpWn9Fb1ao+yhnjvCf3Ayv4J6aN4VPrdXxCD2P5V2Oh7ewcLoQ==",
+    "shasum": "ecace97fd158bdf782f2caf8e2e74733778daf0e",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.46.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.46"
+  },
+  "0.1.49": {
+   "_id": "@andysu/cli@0.1.49",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-mG0y4r4z+C4e6XU9gjGfCfudqFXQ7NUNwlUSbQkGAwZaxxvpaBweQtw/nvc2P7iBjWZ7YI67ArlvoUZe9qd0Pg==",
+    "shasum": "f06dbacf9301ec2ac43e786ef9f39ab1abb51a4d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.49.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.49"
+  },
+  "0.1.53": {
+   "_id": "@andysu/cli@0.1.53",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-zg1P4W/TFWyj8ZktvrN+unTVPCyR1V4m5pfJ4nQ443dVZzLPEq0HLD1uxQQ6atuyHaprFTXuWEj2GAfQ3PhG7w==",
+    "shasum": "9f3a54c416b2d5defede99de66d2a56a9398aaaa",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.53.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.53"
+  },
+  "0.1.56": {
+   "_id": "@andysu/cli@0.1.56",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-b6T0NM1Vntk9YDmmXD15977qIaA1AB801zBEJd7WRFT8mJ8I8SByWEz4Xl+WWssyuXtJ91WPfJEpAIqO/2GJFg==",
+    "shasum": "3727602f84aa10ad03bad6a76eda60954755b5b2",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.56.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.56"
+  },
+  "0.1.58": {
+   "_id": "@andysu/cli@0.1.58",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-joEEcrV5KUPPO/SFCkaLCyaJS63deCJSFHOnk/HuvnOFg24KTOa6/h8CDmWWREqEG9B+87iCtnYMa3FcvkAQtA==",
+    "shasum": "7f40ec84c1bf579688cbbdfa006effa49ea74637",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.58.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.58"
+  },
+  "0.1.62": {
+   "_id": "@andysu/cli@0.1.62",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-jvyiza3jXDN+Hc9f6RqtuTbdCNXnPvTDxsEXpASVtWLvX0yHmyk4koofRi9TtwFCmMmjcbpbOrD5gFfoUafLBw==",
+    "shasum": "bffd7cafc6899a997ab8a5f29c53834c8d07ebe1",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.62.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.62"
+  },
+  "0.1.65": {
+   "_id": "@andysu/cli@0.1.65",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-EdEcx3A/gp1SWW2oGGbm73gVtxl3vyt5fmtPYF24rZX4MFcLZLDX7nHkJS4QSYxgQUdRRhA5hDrttPwELaGP5g==",
+    "shasum": "bfb325cf33c821b731871d9c24c74b98ebedae95",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.65.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.65"
+  },
+  "0.1.68": {
+   "_id": "@andysu/cli@0.1.68",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-ukSddmRz+TAE3IGEN58ucltNiWliWlpn6FJ/I11FaGqsrIovcyd56T7LzKVLVrrbRMbh+lds9+LrHMrOljqGhA==",
+    "shasum": "27ec99dbafcb9f93e516e102124d1dcf583f7092",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.68.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.68"
+  },
+  "0.1.71": {
+   "_id": "@andysu/cli@0.1.71",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-GPpz0k2k0hDtPVvmLwb8/eY69HZhUTeNa2QpP2kGtJ/+P1dnvYOTGbMIFM945UAuosZIYDm98Mq50D9HqRCJ3w==",
+    "shasum": "35d9f283833990fd9878e7e400244fac701d5e3d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.71.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.71"
+  },
+  "0.1.78": {
+   "_id": "@andysu/cli@0.1.78",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-+aXQbLe5UzHuzkarJ7evtmaARozy2LK4AXsINhcwjm2tXVjDB5DUfmTnmArCRZJvpCk/g9UYe1LFfHhmW2cvuA==",
+    "shasum": "8c1ea5e9eeb000b645bba98936ea31e8e037ee49",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.78.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.78"
+  },
+  "0.1.81": {
+   "_id": "@andysu/cli@0.1.81",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-4JnQ6fXhvEnv9dxxCHMO3etTms43r6U3Sdys0AsJOSGN7pacn4DxQly5av+4aJkf7twlqFDsUKP4ZUdFJwcIqg==",
+    "shasum": "053a2bdd522001be32f8764034ee883447234877",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.81.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.81"
+  },
+  "0.1.90": {
+   "_id": "@andysu/cli@0.1.90",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-glJsAv/2L7lPmxpzEZ7KaATEWzCXz/t/zzQc6Nep6uUD4YbqU18V5tgCjeGEmzw/OIjeEUCChwywxplBGdliqQ==",
+    "shasum": "6940b086018cdefba83c0654da7dafbba06f67bb",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.90.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.90"
+  },
+  "0.1.96": {
+   "_id": "@andysu/cli@0.1.96",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-wdZeHqZaZKJShNiwqbMtSGi/2VDnB6bw9Hnc9doITaR/S2uP/Dj3rpPasUIS1Rp5zrP/UlIs1AJiHHcu2jPq7A==",
+    "shasum": "6ec6ab6c35e0bc62bc0e28eef56b548da17ac5d0",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.96.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.96"
+  },
+  "0.1.98": {
+   "_id": "@andysu/cli@0.1.98",
+   "bin": {
+    "andysu": "bin/andysu.js"
+   },
+   "cpu": [
+    "x64",
+    "arm64"
+   ],
+   "description": "The AndySU command line (keygen, init, split, pack, publish, sign, verify) as an npm package",
+   "dist": {
+    "integrity": "sha512-uEJ3hT6vT5sxg6AQp+RsqTI33y/TGcVQl833FE41Ll8DnrDKarf+ZcTU6Q2IaAxGE5arYL5IhKTLJc/ASOGFBw==",
+    "shasum": "6c65b4fdb6d8034e6510094af0622f4322a95081",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-cli-0.1.98.tgz"
+   },
+   "engines": {
+    "node": ">=18"
+   },
+   "files": [
+    "bin",
+    "vendor"
+   ],
+   "license": "Apache-2.0",
+   "name": "@andysu/cli",
+   "os": [
+    "linux",
+    "darwin"
+   ],
+   "repository": {
+    "directory": "cli/npm",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "version": "0.1.98"
+  }
+ }
+}

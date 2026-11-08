@@ -1,0 +1,948 @@
+{
+ "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+ "dist-tags": {
+  "latest": "0.1.135"
+ },
+ "license": "Apache-2.0",
+ "name": "@andysu/react-native",
+ "repository": {
+  "directory": "bindings/react-native",
+  "type": "git",
+  "url": "https://github.com/dixonSolutions/AndySU"
+ },
+ "time": {
+  "0.1.106": "2026-11-05T06:48:04.000Z",
+  "0.1.112": "2026-11-05T21:42:15.000Z",
+  "0.1.117": "2026-11-06T01:21:41.000Z",
+  "0.1.120": "2026-11-06T02:33:20.000Z",
+  "0.1.124": "2026-11-06T05:35:16.000Z",
+  "0.1.127": "2026-11-06T06:22:52.000Z",
+  "0.1.13": "2026-11-02T21:41:46.000Z",
+  "0.1.130": "2026-11-06T09:38:28.000Z",
+  "0.1.135": "2026-11-08T22:09:07.000Z",
+  "0.1.15": "2026-11-02T22:10:29.000Z",
+  "0.1.17": "2026-11-02T22:38:43.000Z",
+  "0.1.25": "2026-11-02T22:56:20.000Z",
+  "0.1.33": "2026-11-02T23:37:54.000Z",
+  "0.1.36": "2026-11-03T00:06:26.000Z",
+  "0.1.41": "2026-11-03T01:57:19.000Z",
+  "0.1.44": "2026-11-03T02:40:42.000Z",
+  "0.1.46": "2026-11-03T02:58:48.000Z",
+  "0.1.49": "2026-11-03T03:54:18.000Z",
+  "0.1.53": "2026-11-03T04:49:58.000Z",
+  "0.1.56": "2026-11-03T05:09:01.000Z",
+  "0.1.58": "2026-11-03T05:28:45.000Z",
+  "0.1.62": "2026-11-03T05:48:41.000Z",
+  "0.1.65": "2026-11-03T07:12:39.000Z",
+  "0.1.68": "2026-11-03T20:50:37.000Z",
+  "0.1.71": "2026-11-03T21:43:46.000Z",
+  "0.1.78": "2026-11-03T22:21:30.000Z",
+  "0.1.81": "2026-11-04T07:25:25.000Z",
+  "0.1.90": "2026-11-04T08:56:03.000Z",
+  "0.1.96": "2026-11-04T09:53:45.000Z",
+  "0.1.98": "2026-11-04T22:44:33.000Z",
+  "modified": "2026-11-08T22:09:07.000Z"
+ },
+ "versions": {
+  "0.1.106": {
+   "_id": "@andysu/react-native@0.1.106",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-0FMngmhxlhzml1y3/jQ1Ezckr4ApSmQMwGC9ob8SxUFw4JUtEnei8qz9bQ1ACJsJBQ1e+VeKyBrVA5wBCvwPJA==",
+    "shasum": "7fb740253ce3f45345b32f9bd91aad74bc2db43d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.106.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.106"
+  },
+  "0.1.112": {
+   "_id": "@andysu/react-native@0.1.112",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-xtad4bhapf/sHYhxjvjclOxPUvfCtVDdXN/MtIe8/JtgI89FMxXu7flcSaOLvX+LG9gB4kPFvee/0QZT0isycQ==",
+    "shasum": "e585ccc134edbd3d1411ca9b80349774bf73df49",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.112.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.112"
+  },
+  "0.1.117": {
+   "_id": "@andysu/react-native@0.1.117",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-tHivJDf2vfb08WKi8cvio8/tBUfvmVkNYLKChFDyUuWJB4i7gD2VKWiGKc6M50XI0E8C3W21M0eBTYV1Bf+s2g==",
+    "shasum": "420cb29f6e7ef79f0f020f3ae8e972c27d1de33b",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.117.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.117"
+  },
+  "0.1.120": {
+   "_id": "@andysu/react-native@0.1.120",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-ofJIScMd2QeV9kU314p/j8nVylkm4B5CR+ALwJNVuYTyxR1PVUaObrNa7oCV6mV+C83xkaGXfwyA3PpDZENeWQ==",
+    "shasum": "b1479ddd5aec20fe510f1a05445b7643af6b610a",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.120.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.120"
+  },
+  "0.1.124": {
+   "_id": "@andysu/react-native@0.1.124",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-nTgPzNpdEy7G8/twxMyll+Aky21oLi2xOCutBeOG+Eh9/g9z9fhCeM6CDqFF63S+61P18MruYiav8CLoZbL31w==",
+    "shasum": "dd624e39458b32a73a3337b5a44c8a7fbeb02918",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.124.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.124"
+  },
+  "0.1.127": {
+   "_id": "@andysu/react-native@0.1.127",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-Vv7dE4EQt1f7hA4QL2rtrmDeem5VB1+r6hF7ZzTRMMbst8EPpSwhHQ+ZIYiQPAZ7y30djkEsh+1cVKN95Sy5Fg==",
+    "shasum": "bbbeab701899835625c346bc73baa0c77ce961a4",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.127.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.127"
+  },
+  "0.1.13": {
+   "_id": "@andysu/react-native@0.1.13",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-wIy1GhPdcu6RIyeL4N1ZHlzVvb6bedN5fhHwKbNpC5zgLR8osk0zol631x7i1WROIjGmw3pAWuM3rOd96m+Dzg==",
+    "shasum": "9a5440d9fc8ae84f5ab974b369916c18a723e3e7",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.13.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.13"
+  },
+  "0.1.130": {
+   "_id": "@andysu/react-native@0.1.130",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-VD3aKNIQu7pqB4xcQqrQId0xeJpsfsmOW3FTcclTMVO76G8Xat+k82XWs8iAaTeqPjgEJSBO8u4quUb3GyILSg==",
+    "shasum": "b98246f26c208a1983f16f186ff5503a62dfe8cb",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.130.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.130"
+  },
+  "0.1.135": {
+   "_id": "@andysu/react-native@0.1.135",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-E0WlITU/b9xeBptYVF2fgX5yDVR3DmM06xmlX7LYAAGL78d8UG5U+YrwMdrX3WAlz+X69WNrqSNsbCiJsp3zLg==",
+    "shasum": "9377c1ecb420dc0046138cf082fe17809e72ed42",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.135.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.135"
+  },
+  "0.1.15": {
+   "_id": "@andysu/react-native@0.1.15",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-BUceQTsewCoBiZU8Au/KlAhRBJBnA6w2YsPHfs/MrwgLatYhg3/9JStAIsYVO0z5/aT9Ktk2FfNX4UVBnxjyVA==",
+    "shasum": "072784ba3e011a16a8dea771c545fed507043edc",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.15.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.15"
+  },
+  "0.1.17": {
+   "_id": "@andysu/react-native@0.1.17",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-iHmqEk4a1/IAfkauWZDSSc/dZPSSxKTFFlTLDeG44rl13Qi9J7MZrOQE8JM+3mpAKS8I67mTOD6mDMVzAoi0Mw==",
+    "shasum": "f251e0b198c9f72ba49c99ad468d5d40710c6b00",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.17.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.17"
+  },
+  "0.1.25": {
+   "_id": "@andysu/react-native@0.1.25",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-Bxuxe6Lx5GLHANin3eAuha8f3fTGJyPXDmmoTL6OiL7YDkeQ2I673MM2xr/d+NQwnRspyi6Q1i+LN5itFbUQVw==",
+    "shasum": "67ed1febe2901b6730659e18f26296003a3eebbb",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.25.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.25"
+  },
+  "0.1.33": {
+   "_id": "@andysu/react-native@0.1.33",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-s/QHTFCYCGQmVTIkkhfCoC+0O5jbURBxxKmgXH0uoFFyk0uLvFs/r7RgAiD37e+thvDrdNphddflQVozyRq4sA==",
+    "shasum": "9b7ed72f354876d5036650f02c8b9056722c2fec",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.33.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.33"
+  },
+  "0.1.36": {
+   "_id": "@andysu/react-native@0.1.36",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-HRNfjxrOmxK5g+LduXDxFbAYLVK3UN9rMckAuqA/jrsggZz+W1uK7RtyfloKxbpm4PdU+jSYoMOPImH0MEsTyg==",
+    "shasum": "19a212ffd45f9eff94072541bec7a91bce0a6a1d",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.36.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.36"
+  },
+  "0.1.41": {
+   "_id": "@andysu/react-native@0.1.41",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-7edRfiHVXu1NtJ48ioOTm3FaZ+wpmIOyNxpZrIF/n4lDysG4XLULkP9nvHw0kc01KWltRFH/ZTaIQ/vCIm0p2g==",
+    "shasum": "20e6ecd395cc985a3569b9e947b6d1cf39b936d9",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.41.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.41"
+  },
+  "0.1.44": {
+   "_id": "@andysu/react-native@0.1.44",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-QQ/UC+AHM0Nhrb1q/wxVQMMkbJEMO5Fo4NQm2gJ/gwNctTutjASQiCKtewAxvuiJ8lqfuRUV8QPUu98U3udwPw==",
+    "shasum": "1903e404525dfa19b21f23468f9253dc9b2b1c0e",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.44.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.44"
+  },
+  "0.1.46": {
+   "_id": "@andysu/react-native@0.1.46",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-gs6qZFud80DYxPAKmp9aGVKcG/dFhc2UNiYTjmszEPaJJIUCwvPHNqFa1xt2dfOF2x80GhbClYfbdNoRFesxng==",
+    "shasum": "2ac0713d905315794b686f56735efc85238b3410",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.46.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.46"
+  },
+  "0.1.49": {
+   "_id": "@andysu/react-native@0.1.49",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-Nv3skLhbWHAesj+W1JL7LPr82/EoMXnZ9B4+wXy3+3W0nSnPvNdiMfEsWbkJvqyrREmCJAHh5osuxXYyrCTPtg==",
+    "shasum": "47d1ee919df999deb25812974b0b32e7e258120b",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.49.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.49"
+  },
+  "0.1.53": {
+   "_id": "@andysu/react-native@0.1.53",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-TSj925g3tbsXMyL/VRRroMNVEjwb2PfG8VhbJy36dHcyklD/Vqcnx9c7YBED18+NIYxguFyqOWeG1BieLKGGvQ==",
+    "shasum": "921370782a666345e7991107f91416396bd5e03a",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.53.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.53"
+  },
+  "0.1.56": {
+   "_id": "@andysu/react-native@0.1.56",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-OArM4pF1ttMjN1BeMbDujYiRVEAM5GiemGSa0L4MKdtSG/juR8c/cSFpCaYzWy9FjhPPhEH4LH6ekxbbYDLI3Q==",
+    "shasum": "180d5390e2cde8f4a066a1efe652138c552b2e59",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.56.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.56"
+  },
+  "0.1.58": {
+   "_id": "@andysu/react-native@0.1.58",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-+3O8X9w7DvKRsT6PjcsgKbe3U3GzOaNbrcDFhj4ycEpBQDv+qA3SeA1tXRs4XdN28vsQpPJy2XeOZLMDuGch0Q==",
+    "shasum": "4630e8cf7d0f0cbed88584c6c0656cc2a8e636f7",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.58.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.58"
+  },
+  "0.1.62": {
+   "_id": "@andysu/react-native@0.1.62",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-PF+jymHJovFbwTmz9eW8SuA3d3FOx9QuHZNBjLLXgk5H/HlRxpkCqrqbafdOaSvjNnuSniEguTnzYt9Dj3naqg==",
+    "shasum": "1f26390ae0852106675b19e5503d7354df226211",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.62.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.62"
+  },
+  "0.1.65": {
+   "_id": "@andysu/react-native@0.1.65",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-UgGmceFh3HSpyLtuueSCrRcVM0WiJo8UjLrOWgvGVP6W1iUys/aD7KG2Hx0D8AYfuf5+pSJ7NOcgR1SA89jfDA==",
+    "shasum": "8a44edd2d56ea6734222b45f9beab4b9e89c8cd8",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.65.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.65"
+  },
+  "0.1.68": {
+   "_id": "@andysu/react-native@0.1.68",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-WyfDsYGe+n8yxWx1dgeBE5EnMu02EKVeNZqDxvzQN0PXZo5WkGTniJMRK9qQOaSgnntIcOs9JmgZBDMofCSAgQ==",
+    "shasum": "4a73192ed8c6fbcede9891c0c4ea4117603bb07b",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.68.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.68"
+  },
+  "0.1.71": {
+   "_id": "@andysu/react-native@0.1.71",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-HtXJ5t5djx0thtmncDdPSEZxnEsuy4ij+Ev4BZJuEB1JY3LPw5+orJEzWpx5Db9q+ti1FXqRDUqACVwZ2x7Rjw==",
+    "shasum": "2d1c75255c23e38c8d7c756e6f73327759baecb7",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.71.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.71"
+  },
+  "0.1.78": {
+   "_id": "@andysu/react-native@0.1.78",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-gaWQ6eENi0oAMrTx7KsPgcMaR4t34+xs3dLwrBRkD8gFJyxALjHnIINeVjPph+cyb6RQSFrOeiev5a0UqaALBQ==",
+    "shasum": "aba434a94d95d82e83577756f1b44b67a0e5a609",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.78.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.78"
+  },
+  "0.1.81": {
+   "_id": "@andysu/react-native@0.1.81",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-b6aFqJA2orMovPyAOC8rtKOUtDnWblbOhLbxfnvQhFNSHDgjNNGPJefvKzgeuSlwpGK0dFjNW0OMnyzWSlRZYw==",
+    "shasum": "8900f1bad0e7d9b7144551b210485993f51d2d05",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.81.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.81"
+  },
+  "0.1.90": {
+   "_id": "@andysu/react-native@0.1.90",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-Lj53z1/iztvR9wmG8kbq01gtM9ujh5tXwilbxrLe0X69TeOYkEbaZv5gGTlyFNlecKr7qbI+h3O3u1nLQ1CeEQ==",
+    "shasum": "839ee7ea1283dc79ed2745386f10614ab910aea3",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.90.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.90"
+  },
+  "0.1.96": {
+   "_id": "@andysu/react-native@0.1.96",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-wPSMHDJHdAvXtmqn3r3bZleshwqFoE/VV9LotiPdh/pt55llrmPkNVzp6euoBxAJMtmUi2QyMUIqZnEUoHTjow==",
+    "shasum": "f02b7335c115c95708d74a94a2d77db98cd96000",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.96.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.96"
+  },
+  "0.1.98": {
+   "_id": "@andysu/react-native@0.1.98",
+   "description": "AndySU self-updates for React Native and Expo apps on Android (status, check, apply)",
+   "dist": {
+    "integrity": "sha512-7r0Y/8Fa95+Y693RzrI4Erw/wQf7fHjPCViLFcfQ783C6Dr8oLZi7wCI2yjK5I325BlqWCZckXz+2AyhT/r+qg==",
+    "shasum": "d7e7eeea8942bc7b812857e82cac015a159a6b13",
+    "tarball": "https://dixonsolutions.github.io/AndySU/npm/-/andysu-react-native-0.1.98.tgz"
+   },
+   "files": [
+    "lib",
+    "src",
+    "android/build.gradle",
+    "android/src",
+    "app.plugin.js",
+    "README.md"
+   ],
+   "license": "Apache-2.0",
+   "main": "lib/index.js",
+   "name": "@andysu/react-native",
+   "peerDependencies": {
+    "react-native": ">=0.70"
+   },
+   "repository": {
+    "directory": "bindings/react-native",
+    "type": "git",
+    "url": "https://github.com/dixonSolutions/AndySU"
+   },
+   "types": "lib/index.d.ts",
+   "version": "0.1.98"
+  }
+ }
+}
