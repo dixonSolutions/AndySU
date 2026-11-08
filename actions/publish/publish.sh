@@ -48,6 +48,19 @@ rollout=()
 # shellcheck disable=SC2206
 pack_args=($INPUT_PACK_ARGS)
 
+# A re-run after a complete publish has nothing to do: the channel already lists this release.
+already_published() {
+  [ -f "$1" ] || return 0
+  python3 - "$1" "$version" <<'PY' || return 0
+import json, sys
+sys.exit(0 if sys.argv[2] in [r["id"] for r in json.load(open(sys.argv[1]))["releases"]] else 1)
+PY
+  echo "manifest-url=$(field manifest_url)" >> "$out"
+  echo "release=$version" >> "$out"
+  echo "$version is already on $channel: nothing to do"
+  exit 0
+}
+
 case "$kind" in
 pages)
   # The whole site (manifests, blobs, deltas) lives on the Pages branch.
@@ -59,6 +72,7 @@ pages)
     git init -q -b "$INPUT_PAGES_BRANCH" "$site"
     git -C "$site" remote add origin "$git_remote"
   fi
+  already_published "$site/$channel/update.json"
   "$cli" pack "$INPUT_PAYLOAD" --site "$site" --channel "$channel" --id "$version" "${pack_args[@]}"
   "$cli" publish --site "$site" --channel "$channel" --release "$version" "${sign[@]}" "${rollout[@]}"
   touch "$site/.nojekyll"
@@ -84,6 +98,7 @@ github)
   else
     rm -f "$site/$channel/update.json"
   fi
+  already_published "$site/$channel/update.json"
   base="${ANDYSU_GITHUB_URL:-https://github.com}/$repo/releases/download/$tag"
   "$cli" pack "$INPUT_PAYLOAD" --site "$site" --channel "$channel" --id "$version" --base-url "$base" "${pack_args[@]}"
   "$cli" publish --site "$site" --channel "$channel" --release "$version" "${sign[@]}" "${rollout[@]}"
@@ -97,12 +112,23 @@ github)
     assets+=("$f")
   done < <(find "$site/blobs" "$site/deltas" -type f 2>/dev/null)
   manifest=("$site/$channel/update.json" "$site/$channel/update.json.sig")
-  if [ "$channel" = stable ]; then
+  # A run that created the release and stopped before the channel was updated is resumed: upload
+  # into the release it left behind instead of failing on the existing tag.
+  if gh release view "$tag" --repo "$repo" >/dev/null 2>&1; then
+    if [ "$channel" = stable ]; then
+      gh release upload "$tag" --repo "$repo" --clobber "${manifest[@]}" "${assets[@]}"
+      gh release edit "$tag" --repo "$repo" --latest
+    else
+      gh release upload "$tag" --repo "$repo" --clobber "${assets[@]}"
+    fi
+  elif [ "$channel" = stable ]; then
     gh release create "$tag" --repo "$repo" --latest --title "$version" \
       --notes "AndySU payload $version (stable)" "${manifest[@]}" "${assets[@]}"
   else
     gh release create "$tag" --repo "$repo" --prerelease --latest=false --title "$version ($channel)" \
       --notes "AndySU payload $version ($channel)" "${assets[@]}"
+  fi
+  if [ "$channel" != stable ]; then
     gh release view "channel-$channel" --repo "$repo" >/dev/null 2>&1 ||
       gh release create "channel-$channel" --repo "$repo" --prerelease --latest=false --title "Channel $channel" \
         --notes "Moving manifest of the $channel channel"

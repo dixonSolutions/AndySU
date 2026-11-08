@@ -62,6 +62,13 @@ not established: that boot's journal shows no OOM, panic, MCE, NVMe error or Bli
   profile kept. STK saves `players.xml` only on a clean exit, so tests must not force-stop it.
 - **Tauri:** the published dYT 0.1.11 APK ran under a transparent host and committed an update. The
   payload differed only by version, so changed web content is still unproven.
+- **First real device (owner's tablet):** it found what the emulator could not. The downloaded game
+  data outranked the logo override, so the logo now has a name only we ship. A live APK older than
+  the installed plain one is refused as a downgrade, with a misleading message.
+- **Publish action:** identical patches from two bases share a hash name, which broke the upload on
+  a channel's third release (Xonotic 1.2.113). Each name is now uploaded once, with a test.
+- **Slow devices:** a good update took 33 s of a 45 s watchdog at 10 fps and missed it once under
+  load. Xonotic now reports healthy at 90 frames and new hosts use 120 s.
 - **Lost:** the clean-room script a Luna worker wrote lived in `/tmp/luna` and went with the crash.
 
 ## Environment (2026-11-02)

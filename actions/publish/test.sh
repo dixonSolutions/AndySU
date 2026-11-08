@@ -59,6 +59,9 @@ ls "$t/pages/served/deltas" | grep -q . || { echo "pages: no deltas were built" 
 pct="$(python3 -c "import json; print(json.load(open('$t/pages/served/stable/update.json'))['releases'][-1]['rollout']['percent'])")"
 [ "$pct" = 50 ] || { echo "pages: rollout input not applied ($pct)" >&2; exit 1; }
 client_update pages "http://127.0.0.1:$p/stable/update.json" | grep -Eq '"staged": "(2|3)\.0"'
+git -C "$t/pages/origin.git" rev-parse gh-pages > "$t/pages/head"
+ANDYSU_GIT_REMOTE="$t/pages/origin.git" run_action pages 3.0 >/dev/null || { echo "pages: re-running 3.0 failed" >&2; exit 1; }
+[ "$(git -C "$t/pages/origin.git" rev-parse gh-pages)" = "$(cat "$t/pages/head")" ] || { echo "pages: re-running 3.0 pushed again" >&2; exit 1; }
 echo "ok pages: 3 releases on the branch (with deltas, 3.0 at 50% rollout), client staged 2.0 or 3.0 by its bucket"
 
 # ---- github (stand-in gh)
@@ -83,6 +86,9 @@ done
 d="$GH_ROOT/$repo/releases/download/$tag"
 case "$sub" in
   view) [ -d "$d" ] ;;
+  edit)
+    [ -d "$d" ] || { echo "release not found" >&2; exit 1; }
+    if $latest; then rm -rf "$GH_ROOT/$repo/releases/latest"; mkdir -p "$GH_ROOT/$repo/releases/latest"; cp -r "$d/." "$GH_ROOT/$repo/releases/latest/download/" 2>/dev/null || { mkdir -p "$GH_ROOT/$repo/releases/latest/download"; cp -r "$d/." "$GH_ROOT/$repo/releases/latest/download/"; }; fi ;;
   create|upload)
     mkdir -p "$d"
     # Release assets are a flat list: GitHub refuses a second asset of the same name.
@@ -116,6 +122,8 @@ for v in 1.0 2.0 3.0; do
     run_action github "$v" >/dev/null
 done
 latest="$gh_root/owner/app/releases/latest/download/update.json"
+seq() { python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sequence'])" "$latest"; }
+
 releases="$(python3 -c "import json; print([r['id'] for r in json.load(open('$latest'))['releases']])")"
 [ "$releases" = "['1.0', '2.0', '3.0']" ] || { echo "github: unexpected releases $releases" >&2; exit 1; }
 # Old blobs stay in their own releases; the newest release holds only what changed.
@@ -124,6 +132,20 @@ n1="$(ls "$gh_root/owner/app/releases/download/andysu-1.0" | wc -l)"
 [ "$n3" -lt "$((n1 + 4))" ] || { echo "github: release 3.0 re-uploaded unchanged blobs ($n3 assets)" >&2; exit 1; }
 client_update github "http://127.0.0.1:$p/owner/app/releases/latest/download/update.json" | grep -q '"staged": "3.0"'
 echo "ok github: 3 releases as release assets, manifest on the latest release, client staged 3.0"
+
+# A re-run of a release that is already in the channel changes nothing.
+before="$(seq)"
+PATH="$t/bin:$PATH" GH_ROOT="$gh_root" ANDYSU_GITHUB_URL="http://127.0.0.1:$p" run_action github 3.0 >/dev/null
+[ "$(seq)" = "$before" ] || { echo "github: re-running 3.0 re-signed the channel"; exit 1; }
+
+# A run that created its release but stopped before the channel was updated can be resumed.
+payload "$t/p4.0" 4.0
+mkdir -p "$gh_root/owner/app/releases/download/andysu-4.0" && touch "$gh_root/owner/app/releases/download/andysu-4.0/partial"
+PATH="$t/bin:$PATH" GH_ROOT="$gh_root" ANDYSU_GITHUB_URL="http://127.0.0.1:$p" run_action github 4.0 >/dev/null ||
+  { echo "github: could not resume a release that already existed"; exit 1; }
+python3 -c "import json,sys; ids=[r['id'] for r in json.load(open(sys.argv[1]))['releases']]; sys.exit(0 if '4.0' in ids else 1)" "$latest" ||
+  { echo "github: the resumed release is not in the channel"; exit 1; }
+echo "ok github: a re-run is a no-op and a half-published release resumes"
 
 # GitHub loads action.yml itself and nothing above does: an unquoted colon once made the action
 # impossible to use while this script passed.
