@@ -26,6 +26,8 @@ class Config(val json: JSONObject) {
     val crashSignals: String = json.optString("crash_signals", "payload")
     /** any | unmetered */
     val network: String = json.optString("network", "any")
+    /** Delta updates are disabled unless explicitly enabled after device validation. */
+    val allowDeltas: Boolean = json.optBoolean("allow_deltas", false)
     val charging: Boolean = json.optBoolean("charging", false)
     val batteryNotLow: Boolean = json.optBoolean("battery_not_low", true)
     val checkOnOpen: Boolean = json.optBoolean("check_on_open", true)
@@ -52,6 +54,7 @@ class Config(val json: JSONObject) {
         .put("base_dirs", JSONArray(java.io.File(root, "factory").listFiles()
             ?.filter { java.io.File(it, "andysu-slot.json").isFile }?.map { it.path } ?: emptyList<String>()))
         .put("factory_id", if (Transparent.active && Transparent.isFactory) Transparent.version else JSONObject.NULL)
+        .put("allow_deltas", allowDeltas)
         .put("app", app)
         .put("channel", channel)
         .put("roots", JSONArray(roots))

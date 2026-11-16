@@ -35,6 +35,9 @@ pub struct Config {
     pub device: Device,
     #[serde(default)]
     pub low_storage: bool,
+    /// Opt in only after delta verification has been proven on a device.
+    #[serde(default)]
+    pub allow_deltas: bool,
     /// Read-only slot directories usable as delta bases (e.g. the payload built into the host).
     #[serde(default)]
     pub base_dirs: Vec<String>,
@@ -278,6 +281,9 @@ impl Session {
     }
 
     fn usable_delta<'a>(&self, c: &'a Component, slots: &[String]) -> Option<&'a Delta> {
+        if !self.cfg.allow_deltas {
+            return None;
+        }
         c.deltas
             .iter()
             .filter(|d| d.size < c.size && !self.failed_deltas.contains(&d.sha256))
