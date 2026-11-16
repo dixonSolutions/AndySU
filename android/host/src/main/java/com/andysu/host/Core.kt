@@ -26,6 +26,7 @@ object Core {
     @JvmStatic external fun etag(root: String): String
     @JvmStatic external fun launch(root: String, random16: ByteArray, now: Long, applyPending: Boolean, maxAttempts: Int): String
     @JvmStatic external fun markHealthy(root: String): String
+    @JvmStatic external fun commitUnconfirmed(root: String): String
     @JvmStatic external fun reportFailure(root: String, reason: String): String
     @JvmStatic external fun beginLive(root: String, now: Long): String
     @JvmStatic external fun reset(root: String, reason: String): String

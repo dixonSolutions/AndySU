@@ -65,6 +65,9 @@ pub struct State {
     pub live_swaps: u32,
     #[serde(default)]
     pub last_event: Option<String>,
+    /// A timer-committed slot remains unconfirmed until the payload reports health.
+    #[serde(default)]
+    pub unconfirmed_crashes: Option<u32>,
 }
 
 /// What happened during a transition, for logs and UI.
@@ -108,6 +111,7 @@ impl State {
             last_manifest: None,
             live_swaps: 0,
             last_event: None,
+            unconfirmed_crashes: None,
         }
     }
 
@@ -138,6 +142,7 @@ impl State {
         }
         let e = Event::Promoted { id: p.id.clone() };
         self.current = Some(p);
+        self.unconfirmed_crashes = None;
         self.trial = Some(Trial { boot_attempts: 0, started: now, live });
         self.note(&e);
         Some(e)
@@ -151,6 +156,7 @@ impl State {
         }
         self.current = self.previous.take();
         self.trial = None;
+        self.unconfirmed_crashes = None;
         let e =
             Event::RolledBack { bad: cur.id, to: self.current.as_ref().map(|s| s.id.clone()), reason: reason.into() };
         self.note(&e);
@@ -197,10 +203,32 @@ impl State {
 
     /// The payload called markHealthy(): COMMIT.
     pub fn mark_healthy(&mut self) -> Option<Event> {
+        self.unconfirmed_crashes = None;
         self.trial.take()?;
         let e = Event::Committed { id: self.current.as_ref()?.id.clone() };
         self.note(&e);
         Some(e)
+    }
+
+    /// Compatibility commit for a payload that has not reported health.
+    pub fn commit_unconfirmed(&mut self) -> Option<Event> {
+        let event = self.mark_healthy()?;
+        self.unconfirmed_crashes = Some(0);
+        Some(event)
+    }
+
+    /// A persisted crash marker belongs to the slot that ran before this launch.
+    pub fn record_crash(&mut self, reason: &str, max_crashes: u32) -> Option<Event> {
+        if self.trial.is_some() {
+            return self.rollback(reason);
+        }
+        if let Some(count) = &mut self.unconfirmed_crashes {
+            *count = count.saturating_add(1);
+            if *count >= max_crashes.max(1) {
+                return self.rollback(reason);
+            }
+        }
+        None
     }
 
     /// Init exception, uncaught crash, native signal or watchdog timeout. Only acts in TRIAL;
@@ -225,6 +253,7 @@ impl State {
         self.previous = None;
         self.pending = None;
         self.trial = None;
+        self.unconfirmed_crashes = None;
         self.note(&e);
         e
     }
@@ -240,7 +269,7 @@ impl State {
         if let Some(c) = &self.current {
             v.push(c.id.clone());
         }
-        if !low_storage || self.trial.is_some() {
+        if !low_storage || self.trial.is_some() || self.unconfirmed_crashes.is_some() {
             if let Some(p) = &self.previous {
                 v.push(p.id.clone());
             }

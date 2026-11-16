@@ -36,7 +36,9 @@ public interface HostApi {
 
     /**
      * Commit this generation. Call once the payload is known to work (e.g. first frame drawn,
-     * first screen shown). Until then it is on trial and a crash or a timeout rolls it back.
+     * first real engine frame or first map loaded). Transparent apps can call
+     * {@code Host.current().markHealthy()}; check for null when running outside AndySU.
+     * Until then a trial crash or timeout rolls the generation back.
      */
     void markHealthy();
 

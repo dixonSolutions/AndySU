@@ -41,8 +41,11 @@ the host's `AndySUComponentFactory`.
 - `ApplicationInfo.nativeLibraryDir` is pointed into the slot.
 - Payload assets reach `getAssets()` and `AAssetManager` through a `ResourcesLoader` with an
   `AssetsProvider` (Android 11+). Asset **listing** is not supported.
-- A generation is **committed** once an activity has stayed resumed for `auto_healthy_ms` (default
-  8000) without a crash. The app does not have to call `markHealthy()`, though it may.
+- Call `com.andysu.api.Host.current()?.markHealthy()` after the engine has drawn a real frame or
+  loaded its first map. For a plain APK, check that `Host.current()` is non-null first. This API
+  exists since host API 1. Unmodified payloads use a compatibility fallback after an activity has
+  stayed resumed for `auto_healthy_ms` (default and minimum 600000 ms). A fallback commit remains
+  unconfirmed until `markHealthy()` is called; repeated crash markers roll it back.
 - Library names are kept (`andysu pack --no-rename`): one generation per process, and engines that
   `dlopen("libmain.so")` by name keep working. `split` does this for the built-in payload; **pass
   `--no-rename` yourself when packing updates.**

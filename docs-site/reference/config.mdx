@@ -109,7 +109,7 @@ writes the key from `andysu.toml`.
 | `check_on_open` | `true` | not written | check every time the app opens |
 | `check_interval_minutes` | 360 | `[policy] check_interval_minutes` | |
 | `watchdog_ms` | 10000 | `[policy] watchdog_ms` | TRIAL deadline, foreground time only |
-| `auto_healthy_ms` | 8000 | not written | transparent mode: commit after an activity stayed resumed this long |
+| `auto_healthy_ms` | 600000 | not written | transparent mode: compatibility commit after an activity stays resumed this long; minimum 600000 ms |
 | `max_boot_attempts` | 2 | not written | cold boots of a TRIAL slot before rolling back without loading it |
 | `host_api` | 1 | `host_api` | what the frozen host offers; the host uses `min(host_api, level its AAR implements)` |
 | `shell_version` | 0 | `[host] shell_version` | tier C shell version |

@@ -34,7 +34,7 @@ payload from the finished APK with `andysu split`, or with the Gradle plugin.
 | status events | a listener or stream for status changes |
 
 For apps in transparent mode, calling mark healthy is optional: the host commits after an activity has
-stayed resumed for `auto_healthy_ms`.
+stayed resumed for `auto_healthy_ms` (at least ten minutes), unless it reports health first.
 
 ## What is verified
 

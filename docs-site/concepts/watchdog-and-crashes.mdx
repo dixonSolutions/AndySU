@@ -40,11 +40,11 @@ app calls `started()`, and `started()` re-arms the configured watchdog.
 
 ## Crash detection
 
-- **Java.** A default uncaught-exception handler emits `uncaught`. During TRIAL it reports a failure to the core (which rolls back) and relaunches; otherwise it passes the exception on to the platform's handler.
+- **Java.** A default uncaught-exception handler emits `uncaught`. During TRIAL it reports a failure to the core (which rolls back) and relaunches; otherwise it writes a crash marker and passes the exception on to the platform's handler.
 - **Native.** The host installs signal handlers for `SIGSEGV`, `SIGABRT`, `SIGBUS`, `SIGILL` and
   `SIGFPE`. A handler cannot safely call into the core, so it creates a `crash.marker` file using
   only async-signal-safe calls, then re-raises. The next launch turns the marker into a failure
-  report, which rolls back if the slot was in TRIAL. Native crashes on non-main threads reach Java
+  report, which rolls back if the slot was in TRIAL. A fallback-committed slot rolls back after `max_boot_attempts` markers unless the payload reports health first. Native crashes on non-main threads reach Java
   through a pipe from the signal handler. The event is `native_crash`.
 - **Relaunch.** During TRIAL a crash relaunches the app **once** through a phoenix activity (a
   separate process, `:andysu_phoenix`), so the user sees one relaunch, never a crash loop. At most

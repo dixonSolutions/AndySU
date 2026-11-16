@@ -84,7 +84,7 @@ they are.
     Open the app. You see `booted` with `"factory": true`, then a check that finds 1.1
     (`update_status`: `checking`, `downloading`, `staged`). With the policy above, the app relaunches
     when you leave it and comes back on 1.1 (`booted`, `"trial": true`). After it has stayed on screen
-    for `auto_healthy_ms` (8 s by default) you see `committed`.
+    for `auto_healthy_ms` (10 minutes by default) you see a compatibility `committed`, unless the app reports health earlier.
   </Step>
 </Steps>
 

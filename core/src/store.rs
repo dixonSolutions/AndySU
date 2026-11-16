@@ -503,7 +503,7 @@ impl Store {
             } else {
                 format!("native crash: {}", why.trim())
             };
-            early.extend(st.report_failure(&why));
+            early.extend(st.record_crash(&why, max_attempts));
             self.save_state(&st)?;
             let _ = fs::remove_file(&marker);
         }

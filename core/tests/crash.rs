@@ -201,3 +201,49 @@ fn concurrent_state_updates_are_never_lost() {
     }
     assert_eq!(store.load_state([3; 16]).unwrap().live_swaps, 320);
 }
+
+#[test]
+fn markers_roll_back_trial_and_unconfirmed_commits_but_not_healthy_releases() {
+    let d = tempfile::tempdir().unwrap();
+    let store = andysu_core::store::Store::open(d.path()).unwrap();
+    let mut st = store.load_state([1; 16]).unwrap();
+    for id in ["a", "b"] {
+        fs::create_dir_all(store.slot_dir(id)).unwrap();
+        fs::write(store.slot_dir(id).join(andysu_core::store::SLOT_INDEX), b"{}").unwrap();
+    }
+    let slot = |id: &str, sequence| SlotRef { id: id.into(), sequence, hot_only: false, native_live: false };
+    st.stage(slot("a", 1));
+    st.on_launch(0, true, 2);
+    st.mark_healthy();
+    st.stage(slot("b", 2));
+    st.on_launch(0, true, 2);
+    store.save_state(&st).unwrap();
+    fs::write(store.crash_marker_path(), "SIGSEGV main").unwrap();
+    let decision = store.launch([1; 16], 1, true, 2).unwrap();
+    assert_eq!(decision.slot.unwrap().id, "a");
+    assert!(store.load_state([1; 16]).unwrap().bad.contains(&"b".to_string()));
+
+    let mut st = store.load_state([1; 16]).unwrap();
+    st.bad.clear();
+    st.stage(slot("b", 2));
+    st.on_launch(2, true, 2);
+    st.commit_unconfirmed();
+    assert_eq!(st.keep(true), vec!["b", "a"]);
+    store.save_state(&st).unwrap();
+    fs::write(store.crash_marker_path(), "SIGSEGV main").unwrap();
+    assert_eq!(store.launch([1; 16], 3, true, 2).unwrap().slot.unwrap().id, "b");
+    fs::write(store.crash_marker_path(), "SIGSEGV main").unwrap();
+    assert_eq!(store.launch([1; 16], 4, true, 2).unwrap().slot.unwrap().id, "a");
+
+    let mut st = store.load_state([1; 16]).unwrap();
+    st.bad.clear();
+    st.stage(slot("b", 2));
+    st.on_launch(5, true, 2);
+    st.commit_unconfirmed();
+    st.mark_healthy();
+    store.save_state(&st).unwrap();
+    for t in 6..9 {
+        fs::write(store.crash_marker_path(), "SIGSEGV main").unwrap();
+        assert_eq!(store.launch([1; 16], t, true, 2).unwrap().slot.unwrap().id, "b");
+    }
+}

@@ -198,7 +198,7 @@ class InitProvider : ContentProvider() {
 internal class TransparentCallbacks(private val autoHealthyMs: Long) : Application.ActivityLifecycleCallbacks {
     private val main = Handler(Looper.getMainLooper())
     private var loader: Any? = if (Build.VERSION.SDK_INT >= 30) Transparent.slotDir?.let { Transparent.assetsLoader(it) } else null
-    private val healthy = Runnable { if (AndySU.resumed != null) AndySU.markHealthy() }
+    private val healthy = Runnable { if (AndySU.resumed != null) AndySU.fallbackHealthy() }
 
     fun installOn(app: Application) {
         if (Build.VERSION.SDK_INT >= 30 && loader != null) app.resources.addLoaders(loader as ResourcesLoader)

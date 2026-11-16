@@ -89,6 +89,11 @@ jfn!(Java_com_andysu_host_Core_markHealthy(env, root: JString<'l>) {
     api::mark_healthy(&r)
 });
 
+jfn!(Java_com_andysu_host_Core_commitUnconfirmed(env, root: JString<'l>) {
+    let r = st(&mut env, &root)?;
+    api::commit_unconfirmed(&r)
+});
+
 jfn!(Java_com_andysu_host_Core_reportFailure(env, root: JString<'l>, reason: JString<'l>) {
     let (r, why) = (st(&mut env, &root)?, st(&mut env, &reason)?);
     api::report_failure(&r, &why)

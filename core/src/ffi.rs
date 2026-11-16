@@ -116,6 +116,10 @@ pub mod api {
         Ok(serde_json::to_value(Store::open(root)?.update_state(|s| s.mark_healthy())?).unwrap())
     }
 
+    pub fn commit_unconfirmed(root: &str) -> Result<Value> {
+        Ok(serde_json::to_value(Store::open(root)?.update_state(|s| s.commit_unconfirmed())?).unwrap())
+    }
+
     pub fn report_failure(root: &str, reason: &str) -> Result<Value> {
         let store = Store::open(root)?;
         let e = store.update_state(|s| s.report_failure(reason))?;

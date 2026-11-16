@@ -367,3 +367,12 @@ NVMe error or Bliss/libvirt entry, so it is not recorded against Bliss.
 `scripts/heavy.sh` never capped emulators. `podman run` places the container in its own `libpod`
 scope, outside the `systemd-run` scope, so `run.sh` now sets `--memory=8g --memory-swap=8g` itself.
 CI remains the emulator coverage across API levels. Waydroid is under assessment and not installed.
+
+### Transparent health and compatibility fallback (2026-11-17)
+
+Transparent payloads can explicitly report readiness with the existing Host API 1
+`Host.current().markHealthy()`. Keep a ten-minute minimum resumed-activity fallback for legacy
+payloads; record fallback commits as unconfirmed, retain the previous slot even under low storage,
+and roll back after `max_boot_attempts` crash markers until the payload explicitly reports health.
+Older state files have no health provenance and are left unchanged. In payload signal mode a native
+handler that replaces the host handler without chaining can still prevent marker creation.

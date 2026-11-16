@@ -25,8 +25,8 @@ from `.staging`.
 ## TRIAL
 
 A new slot starts in **TRIAL**. It stays there until the payload calls `HostApi.markHealthy()` (stub
-mode) or, in [transparent mode](/android/transparent-mode), until an activity has stayed resumed for
-`auto_healthy_ms`. While in TRIAL:
+mode or [transparent mode](/android/transparent-mode)). Transparent mode also has a compatibility
+fallback after an activity stays resumed for `auto_healthy_ms` (at least ten minutes). While in TRIAL:
 
 - every launch increments `boot_attempts` **before** the slot is loaded; when it exceeds
   `max_boot_attempts` (default 2), the client rolls back without loading the slot;
@@ -35,7 +35,8 @@ mode) or, in [transparent mode](/android/transparent-mode), until an activity ha
 
 ## COMMITTED
 
-`markHealthy()` commits the slot. The state is written atomically: a uniquely named temp file next
+`markHealthy()` commits the slot. A compatibility fallback commit remains unconfirmed: the previous
+slot is retained, and `max_boot_attempts` crash markers before a later health report cause rollback. The state is written atomically: a uniquely named temp file next
 to `state.json`, fsync, rename over `state.json`, fsync the directory. A reader always sees the old
 or the new state, never a torn one. Every read-modify-write runs under an exclusive lock on
 `state.lock`, so an updater thread and a crash handler cannot lose each other's transitions.

@@ -639,3 +639,19 @@ README (what AndySU is, how it works, the Play/F-Droid caveat, adoption per ecos
 with the test that covers it, what is out of scope), [REGISTRIES.md](REGISTRIES.md),
 [KEYS.md](KEYS.md), and spec updates: the state lock, base directories, and host configuration
 including the apply policy.
+
+### 2026-11-17 — transparent trial health and crash markers
+
+Changed transparent trial fallback to at least ten minutes and distinguished explicit health from
+fallback commits in persisted state. Startup crash markers now roll back a trial immediately and
+count against an unconfirmed fallback commit. Explicit health clears that counter. The previous slot
+is retained while the commit is unconfirmed. Added core startup/marker regression coverage.
+
+Validation: `cargo test --workspace`, `cargo fmt --all -- --check`, workspace clippy with JNI and
+transport, `bash templates/remote/test.sh`, and generated-header comparison passed. The Android
+Gradle build/test wrapper could not start: `systemd-run --user` could not connect to a user bus.
+`actions/publish/test.sh` failed with a Rust broken-pipe panic after its Pages scenario. The desktop
+suite was interrupted because it starts a release build requiring the unavailable heavy-job scope.
+No Android device or native-signal integration test ran. Replacing the host's signal handler without
+chaining remains undetectable in payload mode, and pre-existing committed state has no health
+provenance. Existing installed host APKs require an APK update for these host changes.

@@ -68,7 +68,7 @@ object AndySU {
      *  background, the time it still had left (-1: not paused). D31. */
     private var watchdogDueAt = 0L
     private var watchdogLeft = -1L
-    private var autoHealthyMs = 8_000L
+    private var autoHealthyMs = 600_000L
     private var transparentCallbacks: TransparentCallbacks? = null
     /** Host API level 2: the app's handler for live native swaps in transparent mode (D29). */
     @Volatile internal var liveSwapHandler: LiveSwapHandler? = null
@@ -123,7 +123,7 @@ object AndySU {
         emit("booted", JSONObject().put("version", Transparent.version).put("factory", Transparent.isFactory)
             .put("trial", inTrial).put("transparent", true))
         com.andysu.api.Host.install(HostApiImpl(null))
-        val autoHealthy = config.json.optLong("auto_healthy_ms", 8_000)
+        val autoHealthy = config.json.optLong("auto_healthy_ms", 600_000).coerceAtLeast(600_000)
         autoHealthyMs = autoHealthy
         transparentCallbacks = TransparentCallbacks(autoHealthy).also { it.installOn(app) }
         if (inTrial) {
@@ -222,17 +222,24 @@ object AndySU {
 
     // ---------------------------------------------------------------- health
 
-    fun markHealthy() {
+    fun markHealthy() = finishHealth(true)
+
+    internal fun fallbackHealthy() = finishHealth(false)
+
+    private fun finishHealth(explicit: Boolean) {
         main.post {
-            if (!inTrial) return@post
+            if (!inTrial) {
+                if (explicit) Core.ok(Core.markHealthy(root.path))
+                return@post
+            }
             inTrial = false
             trialLive = false
             cancelWatchdog()
             NativeBridge.setRelaunchOnCrash(false)
             swapState = null
-            val r = Core.ok(Core.markHealthy(root.path))
+            val r = Core.ok(if (explicit) Core.markHealthy(root.path) else Core.commitUnconfirmed(root.path))
             emit("committed", JSONObject().put("version", generation?.version ?: Transparent.version).put("result", r)
-                .put("state", Core.obj(Core.state(root.path))))
+                .put("explicit_health", explicit).put("state", Core.obj(Core.state(root.path))))
             liveSwap = null
             updater.committed(generation?.version ?: Transparent.version)
             updater.gcAsync()
@@ -689,6 +696,8 @@ object AndySU {
                     Core.ok(Core.reportFailure(root.path, "uncaught exception: $e"))
                     Phoenix.relaunch(app, "uncaught exception during trial")
                     return@setDefaultUncaughtExceptionHandler
+                } else {
+                    File(root, "crash_marker").writeText("uncaught exception: $e")
                 }
             } catch (inner: Throwable) {
                 Log.e(TAG, "crash handler failed", inner)

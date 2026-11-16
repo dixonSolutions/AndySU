@@ -41,7 +41,7 @@ Get these right before users install it.
   need `live_fallback`. See [Apply policies](/concepts/apply-policies).
 - [ ] **Health signal.** Call `markHealthy()` when the app is *really* working, for example after the
   first screen has rendered or the first network call has succeeded, not at the top of `start()`.
-  Transparent apps commit after `auto_healthy_ms` on screen.
+  Transparent apps should call `Host.current()?.markHealthy()` after the engine is ready; legacy apps use the long `auto_healthy_ms` fallback.
 - [ ] **Watchdog.** `watchdog_ms` (default 10 s of foreground time) must be longer than your slowest
   healthy start on a low-end device.
 - [ ] **Network.** `network = "unmetered"` if payloads are large; checks then wait for Wi-Fi.
