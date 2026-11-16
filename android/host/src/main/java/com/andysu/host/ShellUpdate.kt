@@ -33,7 +33,7 @@ object ShellUpdate {
         val installed = ctx.packageManager.getPackageInfo(ctx.packageName, PackageManager.GET_SIGNATURES)
             .signatures?.map { it.toByteArray().toList() }?.toSet() ?: emptySet()
         val candidate = result.signerCertificates.map { it.encoded.toList() }.toSet()
-        require(installed.isNotEmpty() && candidate == installed) { "APK signer differs from installed app" }
+        require(trustedApkSigner(result.isVerified, installed, candidate)) { "APK signer differs from installed app" }
         val info = ctx.packageManager.getPackageArchiveInfo(apk.path, 0)
         require(info?.packageName == ctx.packageName) { "APK package differs from installed app" }
     }
@@ -90,3 +90,7 @@ class ShellInstallReceiver : BroadcastReceiver() {
         if (AndySU.isInitialized()) AndySU.emit("shell_install_status", JSONObject().put("status", st).put("message", intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)))
     }
 }
+
+/** Reject unverified signatures, empty identities, and any signer-set mismatch. */
+internal fun trustedApkSigner(verified: Boolean, installed: Set<List<Byte>>, candidate: Set<List<Byte>>): Boolean =
+    verified && installed.isNotEmpty() && candidate == installed

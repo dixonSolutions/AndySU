@@ -493,6 +493,7 @@ fn client(root: &Path, cmd: ClientCmd) -> R<()> {
                 roots,
                 device: andysu_core::select::Device { host_api, shell_version: 0, api_level, abis: abi },
                 low_storage: false,
+                allow_deltas: false,
                 base_dirs: vec![],
                 factory_id: None,
             };
