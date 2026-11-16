@@ -64,4 +64,5 @@ androidComponents {
 dependencies {
     // The one runtime copy of the API lives in the host.
     api(project(":api"))
+    implementation("com.android.tools.build:apksig:9.5.0")
 }

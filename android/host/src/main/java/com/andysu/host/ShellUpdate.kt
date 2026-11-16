@@ -9,7 +9,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import org.json.JSONObject
 import java.io.File
-import java.security.MessageDigest
+import com.android.apksig.ApkVerifier
 
 /**
  * Tier C: replace the host APK itself. Optional and never silent unless the platform allows it:
@@ -26,6 +26,18 @@ object ShellUpdate {
         return "android.permission.REQUEST_INSTALL_PACKAGES" in req
     }
 
+    @Suppress("DEPRECATION")
+    private fun verifySigningIdentity(ctx: Context, apk: File) {
+        val result = ApkVerifier.Builder(apk).build().verify()
+        require(result.isVerified) { "APK signature verification failed: ${result.errors}" }
+        val installed = ctx.packageManager.getPackageInfo(ctx.packageName, PackageManager.GET_SIGNATURES)
+            .signatures?.map { it.toByteArray().toList() }?.toSet() ?: emptySet()
+        val candidate = result.signerCertificates.map { it.encoded.toList() }.toSet()
+        require(installed.isNotEmpty() && candidate == installed) { "APK signer differs from installed app" }
+        val info = ctx.packageManager.getPackageArchiveInfo(apk.path, 0)
+        require(info?.packageName == ctx.packageName) { "APK package differs from installed app" }
+    }
+
     fun install(ctx: Context, status: JSONObject) {
         if (!available(ctx)) {
             AndySU.emit("shell_update_unavailable", JSONObject().put("reason", "REQUEST_INSTALL_PACKAGES not declared"))
@@ -40,8 +52,13 @@ object ShellUpdate {
             try {
                 Http.download(urls.getString(i), apk, 0, size)
                 ok = Core.ok(Core.verifyFile(apk.path, sha, size)) == null
-                if (ok) break
+                if (ok) {
+                    verifySigningIdentity(ctx, apk)
+                    break
+                }
             } catch (e: Exception) {
+                ok = false
+                apk.delete()
                 AndySU.emit("shell_download_failed", JSONObject().put("error", e.toString()))
             }
         }

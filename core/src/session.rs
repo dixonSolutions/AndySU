@@ -344,10 +344,10 @@ impl Session {
                     let new = patch::apply(d.format, &old, &pd, c.size)?;
                     crate::fsx::make_writable_recursive(&pb);
                     let _ = fs::remove_file(&pb);
-                    self.store.ingest_bytes(&c.sha256, &new)
+                    self.store.ingest_bytes(&c.sha256, c.size, &new)
                 })();
                 if res.is_err() {
-                    self.failed_deltas.insert(d.sha256.clone());
+                    self.failed_deltas.extend(c.deltas.iter().map(|delta| delta.sha256.clone()));
                 }
                 return res;
             }
@@ -357,7 +357,13 @@ impl Session {
 
     /// Mark a delta as unusable (e.g. every URL 404'd) so `plan()` falls back to the full blob.
     pub fn skip_delta(&mut self, key: &str) {
-        self.failed_deltas.insert(key.to_string());
+        if let Some((r, abi)) = &self.target {
+            for c in components_for(r, abi.as_deref()) {
+                if c.deltas.iter().any(|d| d.sha256 == key) {
+                    self.failed_deltas.extend(c.deltas.iter().map(|d| d.sha256.clone()));
+                }
+            }
+        }
     }
 
     /// Build the slot from verified blobs and record it as pending.

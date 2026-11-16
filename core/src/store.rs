@@ -192,7 +192,10 @@ impl Store {
     }
 
     /// Store bytes produced locally (e.g. by a delta) after verifying them.
-    pub fn ingest_bytes(&self, sha: &str, data: &[u8]) -> Result<()> {
+    pub fn ingest_bytes(&self, sha: &str, size: u64, data: &[u8]) -> Result<()> {
+        if data.len() as u64 != size {
+            return Err(Error::SizeMismatch { expected: size, got: data.len() as u64 });
+        }
         check_hash(sha)?;
         let got = crate::hash::sha256_hex(data);
         if got != sha {
@@ -200,7 +203,7 @@ impl Store {
         }
         let part = self.part_path(sha);
         io_at(fs::write(&part, data), "write", &part)?;
-        self.ingest_part(sha, data.len() as u64)
+        self.ingest_part(sha, size)
     }
 
     pub fn slot_dir(&self, id: &str) -> PathBuf {
