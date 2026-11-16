@@ -286,9 +286,37 @@ fn deltas_and_fallback() {
         assert!(sess.complete(&d.key).is_err(), "{fmt:?}");
         let plan = sess.plan().unwrap();
         assert!(plan.iter().all(|f| f.kind == "full"), "falls back to full blob");
+        let full = plan.iter().find(|f| f.target == d.target).unwrap();
+        assert_eq!(full.kind, "full");
+        fs::write(&full.dest, vec![0; full.size as usize]).unwrap();
+        assert!(sess.complete(&full.key).is_err(), "corrupt full blob must fail");
+        assert!(!std::path::Path::new(&full.dest).exists());
+        assert!(sess.stage().is_err(), "failed full blob cannot be staged");
         download_all(&mut sess);
         sess.stage().unwrap();
     }
+}
+
+#[test]
+fn reconstructed_bytes_require_manifest_size_and_hash() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(dir.path()).unwrap();
+    let good = b"verified payload";
+    let sha = andysu_core::hash::sha256_hex(good);
+    assert!(matches!(store.ingest_bytes(&sha, good.len() as u64 + 1, good), Err(Error::SizeMismatch { .. })));
+    assert!(matches!(store.ingest_bytes(&sha, good.len() as u64 - 1, good), Err(Error::SizeMismatch { .. })));
+    assert!(matches!(store.ingest_bytes(&"0".repeat(64), good.len() as u64, good), Err(Error::HashMismatch { .. })));
+    assert!(!store.has_blob(&sha));
+    store.ingest_bytes(&sha, good.len() as u64, good).unwrap();
+    assert!(store.has_blob(&sha));
+}
+
+#[test]
+fn delta_policy_defaults_off() {
+    let mut value = serde_json::to_value(config()).unwrap();
+    value.as_object_mut().unwrap().remove("allow_deltas");
+    let cfg: andysu_core::session::Config = serde_json::from_value(value).unwrap();
+    assert!(!cfg.allow_deltas);
 }
 
 #[test]
