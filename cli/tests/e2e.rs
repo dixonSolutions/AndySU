@@ -1,6 +1,6 @@
 //! Step 3 end to end: the real `andysu` binary publishes to a site served over HTTP by the
 //! built-in server; a simulated client checks, downloads (interrupted, then resumed), verifies,
-//! stages, launches, commits, takes a delta update, rolls back, and rejects tampered, replayed
+//! stages, launches, commits, takes a full update, rolls back, and rejects tampered, replayed
 //! and expired manifests.
 
 use std::fs;
@@ -199,7 +199,7 @@ fn publish_update_resume_commit_delta_rollback_and_attacks() {
     assert_eq!(r["outcome"]["outcome"], "up_to_date");
     assert!(srv.requests().iter().any(|l| l.ends_with("update.json -> 304")));
 
-    // v2 with deltas.
+    // v2 publishes deltas, but the default client must request full blobs.
     make_payload(&e.p("p2"), 2, &[]);
     let rep: Value =
         serde_json::from_str(&e.ok(&["pack", "p2", "--site", s, "--host", "host.json", "--hot", "assets/motd"]))
@@ -211,9 +211,8 @@ fn publish_update_resume_commit_delta_rollback_and_attacks() {
     let r: Value = serde_json::from_str(&e.client(&url).1).unwrap();
     assert_eq!(r["staged"], "2.0");
     let reqs = srv.requests()[before..].to_vec();
-    assert!(reqs.iter().any(|l| l.starts_with("GET /deltas/")), "delta used: {reqs:?}");
-    let full_level = reqs.iter().filter(|l| l.contains("/blobs/")).count();
-    assert!(full_level <= 4, "only small blobs fetched in full: {reqs:?}");
+    assert!(!reqs.iter().any(|l| l.starts_with("GET /deltas/")), "deltas must be disabled: {reqs:?}");
+    assert!(reqs.iter().any(|l| l.contains("/blobs/")), "full blobs fetched: {reqs:?}");
 
     // v2 launches into TRIAL and fails init: rolled back to 1.0, 2.0 marked bad.
     assert_eq!(slot_of(&e.dev(&["launch"])), "2.0");
