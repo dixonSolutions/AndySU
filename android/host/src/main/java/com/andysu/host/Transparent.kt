@@ -173,6 +173,19 @@ class AndySUComponentFactory : AppComponentFactory() {
         Log.e(AndySU.TAG, "AndySU transparent boot failed; running the APK's own code", t)
         cl
     }
+
+    /**
+     * The `:andysu_phoenix` process runs on the APK's own class loader (boot returns null there),
+     * where an app's Application class that lives only in the payload does not exist. Without this
+     * the restart helper dies with ClassNotFoundException before it can relaunch the app.
+     */
+    override fun instantiateApplication(cl: ClassLoader, className: String): Application = try {
+        super.instantiateApplication(cl, className)
+    } catch (e: ClassNotFoundException) {
+        if (!Phoenix.isPhoenixProcess()) throw e
+        Log.w(AndySU.TAG, "$className is payload-only; the restart helper runs on AndySUApplication")
+        AndySUApplication()
+    }
 }
 
 /**
