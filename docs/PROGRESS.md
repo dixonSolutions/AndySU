@@ -25,6 +25,15 @@ local.
 | 10 templates/remote | done, tested locally; ready to split into its own repo (owner's call) |
 | 11 Docs | README, THREAT_MODEL, REGISTRIES, KEYS, spec updated. Developer docs site in `docs-site/` (Mintlify, 47 pages: tutorials, guides, reference, how we work; the six tutorials were written by the lead from the sources, and an untrue claim that Capacitor web assets update hot in transparent mode was fixed in the docs and in `andysu init`), written by a worker (Sonnet), passing `mint validate` and `mint broken-links`; spot-checked by the lead against the CLI and registries. Deployed by Mintlify from `main` (`docs-site/`) at https://andysu.mintlify.site, which is also the repo's website link. Mintlify's GitHub App can reach only `lindroids` and `AndySU`; its OAuth grant was revoked after linking, as the owner asked |
 
+## Phoenix relaunch and the app's Application class (2026-11-18)
+On Godnotic's tablet (Samsung SM-X306B, Android 16) every phoenix relaunch died before
+`PhoenixActivity` ran: `ClassNotFoundException io.github.dixonsolutions.godnotic.NativeUIApplication`
+in `:andysu_phoenix`, 20 times on 2026-11-17/18. That process keeps the APK's class loader
+(`Transparent.boot` returns null there) and the app's Application class is in the payload, so the
+relaunch killed the app and nothing brought it back. `AndySUComponentFactory.instantiateApplication`
+now gives the phoenix process `android.app.Application` (`phoenixApplicationClass`, JVM test
+`PhoenixApplicationTest`, now run in CI with `:host:testReleaseUnitTest`). Not yet verified on a device.
+
 ## Release 0.1.106 and the crash of 2026-11-05 (2026-11-06)
 The machine stopped uncleanly at about 17:40 on 2026-11-05 with this release in flight. The cause is
 not established: that boot's journal shows no OOM, panic, MCE, NVMe error or Bliss/libvirt entry.

@@ -173,7 +173,22 @@ class AndySUComponentFactory : AppComponentFactory() {
         Log.e(AndySU.TAG, "AndySU transparent boot failed; running the APK's own code", t)
         cl
     }
+
+    override fun instantiateApplication(cl: ClassLoader, className: String): Application {
+        val name = phoenixApplicationClass(if (Build.VERSION.SDK_INT >= 28) Application.getProcessName() else "", className)
+        return super.instantiateApplication(cl, name)
+    }
 }
+
+/**
+ * The Application class a process instantiates. The `:andysu_phoenix` process keeps the APK's own
+ * class loader ([Transparent.boot] returns null there), and in transparent mode the app's
+ * Application class lives in the payload, not in the host APK: instantiating the manifest's name
+ * failed with ClassNotFoundException and the relaunch died before [PhoenixActivity] ran, so the app
+ * closed instead of coming back. Phoenix needs no app code, so it gets the platform's Application.
+ */
+internal fun phoenixApplicationClass(processName: String, manifestClass: String): String =
+    if (processName.endsWith(":andysu_phoenix")) "android.app.Application" else manifestClass
 
 /**
  * Starts AndySU in transparent mode: providers are created after the Application is attached and
