@@ -88,6 +88,19 @@ object Transparent {
         }
     }
 
+    private fun factoryIsNewer(apk: String, slot: File): Boolean = try {
+        val factory = ZipFile(apk).use { z ->
+            z.getEntry("assets/andysu-factory/andysu-payload.json")?.let { e ->
+                JSONObject(z.getInputStream(e).use { it.readBytes().decodeToString() }).optString("version")
+            }
+        }
+        val current = File(slot, "andysu-payload.json").takeIf { it.isFile }?.let { JSONObject(it.readText()).optString("version") }
+        factory != null && current != null && VersionOrder.newer(factory, current)
+    } catch (t: Throwable) {
+        Log.w(AndySU.TAG, "could not compare the APK payload with the slot", t)
+        false
+    }
+
     private fun config(apk: String): JSONObject = ZipFile(apk).use { z ->
         JSONObject(z.getInputStream(z.getEntry("assets/andysu/config.json")).use { it.readBytes().decodeToString() })
     }
@@ -113,7 +126,12 @@ object Transparent {
         launchEvent = d
         while (true) {
             val trial = d.optBoolean("in_trial")
-            val dirPath = d.str("slot_dir")
+            var dirPath = d.str("slot_dir")
+            // A newer APK installed over an older downloaded slot (sideload, store update) wins.
+            if (dirPath != null && !trial && factoryIsNewer(ai.sourceDir, File(dirPath))) {
+                Log.i(AndySU.TAG, "installed APK payload is newer than slot $dirPath; booting it")
+                dirPath = null
+            }
             val dir = dirPath?.let { File(it) } ?: factoryFromApk(ai.sourceDir, root)
             try {
                 val plan = Core.obj(Core.loadPlan(dir.path, Generation.abi))
