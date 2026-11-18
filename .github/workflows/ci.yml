@@ -53,9 +53,9 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: cargo install cargo-ndk --locked
-      - name: Build the host AAR for all ABIs, the API and the test APKs
+      - name: Build the host AAR for all ABIs, the API and the test APKs; host unit tests
         working-directory: android
-        run: ./gradlew :api:assembleRelease :host:assembleRelease :payload-kit:assembleRelease --stacktrace
+        run: ./gradlew :api:assembleRelease :host:assembleRelease :host:testReleaseUnitTest :payload-kit:assembleRelease --stacktrace
 
   android-devices:
     # The same driver as local runs (android/tests/device_tests.py) against CI emulators.
