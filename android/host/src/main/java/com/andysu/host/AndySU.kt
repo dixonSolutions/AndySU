@@ -387,6 +387,13 @@ object AndySU {
                 .put("handler", liveSwapHandler != null).put("resumed", resumed != null))
             if (resumed != null && liveSwapHandler != null && applyLiveTransparent()) return
             policy = config.liveFallback
+            if (ApplyDecision.fallbackOnBackground(policy, resumed != null)) {
+                // The app asked for live; relaunching it under the player instead is the surprise
+                // live apply exists to avoid. Restart once the player has left.
+                restartWhenBackgrounded = true
+                emit("restart_to_apply", JSONObject().put("when", "on_background").put("reason", "live_fallback"))
+                return
+            }
         }
         when (policy) {
             "live" -> if (resumed != null && !applyLive()) restartToApply()
@@ -491,21 +498,24 @@ object AndySU {
      * accepted: a decline leaves state.json untouched (no cancel API in the core is needed) and
      * the release applies per `live_fallback`. Returns true if the handler accepted.
      */
-    private fun applyLiveTransparent(): Boolean {
-        val h = liveSwapHandler ?: return false
-        if (inTrial || liveSwap != null) return false
+    private fun applyLiveTransparent(): Boolean = applyLiveTransparentResult() == ApplyDecision.SWAPPED
+
+    /** [applyLiveTransparent] with the reason it did not swap (an [ApplyDecision] result). */
+    private fun applyLiveTransparentResult(): String {
+        val h = liveSwapHandler ?: return ApplyDecision.NOT_LIVE
+        if (inTrial || liveSwap != null) return ApplyDecision.TRIAL
         val st = Core.obj(Core.state(root.path))
-        val pending = st.objOrNull("pending") ?: return false
-        if (!pending.optBoolean("native_live")) return false
+        val pending = st.objOrNull("pending") ?: return ApplyDecision.NONE
+        if (!pending.optBoolean("native_live")) return ApplyDecision.NOT_LIVE
         val id = pending.getString("id")
         val bad = st.optJSONArray("bad")
-        if (bad != null && (0 until bad.length()).any { bad.getString(it) == id }) return false
+        if (bad != null && (0 until bad.length()).any { bad.getString(it) == id }) return ApplyDecision.NOT_LIVE
         val newDir = File(root, "slots/$id")
         val version = try {
             Core.obj(Core.loadPlan(newDir.path, Generation.abi)).optString("version", id)
         } catch (t: Throwable) {
             Log.w(TAG, "live swap: cannot read the staged slot", t)
-            return false
+            return ApplyDecision.NOT_LIVE
         }
         val swap = LiveSwap(id, Transparent.slotDir, Transparent.version, Transparent.isFactory, version)
         val accepted = try {
@@ -516,7 +526,7 @@ object AndySU {
         }
         if (!accepted) {
             emit("live_swap_declined", JSONObject().put("to", version))
-            return false
+            return ApplyDecision.DECLINED
         }
         // Accepted: from here the release is a live trial. (The handler's callbacks arrive through
         // the main looper, after this turn, so they always see the promoted state.)
@@ -537,7 +547,20 @@ object AndySU {
         NativeBridge.setRelaunchOnCrash(true)
         watchCrashHandlers()
         postWatchdog(maxOf(config.watchdogMs, 60_000L))
-        return true
+        return ApplyDecision.SWAPPED
+    }
+
+    /**
+     * Host API level 4: apply the staged release in this process if it can be, and never restart.
+     * Returns an [ApplyDecision] result: swapped, declined (the app's handler said not now), trial
+     * (a release is still being confirmed), not_live (it cannot be swapped in-process) or none.
+     */
+    fun applyLiveResult(): String {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        if (transparent) return applyLiveTransparentResult()
+        if (inTrial) return ApplyDecision.TRIAL
+        if (Core.obj(Core.state(root.path)).objOrNull("pending") == null) return ApplyDecision.NONE
+        return if (applyLive()) ApplyDecision.SWAPPED else ApplyDecision.NOT_LIVE
     }
 
     private fun onLiveStarted(s: LiveSwap) {

@@ -38,8 +38,29 @@ class Updater(private val ctx: Context, private val cfg: Config, private val roo
     override fun mode(): String = AndySU.effectiveMode()
     override fun applyNow() = main.post {
         if (status.optString("state") == "shell_update") exec.execute { ShellUpdate.install(ctx, status) }
-        else if (!AndySU.applyLive()) restartNow()
+        else {
+            val result = AndySU.applyLiveResult()
+            when (ApplyDecision.afterLive(result)) {
+                "restart" -> restartNow()
+                "stay" -> if (result != ApplyDecision.NONE) {
+                    // A declined or blocked live swap is not overridden by relaunching the app.
+                    setStatus(status.optString("state", "staged"), JSONObject(status.toString()).put("live", result))
+                }
+                else -> Unit
+            }
+        }
     }.let { }
+
+    /** Host API level 4: the live part of [applyNow] alone; never restarts. Any thread. */
+    override fun applyLive(): String {
+        if (Looper.myLooper() == Looper.getMainLooper()) return AndySU.applyLiveResult()
+        val result = java.util.concurrent.atomic.AtomicReference(ApplyDecision.NONE)
+        val done = java.util.concurrent.CountDownLatch(1)
+        main.post {
+            try { result.set(AndySU.applyLiveResult()) } finally { done.countDown() }
+        }
+        return if (done.await(10, java.util.concurrent.TimeUnit.SECONDS)) result.get() else ApplyDecision.NONE
+    }
     override fun restartNow() {
         UpdateMode.requestApplyPending(AndySU.root)
         Phoenix.relaunch(ctx, "restart requested")

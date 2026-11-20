@@ -12,7 +12,7 @@ import com.andysu.api.ServiceHandler
 import com.andysu.api.UpdateClient
 import java.io.File
 
-/** Host API level 3 (levels 1-2 plus persistent update-mode control), one instance per generation (g == null: transparent mode). */
+/** Host API level 4 (levels 1-3 plus UpdateClient.applyLive, which never restarts), one instance per generation (g == null: transparent mode). */
 class HostApiImpl internal constructor(private val g: Generation?) : HostApi {
     override fun apiLevel() = LEVEL
     override fun setLiveSwapHandler(handler: com.andysu.api.LiveSwapHandler?) { AndySU.liveSwapHandler = handler }
@@ -50,6 +50,6 @@ class HostApiImpl internal constructor(private val g: Generation?) : HostApi {
 
     companion object {
         /** The Host API level this host AAR implements (levels are additive). */
-        const val LEVEL = 3
+        const val LEVEL = 4
     }
 }
