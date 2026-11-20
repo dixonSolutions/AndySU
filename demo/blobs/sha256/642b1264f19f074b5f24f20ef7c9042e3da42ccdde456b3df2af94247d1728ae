@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "app": "com.andysu.sample.compose",
+  "version": "0.1.90",
+  "host_api_min": 1,
+  "entry": {
+    "dex_class": "com.andysu.sample.compose.ComposePayload"
+  },
+  "dex": [
+    "dex/classes.dex",
+    "dex/classes2.dex",
+    "dex/classes3.dex",
+    "dex/resources.jar"
+  ],
+  "needs": {
+    "permissions": [
+      "android.permission.INTERNET",
+      "com.andysu.sample.compose.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+    ],
+    "activities": 0,
+    "services": 0,
+    "receivers": 0,
+    "providers": 0
+  },
+  "native": {
+    "arm64-v8a": [
+      {
+        "name": "libandroidx.graphics.path",
+        "path": "lib/arm64-v8a/libandroidx.graphics.path.41e9a793.so"
+      }
+    ],
+    "armeabi-v7a": [
+      {
+        "name": "libandroidx.graphics.path",
+        "path": "lib/armeabi-v7a/libandroidx.graphics.path.41399eba.so"
+      }
+    ],
+    "x86": [
+      {
+        "name": "libandroidx.graphics.path",
+        "path": "lib/x86/libandroidx.graphics.path.eb0570b4.so"
+      }
+    ],
+    "x86_64": [
+      {
+        "name": "libandroidx.graphics.path",
+        "path": "lib/x86_64/libandroidx.graphics.path.4e56c996.so"
+      }
+    ]
+  }
+}

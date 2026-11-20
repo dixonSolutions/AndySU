@@ -1,0 +1,108 @@
+{
+  "id": "0.1.90",
+  "sequence": 17,
+  "requires": {
+    "host_api_min": 1,
+    "abis": [
+      "arm64-v8a",
+      "armeabi-v7a",
+      "x86",
+      "x86_64"
+    ]
+  },
+  "mandatory": false,
+  "components": [
+    {
+      "name": "andysu-payload.json",
+      "kind": "content",
+      "apply": "restart",
+      "path": "andysu-payload.json",
+      "sha256": "642b1264f19f074b5f24f20ef7c9042e3da42ccdde456b3df2af94247d1728ae",
+      "size": 1158
+    },
+    {
+      "name": "assets.dexopt.baseline.prof",
+      "kind": "content",
+      "apply": "restart",
+      "path": "assets/dexopt/baseline.prof",
+      "sha256": "7022f16eeb160fe254272d3a657d808378520b2f73e5bb9ff100c3b20883f6ab",
+      "size": 10426
+    },
+    {
+      "name": "assets.dexopt.baseline.profm",
+      "kind": "content",
+      "apply": "restart",
+      "path": "assets/dexopt/baseline.profm",
+      "sha256": "13e39846491438696d89fd9203c8baff06f8c11ebb640cb30f02a683fdf08d9d",
+      "size": 467
+    },
+    {
+      "name": "dex.classes.dex",
+      "kind": "dex",
+      "apply": "restart",
+      "path": "dex/classes.dex",
+      "sha256": "79f952359d039db46d3ad41370e3197e2015b429af67aece5c8966014af278d7",
+      "size": 14140952
+    },
+    {
+      "name": "dex.classes2.dex",
+      "kind": "dex",
+      "apply": "restart",
+      "path": "dex/classes2.dex",
+      "sha256": "d307b4b24fa25ebff4657324dfe82ed0f5efcc5229e74afd77714f0f9a6b0203",
+      "size": 2644
+    },
+    {
+      "name": "dex.classes3.dex",
+      "kind": "dex",
+      "apply": "restart",
+      "path": "dex/classes3.dex",
+      "sha256": "f9220f915aded36baa38870f188190eb02807e2f3e211fcf11f3ac925536a352",
+      "size": 8225284
+    },
+    {
+      "name": "dex.resources.jar",
+      "kind": "content",
+      "apply": "restart",
+      "path": "dex/resources.jar",
+      "sha256": "1ab7b9e82c05af105b2e3df5e730090e31d88af1999696a8cd80034a2418cefd",
+      "size": 43351
+    },
+    {
+      "name": "lib.arm64-v8a.libandroidx.graphics.path.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "arm64-v8a",
+      "path": "lib/arm64-v8a/libandroidx.graphics.path.41e9a793.so",
+      "sha256": "1e861422ec73d72f237aed152dd7cf5dfdacac09d437a7a3942837ce81759089",
+      "size": 17163
+    },
+    {
+      "name": "lib.armeabi-v7a.libandroidx.graphics.path.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "armeabi-v7a",
+      "path": "lib/armeabi-v7a/libandroidx.graphics.path.41399eba.so",
+      "sha256": "ece1f39986bd8953f629aa7ea5f3d1128ed7a93bf392631ebe7868b8782d4b94",
+      "size": 16941
+    },
+    {
+      "name": "lib.x86.libandroidx.graphics.path.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "x86",
+      "path": "lib/x86/libandroidx.graphics.path.eb0570b4.so",
+      "sha256": "f81a55fbff8a52af2bfa8ffcca33ae4289c562486104ffde6ac4210ed71e099d",
+      "size": 16955
+    },
+    {
+      "name": "lib.x86_64.libandroidx.graphics.path.so",
+      "kind": "native",
+      "apply": "restart",
+      "abi": "x86_64",
+      "path": "lib/x86_64/libandroidx.graphics.path.4e56c996.so",
+      "sha256": "6f9b08915a678ce78ca503314af606b3c37eb21a77de0ed4cb17977f2deb23c2",
+      "size": 17219
+    }
+  ]
+}
