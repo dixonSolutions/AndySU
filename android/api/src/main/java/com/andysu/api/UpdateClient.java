@@ -14,8 +14,23 @@ public interface UpdateClient {
     /** Check now (and download/apply according to the configured mode). */
     void checkNow();
 
-    /** Apply a staged update now: live if the payload supports it, otherwise by restarting. */
+    /**
+     * Apply a staged update now: live if the payload supports it, otherwise by restarting. From
+     * Host API level 4, a live swap that the app's {@link LiveSwapHandler} declined (or that a
+     * running trial blocks) is not forced through by a restart: the release stays staged and the
+     * status carries {@code "live":"declined"} (or {@code "trial"}).
+     */
     void applyNow();
+
+    /**
+     * Apply the staged update in this process if it can be, and never restart. Returns
+     * {@code "swapped"}, {@code "declined"} (the app's handler said not now), {@code "trial"} (the
+     * running release is still being confirmed), {@code "not_live"} (it can only apply by a
+     * restart or at the next start) or {@code "none"} (nothing staged). Any thread.
+     *
+     * <p>Host API level 4. Check {@link HostApi#apiLevel()} first.</p>
+     */
+    String applyLive();
 
     /** Restart into the newest staged or committed payload. */
     void restartNow();

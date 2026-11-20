@@ -376,3 +376,24 @@ payloads; record fallback commits as unconfirmed, retain the previous slot even 
 and roll back after `max_boot_attempts` crash markers until the payload explicitly reports health.
 Older state files have no health provenance and are left unchanged. In payload signal mode a native
 handler that replaces the host handler without chaining can still prevent marker creation.
+
+## D36. Live apply never relaunches; Host API level 4 `UpdateClient.applyLive()` (2026-11-20)
+Godnotic's owner pressed Apply live and the app closed. Two host paths turn a live apply into a
+relaunch: `applyNow()` restarts whenever `applyLive()` returns false, including when the app's
+`LiveSwapHandler` declined (the app said "not now"), and `onStaged` with `live_fallback =
+"restart"` relaunches while the player is in the app. Now:
+- `UpdateClient.applyLive()` (level 4, any thread) applies in-process if it can and never restarts;
+  it answers `swapped`, `declined`, `trial`, `not_live` or `none`.
+- `applyNow()` restarts only for a release that cannot be swapped (`not_live`); a declined or
+  trial-blocked swap stays staged and the status carries `"live":"declined"` / `"trial"`.
+- A `live_fallback` restart while an activity is resumed waits until the app is in the background.
+The decisions are `ApplyDecision` (unit tested). If level 4 is already taken by another branch
+(apply-at-next-start requests), renumber this one to 5.
+
+In-process Java reload stays out of transparent mode: the app's Application, activities and
+services are instantiated by the system from the class loader `instantiateClassLoader` returned
+for the process, and Java-loaded native libraries are bound to it. A new generation's Java could
+only run in new component instances from a new class loader, with uniquely renamed copies of every
+Java-loaded library (a second SDL), i.e. a restart of everything but the process. Apps that can run
+new native code under the previous Java code (Godnotic's engine, checked by its own `java_abi`)
+swap that part themselves and leave the Java part to the next start.
